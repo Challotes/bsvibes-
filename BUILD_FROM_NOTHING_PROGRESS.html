@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build From Nothing - Progress Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.7;
+      color: #1a1a1a;
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #fff;
+    }
+    
+    h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.4rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e5e5e5; padding-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    p { margin-bottom: 1rem; }
+    
+    .subtitle { font-size: 1.1rem; color: #666; margin-bottom: 2rem; }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    
+    .stat-box {
+      background: #f8f8f8;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-number { font-size: 1.8rem; font-weight: 700; }
+    .stat-label { font-size: 0.8rem; color: #666; margin-top: 0.25rem; }
+    .stat-done { color: #22c55e; }
+    .stat-progress { color: #3b82f6; }
+    .stat-planned { color: #a1a1aa; }
+    
+    .task-list { margin: 1rem 0; }
+    
+    .task {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .task:last-child { border-bottom: none; }
+    
+    .task-status {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: white;
+    }
+    
+    .status-done { background: #22c55e; }
+    .status-progress { background: #3b82f6; }
+    .status-planned { background: #e5e5e5; }
+    
+    .task-content { flex: 1; }
+    .task-title { font-weight: 500; font-size: 0.95rem; }
+    .task-desc { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+    
+    .highlight-box {
+      background: #f8f8f8;
+      border-left: 4px solid #000;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .success-box {
+      background: #f0fff4;
+      border-left: 4px solid #22c55e;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+    
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    th { background: #f8f8f8; font-weight: 600; }
+    
+    .footer {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 2px solid #e5e5e5;
+      text-align: center;
+      color: #666;
+    }
+    
+    @media print {
+      body { padding: 20px; }
+    }
+    
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 Build From Nothing — Progress</h1>
+  <p class="subtitle">Development tracker • Started March 12, 2026</p>
+
+  <div class="stats">
+    <div class="stat-box">
+      <div class="stat-number stat-done">8</div>
+      <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number stat-progress">3</div>
+      <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number stat-planned">12</div>
+      <div class="stat-label">Planned</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">51+</div>
+      <div class="stat-label">Total Prompts</div>
+    </div>
+  </div>
+
+  <h2>Phase 1: Foundation ✅</h2>
+  
+  <div class="task-list">
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Project setup (Next.js + TypeScript + Tailwind)</div>
+        <div class="task-desc">Created bopen.ai project with modern stack</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">SQLite database with posts table</div>
+        <div class="task-desc">better-sqlite3, WAL mode, auto-migration for schema changes</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">BSV identity system</div>
+        <div class="task-desc">Auto-generated keypairs, anon names, WIF storage in localStorage</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Post creation with cryptographic signing</div>
+        <div class="task-desc">ECDSA signatures via @bsv/sdk, proof of authorship</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Minimal GPT-style UI</div>
+        <div class="task-desc">Dark theme, centered layout, post box + feed</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Key backup system</div>
+        <div class="task-desc">Copy to clipboard + download JSON backup file</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Claude Code terminal integration</div>
+        <div class="task-desc">bOpen.ai agent consultation for BSV + security decisions</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-done">✓</div>
+      <div class="task-content">
+        <div class="task-title">Documentation (Vision, Identity, Prompts, Security)</div>
+        <div class="task-desc">Shareable HTML documents for all key decisions</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Phase 2: Security Hardening 🔄</h2>
+  
+  <div class="task-list">
+    <div class="task">
+      <div class="task-status status-progress">→</div>
+      <div class="task-content">
+        <div class="task-title">Server-side signature verification</div>
+        <div class="task-desc">Verify post signatures on server — prevent impersonation</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-progress">→</div>
+      <div class="task-content">
+        <div class="task-title">Rate limiting</div>
+        <div class="task-desc">Per-address + per-IP limits to prevent spam</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-progress">→</div>
+      <div class="task-content">
+        <div class="task-title">PIN/passphrase encryption for localStorage</div>
+        <div class="task-desc">AES-256 encrypt key when user chooses to "keep their name"</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Hide WIF from DOM</div>
+        <div class="task-desc">Don't display raw private key in page — use download-only approach</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">CSP headers enhancement</div>
+        <div class="task-desc">Content Security Policy to prevent XSS attacks</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Phase 3: On-Chain Integration 📋</h2>
+  
+  <div class="task-list">
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">OP_RETURN posting (server-funded)</div>
+        <div class="task-desc">Log posts to BSV blockchain, server pays ~0.00001 BSV per post</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Transaction ID storage</div>
+        <div class="task-desc">Store tx_id with each post for on-chain verification</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Self-funded posting</div>
+        <div class="task-desc">Check user UTXOs, auto-switch between server and user-funded</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Phase 4: Platform Features 📋</h2>
+  
+  <div class="task-list">
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">WebAuthn passkey wrapping</div>
+        <div class="task-desc">Biometric protection for keys (Face ID / fingerprint)</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Daily posting limits + funding</div>
+        <div class="task-desc">5 free posts/day, QR code to fund address for more</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Fairness agent (v1)</div>
+        <div class="task-desc">Basic contribution tracking — timing, frequency, engagement</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Revenue distribution</div>
+        <div class="task-desc">Fairness agent determines share, auto-distribute BSV</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Phase 5: The Recursive Model 📋</h2>
+  
+  <div class="task-list">
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Post → Project spawning</div>
+        <div class="task-desc">Any idea can become its own "Build From Nothing" project</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Template system</div>
+        <div class="task-desc">Reusable setup for new BFN instances</div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="task-status status-planned">○</div>
+      <div class="task-content">
+        <div class="task-title">Yours Wallet integration</div>
+        <div class="task-desc">@1sat/connect for power users who want full wallet</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Tech Stack</h2>
+  
+  <table>
+    <tr>
+      <th>Technology</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td>Next.js 16 (App Router)</td>
+      <td>Framework</td>
+    </tr>
+    <tr>
+      <td>TypeScript</td>
+      <td>Type safety</td>
+    </tr>
+    <tr>
+      <td>Tailwind CSS v4</td>
+      <td>Styling</td>
+    </tr>
+    <tr>
+      <td>SQLite (better-sqlite3)</td>
+      <td>Local database</td>
+    </tr>
+    <tr>
+      <td>@bsv/sdk</td>
+      <td>BSV blockchain (keys, signing)</td>
+    </tr>
+    <tr>
+      <td>Claude Code (bOpen.ai)</td>
+      <td>AI agent consultation</td>
+    </tr>
+    <tr>
+      <td>Cursor IDE</td>
+      <td>Development environment</td>
+    </tr>
+  </table>
+
+  <div class="success-box">
+    <p><strong>Current status:</strong> Phase 1 complete. The core board is live on localhost with BSV identity, cryptographic signing, and key backup. Phase 2 security hardening is next.</p>
+  </div>
+
+  <div class="footer">
+    <p><strong>🌱 Build From Nothing</strong></p>
+    <p>Progress Tracker • Last updated March 14, 2026</p>
+  </div>
+</body>
+</html>
+
+
+
