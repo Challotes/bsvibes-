@@ -1,5 +1,5 @@
 /**
- * BSV identity management for Build From Nothing.
+ * BSV identity management for BSVibes.
  * Auto-generates a keypair on first visit.
  * Private key never leaves the browser.
  */

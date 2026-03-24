@@ -17,6 +17,17 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bootboard (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    boosted_by TEXT NOT NULL,
+    booted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    held_until TEXT,
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+  )
+`);
+
 // Migrate: add columns if they don't exist yet
 const columns = db.prepare("PRAGMA table_info(posts)").all() as { name: string }[];
 const columnNames = columns.map(c => c.name);
