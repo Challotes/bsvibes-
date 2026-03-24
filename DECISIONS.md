@@ -4,8 +4,9 @@
 
 ## Naming
 
-- **Project name:** BS Vibes (was "Build From Nothing" — name is changing)
-- **bOpen.ai** is the toolkit, not the product
+- **Project name:** BSVibes (formerly "Build From Nothing" — renamed 2026-03-23)
+- **Subtitle:** Agentic Fairness — fairness enforced by autonomous AI agents, not committees
+- **bOpen.ai** is the toolkit, not the product. "created with bopen.ai" shown in UI
 - **User-facing language:** Never say "key", "wallet", "WIF", "private key" in the UI
   - "save your key" → "keep your name"
   - "fund your address" → "deposit slot"
@@ -63,10 +64,38 @@
 - Server-side enforcement (pubkey + IP + session token), not chain-only
 - Optional: proof-of-work for free posts
 
+## Bootboard (settled)
+
+- **Mechanic:** Any post can be "booted" to a spotlight slot by paying a fee. Someone else pays, you get booted off
+- **Boot count:** Tracked per post — shows how many times a post has been featured
+- **Revenue model:** Built into the UX, not bolted on. Creates natural urgency and competition
+- **Animations:** Shake + glow + slide-in on holder change. Expandable history
+- **Boot icon:** Uses 🥾 emoji (custom SVG attempted, reverted to emoji for clarity at small sizes)
+
+## Agent Chat (settled)
+
+- **No API cost:** Knowledge base is a static set of Q&A pairs with keyword matching
+- **Upgrade path:** Same UI can swap keyword matching for Claude API call later
+- **Location:** Triggered from post box area, opens as centered modal with backdrop blur
+
+## Genesis Section (settled)
+
+- **Founding conversation** preserved at top of feed as immutable record
+- **Visited state** persisted in localStorage — shows full "Genesis" pill first visit, discreet chevron after
+- **Fairness agent tie-in:** This is the starting point for contribution tracking
+
+## Agentic Fairness (settled direction)
+
+- **Phase 1:** Human-defined parameters, AI executes (current target)
+- **Phase 2:** AI suggests parameter changes, humans approve
+- **Phase 3:** AI adjusts within bounds, humans can override
+- **Phase 4:** Fully agentic, humans only intervene on disputes
+- The name describes the vision, not just today's implementation
+
 ## Tech Stack (settled)
 
 - Next.js 16 + TypeScript + Tailwind v4 + SQLite + BSV
-- GPT-style minimal dark UI
+- Telegram/X/GPT hybrid UI — feed-first, dark theme, pinned compose
 - Server components by default, client only when needed
 - Dynamic imports for @bsv/sdk
 

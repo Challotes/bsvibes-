@@ -2,6 +2,19 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-24 — BSVibes UI Overhaul & Bootboard
+
+- Renamed project from "Build From Nothing" to BSVibes across all source files
+- Built Telegram-style feed layout with scroll-to-bottom, unread count badge (IntersectionObserver), hidden scrollbars
+- Created Bootboard feature: pay-to-spotlight any post, boot counter, live timer, shake/glow/slide animations, expandable history
+- Added Genesis section preserving the founding conversation (Feb 2026), with localStorage-persisted visited state and header-centered navigation
+- Built agent chat with keyword-matched Q&A (11 knowledge entries, modal overlay, zero API cost)
+- Added voice-to-text mic button (Web Speech API), enter-to-post with auto-refocus
+- Identity bar refactored to compact header chip with dropdown
+- Established "Agentic Fairness" as the subtitle/philosophy — progressive autonomy from human-set parameters to fully agentic
+- Added "created with bopen.ai" attribution
+- Updated all context files (CLAUDE.md, ROADMAP.md, DECISIONS.md)
+
 ## 2026-03-19 — Memory System & AI-Native Docs
 
 - Reviewed and expanded memory system (was 2 files, now 6)

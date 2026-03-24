@@ -7,6 +7,7 @@ import { bootPost } from './actions';
 import { useIdentity } from '@/hooks/useIdentity';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { Genesis } from './Genesis';
+import { IdentityChip } from './IdentityBar';
 
 interface Post {
   id: number;
@@ -83,6 +84,15 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [isAtTop, setIsAtTop] = useState(false);
   const [genesisVisited, setGenesisVisited] = useState(false);
+  const [genesisHydrated, setGenesisHydrated] = useState(false);
+
+  // Hydrate from localStorage after mount
+  useEffect(() => {
+    if (localStorage.getItem('bsvibes_genesis_visited') === '1') {
+      setGenesisVisited(true);
+    }
+    setGenesisHydrated(true);
+  }, []);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevCountRef = useRef(posts.length);
 
@@ -105,7 +115,10 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
       setIsAtBottom(atBottom);
       const atTop = el.scrollTop < 80;
       setIsAtTop(atTop);
-      if (atTop) setGenesisVisited(true);
+      if (atTop && !genesisVisited) {
+        setGenesisVisited(true);
+        localStorage.setItem('bsvibes_genesis_visited', '1');
+      }
       if (atBottom) setUnreadCount(0);
     }
 
@@ -171,33 +184,52 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
   const chronological = useMemo(() => [...posts].reverse(), [posts]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-57px)]">
-      {/* Pinned Genesis button — top center */}
-      {!isAtTop && (
-        <div className="shrink-0 flex justify-center">
-          {genesisVisited ? (
-            <button
-              onClick={scrollToGenesis}
-              className="relative z-30 py-1 px-3 hover:text-amber-400 transition-colors"
-              title="Back to Genesis"
-            >
-              <svg width="16" height="8" viewBox="0 0 16 8" fill="none" className="text-zinc-700 hover:text-amber-400/60">
-                <path d="M1 7l7-5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          ) : (
-            <button
-              onClick={scrollToGenesis}
-              className="relative -mb-4 z-30 flex items-center gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-amber-400">
-                <path d="M8 13V3m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Genesis
-            </button>
-          )}
+    <div className="flex flex-col h-screen">
+      {/* Header */}
+      <header className="shrink-0 border-b border-zinc-800 bg-black/80 backdrop-blur-md">
+        <div className="relative mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight leading-none"><span className="text-amber-400">BS</span>Vibes</h1>
+            <p className="text-[10px] text-zinc-600 tracking-wide">Agentic Fairness</p>
+          </div>
+
+          {/* Genesis button — center of header */}
+          <div className="absolute left-1/2 -translate-x-1/2">
+            {genesisHydrated && !isAtTop && (
+              genesisVisited ? (
+                <button
+                  onClick={scrollToGenesis}
+                  className="hover:text-amber-400 transition-colors"
+                  title="Back to Genesis"
+                >
+                  <svg width="16" height="8" viewBox="0 0 16 8" fill="none" className="text-zinc-700 hover:text-amber-400/60">
+                    <path d="M1 7l7-5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={scrollToGenesis}
+                  className="flex items-center gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-amber-400">
+                    <path d="M8 13V3m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Genesis
+                </button>
+              )
+            )}
+          </div>
+
+          <IdentityChip />
         </div>
-      )}
+      </header>
+
+      {/* Pinned bootboard — top */}
+      <div className="shrink-0">
+        <div className="mx-auto max-w-2xl px-4 pt-2 pb-1">
+          <Bootboard data={bootboard} />
+        </div>
+      </div>
 
       {/* Scrollable posts area */}
       <div
@@ -282,9 +314,13 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
 
       {/* Pinned bottom — seamless, no footer look */}
       <div className="shrink-0">
-        <div className="mx-auto max-w-2xl px-4 pb-4 pt-2 space-y-4">
+        <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
           <PostForm />
-          <Bootboard data={bootboard} />
+          <div className="flex justify-center mt-1">
+            <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
+              created with bopen.ai
+            </a>
+          </div>
         </div>
       </div>
     </div>

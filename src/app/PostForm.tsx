@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, useEffect } from 'react';
 import { useIdentity } from '@/hooks/useIdentity';
 import { createPost } from './actions';
+import { AgentChat } from './AgentChat';
 
 export function PostForm(): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
@@ -141,7 +142,10 @@ export function PostForm(): React.JSX.Element {
           </svg>
         </button>
       </div>
-      <p className="text-[11px] text-zinc-600 mt-1 ml-1">Enter to post, Shift+Enter for new line</p>
+      <div className="flex items-center justify-between mt-1 ml-1 mr-1">
+        <p className="text-[11px] text-zinc-600">Enter to post, Shift+Enter for new line</p>
+        <AgentChat />
+      </div>
     </form>
   );
 }

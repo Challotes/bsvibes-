@@ -1,17 +1,18 @@
-# BS Vibes (formerly "Build From Nothing") — AI Context File
+# BSVibes — AI Context File
 
 > **If you're an AI reading this:** This file is your onboarding. Read it fully before writing any code.
 > After completing significant work, update the relevant context files (DIRECTION.md, DECISIONS.md, ROADMAP.md) with what you changed and why.
 
 ## What This Is
 
-A platform that starts from nothing — just a post board — and evolves based on user contributions. Every post is logged on-chain (BSV). A fairness agent tracks contributions. Eventually, any idea can spawn into its own project with the same model.
+A platform that builds itself. It started as a post board and evolves based on user contributions. Every post is logged on-chain (BSV). An Agentic Fairness system tracks contributions and distributes value. Eventually, any idea can spawn into its own project with the same model.
 
 **Tagline:** "A platform that builds itself, then lets anyone do the same."
+**Subtitle:** Agentic Fairness
 
 ## Toolkit
 
-This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). bOpen is the tooling, not the product. The product is BS Vibes.
+This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). bOpen is the tooling, not the product. The product is BSVibes.
 
 ## Architecture
 
@@ -19,20 +20,25 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - **Database:** SQLite (better-sqlite3) for local dev, file: `local.db`
 - **Blockchain:** BSV via `@bsv/sdk` — keypair generation, signing, on-chain logging
 - **Identity:** Auto-generated BSV keypair stored in browser localStorage
-- **Styling:** Dark theme (zinc/black palette), GPT-style minimal UI
+- **Styling:** Dark theme (zinc/black palette), Telegram/X/GPT hybrid UI
 
 ## Key Files
 
-- `src/app/page.tsx` — Main board page (server component, fetches posts)
-- `src/app/PostForm.tsx` — Client component for posting ideas
-- `src/app/IdentityBar.tsx` — Shows identity, key backup options
-- `src/app/actions.ts` — Server actions (createPost, getPosts)
+- `src/app/page.tsx` — Main entry (server component, fetches posts + bootboard)
+- `src/app/Feed.tsx` — Client component: scrollable feed, header, pinned sections, scroll tracking
+- `src/app/PostForm.tsx` — Compose box with enter-to-post, voice-to-text mic, agent chat trigger
+- `src/app/IdentityBar.tsx` — Identity chip in header with dropdown key backup
+- `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
+- `src/app/Genesis.tsx` — Founding conversation display (collapsible, at top of feed)
+- `src/app/AgentChat.tsx` — Knowledge-based Q&A agent (modal, keyword-matched answers)
+- `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost)
+- `src/data/genesis.ts` — Genesis conversation data (founding messages)
+- `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
+- `src/components/icons/BootIcon.tsx` — Boot emoji icon component
 - `src/hooks/useIdentity.ts` — React hook for identity management
 - `src/services/bsv/identity.ts` — BSV keypair generation & signing
-- `src/lib/db.ts` — SQLite database setup with auto-migration
-- `src/lib/utils.ts` — cn() helper (clsx + tailwind-merge)
-- `src/components/ui/` — Reusable UI components (Button, Card, Input)
-- `src/types/index.ts` — Shared TypeScript types
+- `src/lib/db.ts` — SQLite database setup with auto-migration (posts + bootboard tables)
+- `src/types/speech.d.ts` — SpeechRecognition API TypeScript types
 
 ## Coding Standards
 

@@ -45,7 +45,7 @@ function LiveTimer({ since }: { since: string }) {
     return () => clearInterval(id);
   }, [since]);
 
-  return <span className="font-mono text-amber-400">{formatDuration(elapsed)}</span>;
+  return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
 }
 
 export function Bootboard({ data }: { data: BootboardData }) {
@@ -53,6 +53,7 @@ export function Bootboard({ data }: { data: BootboardData }) {
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);
   const [slideIn, setSlideIn] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const prevIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -78,62 +79,78 @@ export function Bootboard({ data }: { data: BootboardData }) {
 
   return (
     <div
-      className={`rounded-xl border bg-amber-500/5 p-4 transition-all duration-300 ${
+      className={`rounded-xl border bg-amber-500/5 px-3 py-2.5 transition-all duration-300 ${
         glowing
           ? 'border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
           : 'border-amber-500/30'
       } ${shaking ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <BootIcon size={20} filled className="text-amber-400" />
-        <span className="text-amber-400 text-sm font-semibold tracking-wide uppercase">Bootboard</span>
-      </div>
-
       {current ? (
-        <div>
-          <div
-            className={`rounded-lg border border-amber-500/20 bg-black/40 px-4 py-3 transition-all duration-300 ${
-              slideIn ? 'animate-[slideUp_0.4s_ease-out]' : ''
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-amber-300">{current.author_name}</span>
-                {current.signature && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Signed" />
-                )}
-                <span>·</span>
-                <span>booted by <span className="text-zinc-400">{current.boosted_by}</span></span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                <LiveTimer since={current.booted_at} />
-              </div>
+        <div className={slideIn ? 'animate-[slideUp_0.4s_ease-out]' : ''}>
+          {/* Meta line — label + author + timer + expand toggle */}
+          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <BootIcon size={14} filled className="text-amber-400" />
+              <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
+              <span className="text-zinc-700">·</span>
+              <span className="font-medium text-amber-300">{current.author_name}</span>
+              {current.signature && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Signed" />
+              )}
             </div>
-            <p className="text-[15px] leading-relaxed text-zinc-100 whitespace-pre-wrap break-all">
-              {current.content}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <LiveTimer since={current.booted_at} />
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="text-zinc-600 hover:text-zinc-400 transition-colors ml-1"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                >
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
-          {history.length > 0 && (
-            <div className="mt-3 space-y-1">
-              <p className="text-xs text-zinc-600 mb-1">Recently booted</p>
-              {history.slice(0, 3).map((h, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-zinc-600">
-                  <span className="text-zinc-500">{h.author_name}</span>
-                  <span>·</span>
-                  <span>held for {formatDuration(h.duration_seconds)}</span>
-                  <span>·</span>
-                  <span className="truncate max-w-[200px]">{h.content}</span>
+          {/* Content */}
+          <p className="text-sm leading-snug text-zinc-100 whitespace-pre-wrap break-all">
+            {current.content}
+          </p>
+
+          {/* Expanded: history */}
+          {expanded && (
+            <div className="animate-[slideUp_0.2s_ease-out] mt-2 pt-2 border-t border-zinc-800/40">
+              <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1">
+                <span>booted by {current.boosted_by}</span>
+              </div>
+              {history.length > 0 && (
+                <div className="space-y-0.5">
+                  {history.slice(0, 3).map((h, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px] text-zinc-600">
+                      <span className="text-zinc-500">{h.author_name}</span>
+                      <span>·</span>
+                      <span>held for {formatDuration(h.duration_seconds)}</span>
+                      <span>·</span>
+                      <span className="truncate max-w-[180px]">{h.content}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
       ) : (
-        <div className="text-center py-3">
-          <p className="text-sm text-zinc-500">No one on the bootboard yet.</p>
-          <p className="text-xs text-zinc-600 mt-1">Boost any post to claim the spotlight.</p>
+        <div className="flex items-center gap-2 text-xs">
+          <BootIcon size={14} filled className="text-amber-400" />
+          <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
+          <span className="text-zinc-700">·</span>
+          <span className="text-zinc-600">Boost any post to claim the spotlight</span>
         </div>
       )}
     </div>

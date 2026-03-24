@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-03-19
+> Last updated: 2026-03-24
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -13,6 +13,22 @@
 - [x] Minimal GPT-style dark UI (centered layout, post box + feed)
 - [x] Key backup system (copy to clipboard + download JSON)
 - [x] Documentation (Vision, Identity, Security discussions)
+
+## Phase 1.5: UI Overhaul & Bootboard — COMPLETE
+
+- [x] Renamed project to BSVibes (from "Build From Nothing")
+- [x] Telegram-style feed layout (newest at bottom, scroll-to-bottom with unread count)
+- [x] Bootboard feature (pay-to-spotlight, boot counter per post, live timer)
+- [x] Bootboard animations (shake, glow, slide-in on holder change)
+- [x] Compact bootboard with expandable history
+- [x] Genesis section (founding conversation, collapsible, persisted visited state)
+- [x] Identity chip in header (replaces full identity bar)
+- [x] Enter-to-post with auto-refocus after posting
+- [x] Voice-to-text microphone button (Web Speech API)
+- [x] Agent chat (keyword-matched Q&A, modal overlay, no API cost)
+- [x] Hidden scrollbars, word-break for long content
+- [x] "Agentic Fairness" subtitle in header
+- [x] "created with bopen.ai" attribution
 
 ## Phase 2: Security Hardening — IN PROGRESS
 
