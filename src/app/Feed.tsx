@@ -31,6 +31,7 @@ interface BootboardData {
     signature: string | null;
   } | null;
   history: {
+    post_id: number;
     boosted_by: string;
     booted_at: string;
     held_until: string;
@@ -66,19 +67,23 @@ function BootButton({ postId, bootCount }: { postId: number; bootCount: number }
   }
 
   return (
-    <button
-      onClick={handleBoot}
-      disabled={isPending || !identity}
-      className="flex items-center w-10 justify-end gap-1 text-[11px] transition-all disabled:opacity-30 disabled:cursor-not-allowed sm:hover:scale-110 text-zinc-600 hover:text-amber-400 sm:opacity-0 sm:group-hover:opacity-100"
-      title="Boot to the board"
-    >
-      {isPending ? '...' : (
-        <>
-          {bootCount > 0 && <span className="text-amber-500/70">{bootCount}</span>}
-          <BootIcon size={16} className={bootCount > 0 ? 'text-amber-500' : ''} />
-        </>
+    <div className="flex flex-col items-center">
+      <button
+        onClick={handleBoot}
+        disabled={isPending || !identity}
+        className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
+          bootCount > 0
+            ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
+            : 'text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50'
+        }`}
+        title="Boot to the board"
+      >
+        {isPending ? <span className="text-[11px]">...</span> : <BootIcon size={13} className={bootCount > 0 ? 'text-amber-500' : ''} />}
+      </button>
+      {bootCount > 0 && (
+        <span className="text-[9px] text-zinc-600 mt-0.5">{bootCount}</span>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -267,22 +272,26 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
                 }}
                 className="py-3.5 group"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <span className="font-medium text-zinc-300">
-                      {post.author_name}
-                    </span>
-                    {post.signature && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
-                    )}
-                    <span>·</span>
-                    <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-xs text-zinc-500">
+                      <span className="font-medium text-zinc-300">
+                        {post.author_name}
+                      </span>
+                      {post.signature && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
+                      )}
+                      <span>·</span>
+                      <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
+                    </div>
+                    <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-all">
+                      {post.content}
+                    </p>
                   </div>
-                  <BootButton postId={post.id} bootCount={post.boot_count} />
+                  <div className="shrink-0 self-center">
+                    <BootButton postId={post.id} bootCount={post.boot_count} />
+                  </div>
                 </div>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-all">
-                  {post.content}
-                </p>
               </article>
             ))}
           </div>

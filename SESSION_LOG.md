@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Boot Button UX & Bootboard History
+
+- Boot button redesigned: oval pill with border, vertically centered right of each post, count below
+- Bootboard history now scrollable (up to 50 entries) in compact 120px area
+- Reboot button added to history rows — boot icon left of author name, click to reboot any past post
+- History query returns post_id for reboot functionality
+
 ## 2026-03-25 — Agent Chat AI & Mobile Polish
 
 - Upgraded agent chat from keyword matching to Claude Haiku 4.5 API (~$0.001/question)

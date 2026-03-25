@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useTransition } from 'react';
 import { BootIcon } from '@/components/icons/BootIcon';
+import { bootPost } from './actions';
+import { useIdentity } from '@/hooks/useIdentity';
 
 interface BootboardData {
   current: {
@@ -14,6 +16,7 @@ interface BootboardData {
     signature: string | null;
   } | null;
   history: {
+    post_id: number;
     boosted_by: string;
     booted_at: string;
     held_until: string;
@@ -46,6 +49,36 @@ function LiveTimer({ since }: { since: string }) {
   }, [since]);
 
   return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
+}
+
+function HistoryRow({ entry }: { entry: BootboardData['history'][0] }) {
+  const { identity } = useIdentity();
+  const [isPending, startTransition] = useTransition();
+
+  function handleReboot() {
+    if (!identity) return;
+    startTransition(async () => {
+      await bootPost(entry.post_id, identity.name);
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-[11px] text-zinc-600 py-0.5">
+      <button
+        onClick={handleReboot}
+        disabled={isPending || !identity}
+        className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50`}
+        title="Reboot this post"
+      >
+        {isPending ? <span className="text-[10px]">...</span> : <BootIcon size={11} />}
+      </button>
+      <span className="text-zinc-500 shrink-0">{entry.author_name}</span>
+      <span className="shrink-0">·</span>
+      <span className="shrink-0">{formatDuration(entry.duration_seconds)}</span>
+      <span className="shrink-0">·</span>
+      <span className="truncate">{entry.content}</span>
+    </div>
+  );
 }
 
 export function Bootboard({ data }: { data: BootboardData }) {
@@ -123,22 +156,16 @@ export function Bootboard({ data }: { data: BootboardData }) {
             {current.content}
           </p>
 
-          {/* Expanded: history */}
+          {/* Expanded: scrollable history with reboot */}
           {expanded && (
             <div className="animate-[slideUp_0.2s_ease-out] mt-2 pt-2 border-t border-zinc-800/40">
-              <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1">
+              <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1.5">
                 <span>booted by {current.boosted_by}</span>
               </div>
               {history.length > 0 && (
-                <div className="space-y-0.5">
-                  {history.slice(0, 3).map((h, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[11px] text-zinc-600">
-                      <span className="text-zinc-500">{h.author_name}</span>
-                      <span>·</span>
-                      <span>held for {formatDuration(h.duration_seconds)}</span>
-                      <span>·</span>
-                      <span className="truncate max-w-[180px]">{h.content}</span>
-                    </div>
+                <div className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
+                  {history.map((h, i) => (
+                    <HistoryRow key={i} entry={h} />
                   ))}
                 </div>
               )}

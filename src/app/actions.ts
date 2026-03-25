@@ -70,6 +70,7 @@ interface BootboardRow {
 }
 
 interface BootboardHistoryRow {
+  post_id: number;
   boosted_by: string;
   booted_at: string;
   held_until: string;
@@ -93,14 +94,14 @@ export async function getBootboard(): Promise<{
   `).get() as BootboardRow | undefined;
 
   const history = db.prepare(`
-    SELECT b.boosted_by, b.booted_at, b.held_until,
+    SELECT b.post_id, b.boosted_by, b.booted_at, b.held_until,
       CAST((julianday(b.held_until) - julianday(b.booted_at)) * 86400 AS INTEGER) as duration_seconds,
       p.content, p.author_name
     FROM bootboard b
     JOIN posts p ON p.id = b.post_id
     WHERE b.held_until IS NOT NULL
     ORDER BY b.held_until DESC
-    LIMIT 5
+    LIMIT 50
   `).all() as BootboardHistoryRow[];
 
   const stats = db.prepare(`

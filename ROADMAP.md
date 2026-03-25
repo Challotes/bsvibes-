@@ -30,6 +30,8 @@
 - [x] Hidden scrollbars, word-break for long content
 - [x] "Agentic Fairness" subtitle in header
 - [x] "created with bopen.ai" attribution
+- [x] Boot button UX: oval pill, vertically centered right of post, count below
+- [x] Scrollable bootboard history with reboot buttons (up to 50 entries)
 
 ## Phase 2: Security Hardening — IN PROGRESS
 
