@@ -25,7 +25,8 @@
 - [x] Identity chip in header (replaces full identity bar)
 - [x] Enter-to-post with auto-refocus after posting
 - [x] Voice-to-text microphone button (Web Speech API)
-- [x] Agent chat (keyword-matched Q&A, modal overlay, no API cost)
+- [x] Agent chat (Claude Haiku API, full project context, modal overlay)
+- [x] Telegram-style post button (mic when empty, send arrow when typing)
 - [x] Hidden scrollbars, word-break for long content
 - [x] "Agentic Fairness" subtitle in header
 - [x] "created with bopen.ai" attribution

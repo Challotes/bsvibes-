@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { findAnswer } from '@/data/agent-knowledge';
+import { useState, useRef, useEffect, useTransition } from 'react';
+import { askAgent } from './agent-action';
 
 interface Message {
   from: 'user' | 'agent';
@@ -19,6 +19,7 @@ export function AgentChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [isPending, startTransition] = useTransition();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,12 +38,10 @@ export function AgentChat() {
 
   useEffect(() => {
     if (open) {
-      // Small delay to let the modal render before focusing
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -54,20 +53,20 @@ export function AgentChat() {
 
   function ask(question: string) {
     const userMsg: Message = { from: 'user', text: question };
-    const match = findAnswer(question);
-    const agentMsg: Message = {
-      from: 'agent',
-      text: match
-        ? match.answer
-        : "I don't know that yet. Post your question to the feed — the community might have the answer, and it'll be tracked as a contribution.",
-    };
-    setMessages((prev) => [...prev, userMsg, agentMsg]);
+    const thinking: Message = { from: 'agent', text: '...' };
+    const newMessages = [...messages, userMsg];
+    setMessages([...newMessages, thinking]);
     setInput('');
+
+    startTransition(async () => {
+      const reply = await askAgent(newMessages.filter(m => m.text !== '...'));
+      setMessages([...newMessages, { from: 'agent', text: reply }]);
+    });
   }
 
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isPending) return;
     ask(input.trim());
   }
 
@@ -131,7 +130,7 @@ export function AgentChat() {
                     msg.from === 'agent'
                       ? 'bg-zinc-900 text-zinc-300'
                       : 'bg-amber-500/10 border border-amber-500/20 text-amber-200'
-                  }`}
+                  } ${msg.text === '...' ? 'animate-pulse' : ''}`}
                 >
                   {msg.text}
                 </div>
@@ -147,7 +146,8 @@ export function AgentChat() {
                 <button
                   key={q}
                   onClick={() => ask(q)}
-                  className="text-xs text-zinc-500 border border-zinc-800 rounded-full px-3 py-1.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
+                  disabled={isPending}
+                  className="text-xs text-zinc-500 border border-zinc-800 rounded-full px-3 py-1.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-50"
                 >
                   {q}
                 </button>
@@ -163,8 +163,9 @@ export function AgentChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handleSubmit(e); } }}
-              placeholder="Ask something..."
-              className="w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+              placeholder={isPending ? 'Thinking...' : 'Ask something...'}
+              disabled={isPending}
+              className="w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
             />
           </div>
         </div>

@@ -74,9 +74,11 @@
 
 ## Agent Chat (settled)
 
-- **No API cost:** Knowledge base is a static set of Q&A pairs with keyword matching
-- **Upgrade path:** Same UI can swap keyword matching for Claude API call later
+- **AI-powered:** Uses Claude Haiku 4.5 via Anthropic API with full project context as system prompt
+- **Cost:** ~$0.001 per question (~25,000 questions per $25 credits)
+- **Fallback:** Static keyword-matched knowledge base still exists in `src/data/agent-knowledge.ts` if API is unavailable
 - **Location:** Triggered from post box area, opens as centered modal with backdrop blur
+- **Post button:** Telegram-style — mic icon when empty, amber send arrow when text is present
 
 ## Genesis Section (settled)
 

@@ -2,6 +2,16 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Agent Chat AI & Mobile Polish
+
+- Upgraded agent chat from keyword matching to Claude Haiku 4.5 API (~$0.001/question)
+- Telegram-style post button: mic when empty, amber send arrow when typing
+- Unified boot button: single component, fixed width, number left of icon
+- Mobile fixes: responsive padding, visible post button, boot button always shown, sheet-style agent modal
+- Fixed identity dropdown opacity (solid header bg)
+- Bootboard visual refinement: gradient bg, fade edge, more breathing room
+- Removed debug logging from agent action
+
 ## 2026-03-24 — BSVibes UI Overhaul & Bootboard
 
 - Renamed project from "Build From Nothing" to BSVibes across all source files

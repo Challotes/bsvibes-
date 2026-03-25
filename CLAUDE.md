@@ -30,7 +30,8 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/IdentityBar.tsx` — Identity chip in header with dropdown key backup
 - `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
 - `src/app/Genesis.tsx` — Founding conversation display (collapsible, at top of feed)
-- `src/app/AgentChat.tsx` — Knowledge-based Q&A agent (modal, keyword-matched answers)
+- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, Claude Haiku API)
+- `src/app/agent-action.ts` — Server action for agent chat (Claude API call with project context)
 - `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost)
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
