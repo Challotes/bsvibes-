@@ -85,6 +85,15 @@
 - **Founding conversation** preserved at top of feed as immutable record
 - **Visited state** persisted in localStorage — shows full "Genesis" pill first visit, discreet chevron after
 - **Fairness agent tie-in:** This is the starting point for contribution tracking
+- **NOT collapsible — by design.** Genesis is feed content, not a UI widget. It lives at the top of the scroll area. Users discover it by scrolling up (via the Genesis button), not by toggling a panel. Do not add a collapse/expand toggle.
+
+## Feed UX Model (settled)
+
+- **Telegram-style:** User enters at the most recent post (bottom of feed). Feed grows upward.
+- **Unread tracking:** When user leaves and returns, new posts accumulate. Unread counter badge shows on the scroll-to-bottom button. IntersectionObserver marks posts as read when they scroll into view.
+- **Navigation:** Scroll-to-bottom button (with unread count) and genesis chevron (scroll to top) are the two navigation anchors. Users explore the full history by scrolling between them.
+- **Mobile enter-to-post:** The Telegram-style mic→arrow toggle on the compose button is the primary affordance. The "Enter to post" text hint is desktop-only — this is intentional, not a bug. Mobile users tap the amber arrow.
+- **No collapse, no accordion, no "read more" gates** on any feed content. The feed is a continuous scroll.
 
 ## Agentic Fairness (settled direction)
 
