@@ -23,16 +23,45 @@ export function useFeedPolling({
   const [bootboard, setBootboard] = useState<BootboardData>(initialBootboard)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFetchingRef = useRef(false)
+  // Tracks the highest post id we have seen — null means first poll hasn't run yet
+  const latestIdRef = useRef<number | null>(
+    initialPosts.length > 0 ? initialPosts[0].id : null
+  )
 
   const fetchFeed = useCallback(async () => {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     try {
-      const res = await fetch('/api/posts', { cache: 'no-store' })
+      const latestId = latestIdRef.current
+      const url =
+        latestId !== null
+          ? `/api/posts?since_id=${latestId}`
+          : '/api/posts'
+
+      const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) return
       const data: FeedPollingResult = await res.json()
-      setPosts(data.posts)
+
       setBootboard(data.bootboard)
+
+      if (data.posts.length === 0) {
+        // No new posts — nothing to merge
+        return
+      }
+
+      if (latestId === null) {
+        // First incremental poll — replace the full set
+        setPosts(data.posts)
+      } else {
+        // Prepend new posts (they arrive newest-first from the API)
+        setPosts(prev => [...data.posts, ...prev])
+      }
+
+      // data.posts is ordered DESC, so index 0 is the newest
+      const newMax = data.posts[0].id
+      if (latestIdRef.current === null || newMax > latestIdRef.current) {
+        latestIdRef.current = newMax
+      }
     } catch {
       // Silently ignore network errors — stale data is fine
     } finally {

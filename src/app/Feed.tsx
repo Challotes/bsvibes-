@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useTransition } from 'react';
 import { Bootboard } from './Bootboard';
 import { PostForm } from './PostForm';
 import { Header } from './Header';
@@ -8,7 +8,9 @@ import { PostList } from './PostList';
 import { IdentityProvider } from '@/contexts/IdentityContext';
 import { useScrollTracker } from '@/hooks/useScrollTracker';
 import { useFeedPolling } from '@/hooks/useFeedPolling';
+import { getOlderPosts } from './actions';
 import type { Post, BootboardData } from '@/types';
+import { timeAgo } from '@/lib/utils';
 
 // A post that was added optimistically before the server confirms it.
 interface OptimisticPost {
@@ -16,16 +18,6 @@ interface OptimisticPost {
   content: string;
   author_name: string;
   created_at: string;
-}
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return 'just now';
 }
 
 // Remove an optimistic post if a confirmed server post with matching content +
@@ -56,6 +48,9 @@ export function Feed({
   });
 
   const [optimisticPosts, setOptimisticPosts] = useState<OptimisticPost[]>([]);
+  const [olderPosts, setOlderPosts] = useState<Post[]>([]);
+  const [hasMore, setHasMore] = useState(initialPosts.length === 100);
+  const [isLoadingMore, startLoadingMore] = useTransition();
 
   // Prune confirmed posts on every render — no extra effect needed.
   const pendingOptimistic = useMemo(
@@ -75,7 +70,23 @@ export function Feed({
     ]);
   }, []);
 
-  const chronological = useMemo(() => [...serverPosts].reverse(), [serverPosts]);
+  const handleLoadEarlier = useCallback(() => {
+    // Oldest post is either the last in olderPosts, or the last in chronological.
+    const allSoFar = [...serverPosts, ...olderPosts];
+    const oldestId = allSoFar[allSoFar.length - 1]?.id;
+    if (!oldestId) return;
+    startLoadingMore(async () => {
+      const older = await getOlderPosts(oldestId);
+      setOlderPosts((prev) => [...prev, ...older]);
+      setHasMore(older.length === 100);
+    });
+  }, [serverPosts, olderPosts]);
+
+  // chronological = newest-first server posts reversed to oldest-first, then older pages appended.
+  const chronological = useMemo(
+    () => [...[...serverPosts].reverse(), ...olderPosts],
+    [serverPosts, olderPosts]
+  );
   const postIds = useMemo(() => serverPosts.map((p) => p.id), [serverPosts]);
 
   const {
@@ -121,6 +132,9 @@ export function Feed({
             genesisRef={genesisRef}
             bottomRef={bottomRef}
             observerRef={observerRef}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadEarlier={handleLoadEarlier}
           />
 
           {/* Optimistic posts — appear at the bottom (newest) while pending */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 
 const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
@@ -16,11 +16,24 @@ export function IdentityChip(): React.JSX.Element | null {
   const [revealed, setRevealed] = useState(false);
   // null = not yet hydrated (avoid SSR mismatch)
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Hydrate from localStorage after mount
   useEffect(() => {
     setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   if (isLoading || !identity) return null;
 
@@ -64,7 +77,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const showWarningDot = backedUp === false;
 
   return (
-    <div className="relative">
+    <div ref={dropdownRef} className="relative">
       <button
         onClick={handleOpen}
         className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"

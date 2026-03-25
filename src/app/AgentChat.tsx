@@ -22,6 +22,7 @@ export function AgentChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef(messages);
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -51,6 +52,8 @@ export function AgentChat() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   // Clean up any in-flight stream on unmount
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
@@ -59,7 +62,7 @@ export function AgentChat() {
   const ask = useCallback(async function ask(question: string) {
     const userMsg: Message = { from: 'user', text: question };
     const thinking: Message = { from: 'agent', text: '...' };
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messagesRef.current, userMsg];
     setMessages([...newMessages, thinking]);
     setInput('');
     setIsStreaming(true);
@@ -118,7 +121,7 @@ export function AgentChat() {
     } finally {
       setIsStreaming(false);
     }
-  }, [messages]);
+  }, []);
 
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();

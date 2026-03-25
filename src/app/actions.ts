@@ -73,6 +73,18 @@ export async function getPosts(beforeId?: number): Promise<Post[]> {
   `).all() as Post[];
 }
 
+export async function getNewPosts(sinceId: number): Promise<Post[]> {
+  if (!Number.isInteger(sinceId) || sinceId < 0) return [];
+  return db.prepare(`
+    SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
+    FROM posts p
+    LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
+      ON bc.post_id = p.id
+    WHERE p.id > ?
+    ORDER BY p.id DESC
+  `).all(sinceId) as Post[];
+}
+
 export async function getOlderPosts(beforeId: number): Promise<Post[]> {
   if (!Number.isInteger(beforeId) || beforeId <= 0) return [];
   return getPosts(beforeId);

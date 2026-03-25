@@ -1,8 +1,4 @@
-'use server';
-
-import { rateLimit } from '@/lib/rate-limit';
-
-const SYSTEM_PROMPT = `You are the BSVibes agent — a helpful, knowledgeable assistant embedded in the BSVibes platform. You speak casually but with authority. Keep answers concise (2-4 sentences max unless asked for detail).
+export const AGENT_SYSTEM_PROMPT = `You are the BSVibes agent — a helpful, knowledgeable assistant embedded in the BSVibes platform. You speak casually but with authority. Keep answers concise (2-4 sentences max unless asked for detail).
 
 Here's everything you know:
 
@@ -38,51 +34,3 @@ Built with Next.js, TypeScript, Tailwind, SQLite. Created with bopen.ai toolkit.
 BSV payment integration for the bootboard, fairness agent going live, ability for any post to spawn into its own project, security upgrades for identity.
 
 If someone asks something you don't know about, say so honestly and suggest they post the question to the feed.`;
-
-export async function askAgent(messages: { from: string; text: string }[]): Promise<string> {
-  // 10 calls per minute, global key — callers are anonymous so we can't do better here.
-  const rl = rateLimit('askAgent:global', { limit: 10, windowMs: 60_000 });
-  if (!rl.success) return "Too many questions — try again in a moment.";
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return "Agent is offline — no API key configured.";
-
-  // Cap to last 20 messages and limit content length
-  const cappedMessages = messages.slice(-20);
-
-  const apiMessages = cappedMessages
-    .filter(m => m.from === 'user' || m.from === 'agent')
-    .map(m => ({
-      role: m.from === 'user' ? 'user' as const : 'assistant' as const,
-      content: m.text.slice(0, 2000),
-    }));
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        system: SYSTEM_PROMPT,
-        messages: apiMessages,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('Agent API error:', err);
-      return "Agent had a hiccup — try again in a moment.";
-    }
-
-    const data = await res.json();
-    return data.content?.[0]?.text || "I'm not sure how to answer that.";
-  } catch (e) {
-    console.error('Agent error:', e);
-    return "Couldn't reach the agent right now.";
-  }
-}
