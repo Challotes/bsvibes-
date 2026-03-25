@@ -11,6 +11,7 @@ export function PostForm(): React.JSX.Element {
   const [isPending, startTransition] = useTransition();
   const [isListening, setIsListening] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  const [justPosted, setJustPosted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { identity, sign } = useIdentityContext();
 
@@ -48,6 +49,8 @@ export function PostForm(): React.JSX.Element {
       await createPost(formData);
       formRef.current?.reset();
       setHasContent(false);
+      setJustPosted(true);
+      setTimeout(() => setJustPosted(false), 1500);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
         textareaRef.current.focus();
@@ -112,12 +115,18 @@ export function PostForm(): React.JSX.Element {
           ref={textareaRef}
           name="content"
           aria-label="Share an idea"
-          placeholder="Share an idea..."
+          placeholder={!identity ? 'Setting up your identity...' : 'Share an idea...'}
           autoFocus
           maxLength={1000}
           disabled={isPending || !identity}
           onKeyDown={handleKeyDown}
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none focus:border-zinc-700 placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide"
+          className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide transition-colors duration-300 ${
+            justPosted
+              ? 'border-green-600/60 focus:border-green-600/60'
+              : !identity
+              ? 'border-zinc-800 animate-pulse'
+              : 'border-zinc-800 focus:border-zinc-700'
+          }`}
           style={{ scrollbarWidth: 'none' }}
           rows={1}
           onInput={(e) => {
@@ -160,7 +169,15 @@ export function PostForm(): React.JSX.Element {
         )}
       </div>
       <div className="flex items-center justify-between mt-1 ml-1 mr-1">
-        <p className="text-[11px] text-zinc-600 hidden sm:block">Enter to post, Shift+Enter for new line</p>
+        <div className="hidden sm:flex items-center gap-2">
+          <p className="text-[11px] text-zinc-600">Enter to post, Shift+Enter for new line</p>
+          <span
+            className={`text-[11px] text-green-500 transition-opacity duration-300 ${justPosted ? 'opacity-100' : 'opacity-0'}`}
+            aria-live="polite"
+          >
+            Posted
+          </span>
+        </div>
         <p className="text-[11px] text-zinc-600 sm:hidden">&nbsp;</p>
         <AgentChat />
       </div>

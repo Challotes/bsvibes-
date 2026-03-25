@@ -32,8 +32,10 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/IdentityBar.tsx` — Identity chip with dropdown, WIF masked by default with reveal toggle
 - `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
 - `src/app/Genesis.tsx` — Founding conversation display (collapsible, at top of feed)
-- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, Claude Haiku API)
-- `src/app/agent-action.ts` — Server action for agent chat (Claude API, input capped at 20 msgs / 2000 chars)
+- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent)
+- `src/app/agent-action.ts` — Server action for agent chat (legacy, kept for backward compat)
+- `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
+- `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
 - `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load for all components)

@@ -73,11 +73,27 @@ export async function getIdentity(): Promise<Identity | null> {
   const name = oldName ?? generateAnonName();
   const wif = key.toWif();
 
+  // Re-read localStorage before writing — another tab may have raced and written first
+  const raceCheck = getStoredIdentity();
+  if (raceCheck) {
+    return { name: raceCheck.name, address: raceCheck.address, wif: raceCheck.wif };
+  }
+
   const store: StoredIdentity = { wif, name, address };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch (err) {
+    console.warn('BSVibes: could not persist identity to localStorage (private mode or storage full). Identity is valid for this session only.', err);
+  }
 
   // Clean up old key
-  if (oldName) localStorage.removeItem(OLD_IDENTITY_KEY);
+  if (oldName) {
+    try {
+      localStorage.removeItem(OLD_IDENTITY_KEY);
+    } catch {
+      // Non-critical — ignore
+    }
+  }
 
   return { name, address, wif };
 }

@@ -35,8 +35,8 @@
 
 ## Phase 2: Security Hardening — IN PROGRESS
 
-- [ ] Server-side signature verification (prevent impersonation)
-- [ ] Rate limiting (per-address + per-IP)
+- [x] Server-side signature verification (ECDSA verify via @bsv/sdk, rejects invalid sigs)
+- [x] Rate limiting (in-memory sliding window: 10 posts/min, 5 boots/min, 10 agent calls/min)
 - [x] Hide WIF from DOM (masked by default, reveal toggle, copy/download still work)
 - [x] JSON.parse try/catch in identity.ts (corrupted storage returns null instead of crash)
 - [x] CSP headers (Content-Security-Policy, HSTS, Permissions-Policy added)
@@ -44,6 +44,16 @@
 - [x] Foreign key enforcement enabled in SQLite
 - [x] Agent chat input capped (20 messages, 2000 chars each)
 - [x] Error boundary added (error.tsx)
+- [x] Identity dropdown language fixed (removed "key" from UI copy)
+- [x] localStorage error handling (try/catch on setItem, graceful degradation in private browsing)
+- [x] BSV SDK import failure handling (catch in useIdentity, sets error state instead of infinite loading)
+- [x] Multi-tab identity race condition (re-check storage after async key generation)
+- [x] DB init error handling (try/catch with descriptive error messages)
+- [x] LiveTimer negative time guard (clock skew protection)
+- [x] Post success feedback (green flash + "Posted" indicator)
+- [x] Agent chat discoverable ("Ask AI" pill button replaces hidden text)
+- [x] Identity loading state (dynamic placeholder + pulse animation)
+- [x] Streaming agent responses (SSE via /api/agent route, progressive text display)
 - [ ] Rename UI labels ("keep your name" not "save your key")
 
 ## Phase 3: On-Chain Integration — PLANNED

@@ -20,7 +20,7 @@ function LiveTimer({ since }: { since: string }) {
   useEffect(() => {
     const start = new Date(since + 'Z').getTime();
     function tick() {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
+      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     }
     tick();
     const id = setInterval(tick, 1000);

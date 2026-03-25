@@ -14,10 +14,15 @@ export function useIdentity(): UseIdentityReturn {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getIdentity().then((id) => {
-      setIdentity(id);
-      setIsLoading(false);
-    });
+    getIdentity()
+      .then((id) => {
+        setIdentity(id);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error('BSVibes: failed to load identity (BSV SDK may not have loaded)', err);
+        setIsLoading(false);
+      });
   }, []);
 
   const sign = useCallback(async (content: string) => {

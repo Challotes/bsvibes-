@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useTransition } from 'react';
-import { askAgent } from './agent-action';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface Message {
   from: 'user' | 'agent';
@@ -19,9 +18,10 @@ export function AgentChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [isPending, startTransition] = useTransition();
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -51,22 +51,78 @@ export function AgentChat() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
-  function ask(question: string) {
+  // Clean up any in-flight stream on unmount
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
+  const ask = useCallback(async function ask(question: string) {
     const userMsg: Message = { from: 'user', text: question };
     const thinking: Message = { from: 'agent', text: '...' };
     const newMessages = [...messages, userMsg];
     setMessages([...newMessages, thinking]);
     setInput('');
+    setIsStreaming(true);
 
-    startTransition(async () => {
-      const reply = await askAgent(newMessages.filter(m => m.text !== '...'));
-      setMessages([...newMessages, { from: 'agent', text: reply }]);
-    });
-  }
+    // Abort any previous stream
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.filter(m => m.text !== '...'),
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        setMessages([...newMessages, { from: 'agent', text: errorText || 'Agent had a hiccup — try again in a moment.' }]);
+        setIsStreaming(false);
+        return;
+      }
+
+      if (!res.body) {
+        setMessages([...newMessages, { from: 'agent', text: "Couldn't reach the agent right now." }]);
+        setIsStreaming(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        // Update the last message with accumulated text
+        const text = accumulated;
+        setMessages([...newMessages, { from: 'agent', text }]);
+      }
+
+      // Final update (ensure last chunk is flushed)
+      if (accumulated) {
+        setMessages([...newMessages, { from: 'agent', text: accumulated }]);
+      } else {
+        setMessages([...newMessages, { from: 'agent', text: "I'm not sure how to answer that." }]);
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      console.error('Agent stream error:', e);
+      setMessages([...newMessages, { from: 'agent', text: "Couldn't reach the agent right now." }]);
+    } finally {
+      setIsStreaming(false);
+    }
+  }, [messages]);
 
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
-    if (!input.trim() || isPending) return;
+    if (!input.trim() || isStreaming) return;
     ask(input.trim());
   }
 
@@ -74,10 +130,10 @@ export function AgentChat() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors mt-2"
+        className="flex items-center gap-1.5 text-xs text-zinc-400 border border-zinc-800 rounded-full px-2.5 py-1 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900 transition-colors mt-1"
       >
-        <span className="w-2 h-2 rounded-full bg-cyan-500/60 animate-pulse" />
-        Ask the agent
+        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 animate-pulse flex-shrink-0" />
+        Ask AI
       </button>
     );
   }
@@ -146,7 +202,7 @@ export function AgentChat() {
                 <button
                   key={q}
                   onClick={() => ask(q)}
-                  disabled={isPending}
+                  disabled={isStreaming}
                   className="text-xs text-zinc-500 border border-zinc-800 rounded-full px-3 py-1.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-50"
                 >
                   {q}
@@ -163,8 +219,8 @@ export function AgentChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handleSubmit(e); } }}
-              placeholder={isPending ? 'Thinking...' : 'Ask something...'}
-              disabled={isPending}
+              placeholder={isStreaming ? 'Thinking...' : 'Ask something...'}
+              disabled={isStreaming}
               className="w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
             />
           </div>

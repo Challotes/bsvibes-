@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { generateAnonName } from '@/lib/utils';
+import { rateLimit } from '@/lib/rate-limit';
+import { PublicKey, Signature } from '@bsv/sdk';
 import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
 export async function createPost(formData: FormData): Promise<void> {
@@ -15,8 +17,27 @@ export async function createPost(formData: FormData): Promise<void> {
     ? author
     : generateAnonName();
 
+  // 10 posts per minute per author.
+  const rl = rateLimit(`createPost:${authorName}`, { limit: 10, windowMs: 60_000 });
+  if (!rl.success) return;
+
   const signature = formData.get('signature');
   const pubkey = formData.get('pubkey');
+
+  // Verify signature server-side if both signature and pubkey are present.
+  // Unsigned posts are still allowed (signature/pubkey will be null).
+  if (typeof signature === 'string' && typeof pubkey === 'string') {
+    try {
+      const messageBytes = Array.from(new TextEncoder().encode(content.trim()));
+      const verified = PublicKey.fromString(pubkey).verify(
+        messageBytes,
+        Signature.fromDER(signature, 'hex'),
+      );
+      if (!verified) return; // Signature invalid — reject post
+    } catch {
+      return; // Malformed signature or pubkey — reject post
+    }
+  }
 
   db.prepare(
     'INSERT INTO posts (content, author_name, signature, pubkey) VALUES (?, ?, ?, ?)'
@@ -79,6 +100,10 @@ export async function bootPost(postId: number, boostedBy: string): Promise<{ pro
     boostedBy.length > 20 ||
     !/^anon_[a-z0-9]{4}$/.test(boostedBy)
   ) return { processingMs: 0 };
+
+  // 5 boots per minute per caller.
+  const rl = rateLimit(`bootPost:${boostedBy}`, { limit: 5, windowMs: 60_000 });
+  if (!rl.success) return { processingMs: 0 };
 
   const processingMs = db.transaction(() => {
     // Validate postId exists

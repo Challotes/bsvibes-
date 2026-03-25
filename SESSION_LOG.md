@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Security, Error Handling, UX & Streaming Sprint
+
+- Server-side ECDSA signature verification added (rejects invalid/malformed sigs, unsigned posts still allowed)
+- In-memory sliding window rate limiting on createPost (10/min), bootPost (5/min), askAgent (10/min global)
+- localStorage write failure handling (graceful degradation in private browsing/Safari)
+- BSV SDK import failure handling (catch sets error state instead of infinite loading spinner)
+- Multi-tab identity race condition fixed (re-checks storage after async key generation)
+- DB init wrapped in try/catch with descriptive error messages
+- Post success feedback (green border flash + "Posted" text with auto-fade)
+- "Ask AI" pill button replaces near-invisible text link for agent chat
+- Identity loading state (dynamic placeholder + pulse animation while generating)
+- Streaming agent responses via /api/agent SSE route (text appears progressively)
+- LiveTimer negative time guard, identity dropdown language fix ("key" removed)
+
 ## 2026-03-25 — Agent Team Review & 18-Item Fix Sprint
 
 - Dispatched 5 specialist agents (Architecture, Design, Next.js, Agent/AI, Security) to review the entire codebase

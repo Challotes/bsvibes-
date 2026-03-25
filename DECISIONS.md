@@ -111,8 +111,8 @@
 
 | # | Issue | Severity | Status |
 |---|-------|----------|--------|
-| 1 | Server never verifies signatures | Critical | TODO |
-| 2 | No rate limiting | Critical | TODO |
+| 1 | Server never verifies signatures | Critical | FIXED (2026-03-25) — ECDSA verification via @bsv/sdk |
+| 2 | No rate limiting | Critical | FIXED (2026-03-25) — in-memory sliding window per-author |
 | 3 | WIF displayed raw in DOM | High | FIXED (2026-03-25) — masked by default, reveal toggle |
 | 4 | Backup file contains raw WIF | High | TODO |
 | 5 | JSON.parse without try/catch | Medium | FIXED (2026-03-25) — returns null on parse failure |

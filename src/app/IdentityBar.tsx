@@ -53,7 +53,7 @@ export function IdentityChip(): React.JSX.Element | null {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 p-3 border border-zinc-800 rounded-xl shadow-2xl z-50" style={{ backgroundColor: '#18181b' }}>
           <p className="text-sm text-zinc-400 mb-2">
-            This key proves you wrote your posts. Save it somewhere safe.
+            This is your identity. Save it somewhere safe — if you lose it, your posts can't be linked back to you.
           </p>
           <div className="bg-zinc-800 rounded-lg px-3 py-2 font-mono text-xs text-zinc-300 break-all mb-2">
             {revealed ? identity.wif : maskWif(identity.wif)}

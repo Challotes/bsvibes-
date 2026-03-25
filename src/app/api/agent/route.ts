@@ -1,5 +1,3 @@
-'use server';
-
 import { rateLimit } from '@/lib/rate-limit';
 
 const SYSTEM_PROMPT = `You are the BSVibes agent — a helpful, knowledgeable assistant embedded in the BSVibes platform. You speak casually but with authority. Keep answers concise (2-4 sentences max unless asked for detail).
@@ -39,21 +37,38 @@ BSV payment integration for the bootboard, fairness agent going live, ability fo
 
 If someone asks something you don't know about, say so honestly and suggest they post the question to the feed.`;
 
-export async function askAgent(messages: { from: string; text: string }[]): Promise<string> {
-  // 10 calls per minute, global key — callers are anonymous so we can't do better here.
-  const rl = rateLimit('askAgent:global', { limit: 10, windowMs: 60_000 });
-  if (!rl.success) return "Too many questions — try again in a moment.";
+export async function POST(req: Request) {
+  // Validate input
+  let body: { messages?: { from: string; text: string }[] };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response('Invalid JSON', { status: 400 });
+  }
+
+  const { messages } = body;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response('Messages required', { status: 400 });
+  }
+
+  // Rate limit (use a generic key since we don't have user identity in route handlers)
+  const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
+  const rl = rateLimit(`agent:${ip}`, { limit: 30, windowMs: 60_000 });
+  if (!rl.success) {
+    return new Response('Slow down — too many questions.', { status: 429 });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return "Agent is offline — no API key configured.";
+  if (!apiKey) {
+    return new Response('Agent is offline — no API key configured.', { status: 503 });
+  }
 
   // Cap to last 20 messages and limit content length
   const cappedMessages = messages.slice(-20);
-
   const apiMessages = cappedMessages
     .filter(m => m.from === 'user' || m.from === 'agent')
     .map(m => ({
-      role: m.from === 'user' ? 'user' as const : 'assistant' as const,
+      role: m.from === 'user' ? ('user' as const) : ('assistant' as const),
       content: m.text.slice(0, 2000),
     }));
 
@@ -70,19 +85,72 @@ export async function askAgent(messages: { from: string; text: string }[]): Prom
         max_tokens: 300,
         system: SYSTEM_PROMPT,
         messages: apiMessages,
+        stream: true,
       }),
     });
 
-    if (!res.ok) {
+    if (!res.ok || !res.body) {
       const err = await res.text();
       console.error('Agent API error:', err);
-      return "Agent had a hiccup — try again in a moment.";
+      return new Response('Agent had a hiccup — try again in a moment.', { status: 502 });
     }
 
-    const data = await res.json();
-    return data.content?.[0]?.text || "I'm not sure how to answer that.";
+    // Transform the Anthropic SSE stream into plain text chunks
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        let buffer = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete SSE lines
+            const lines = buffer.split('\n');
+            // Keep the last potentially incomplete line in the buffer
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (
+                  parsed.type === 'content_block_delta' &&
+                  parsed.delta?.type === 'text_delta' &&
+                  parsed.delta.text
+                ) {
+                  controller.enqueue(new TextEncoder().encode(parsed.delta.text));
+                }
+              } catch {
+                // Skip malformed JSON lines
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Stream processing error:', e);
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Transfer-Encoding': 'chunked',
+      },
+    });
   } catch (e) {
     console.error('Agent error:', e);
-    return "Couldn't reach the agent right now.";
+    return new Response("Couldn't reach the agent right now.", { status: 502 });
   }
 }
