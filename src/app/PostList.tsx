@@ -1,9 +1,9 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
-import { bootPost } from './actions';
+import { bootPost, getOlderPosts } from './actions';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { Genesis } from './Genesis';
 
@@ -63,11 +63,39 @@ interface PostListProps {
   observerRef: React.RefObject<IntersectionObserver | null>;
 }
 
-export function PostList({ posts, genesisRef, bottomRef, observerRef }: PostListProps) {
+const PAGE_SIZE = 100;
+
+export function PostList({ posts: initialPosts, genesisRef, bottomRef, observerRef }: PostListProps) {
+  const [posts, setPosts] = useState<Post[]>(initialPosts);
+  const [hasMore, setHasMore] = useState(initialPosts.length === PAGE_SIZE);
+  const [isPending, startTransition] = useTransition();
+
+  function handleLoadEarlier() {
+    const oldestId = posts[posts.length - 1]?.id;
+    if (!oldestId) return;
+    startTransition(async () => {
+      const older = await getOlderPosts(oldestId);
+      setPosts((prev) => [...prev, ...older]);
+      setHasMore(older.length === PAGE_SIZE);
+    });
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
       <div ref={genesisRef} />
       <Genesis />
+
+      {hasMore && (
+        <div className="flex justify-center py-4">
+          <button
+            onClick={handleLoadEarlier}
+            disabled={isPending}
+            className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-1.5 rounded border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50"
+          >
+            {isPending ? 'Loading...' : 'Load earlier posts'}
+          </button>
+        </div>
+      )}
 
       {posts.length === 0 && (
         <p className="py-16 text-center text-sm text-zinc-600">

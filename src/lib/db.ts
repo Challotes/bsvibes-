@@ -4,7 +4,7 @@ import path from 'path';
 let db: ReturnType<typeof Database>;
 
 try {
-  db = new Database(path.join(process.cwd(), 'local.db'));
+  db = new Database(process.env.DATABASE_PATH || path.join(process.cwd(), 'local.db'));
 } catch (err) {
   throw new Error(`BSVibes DB: failed to open local.db — ${err instanceof Error ? err.message : String(err)}`);
 }

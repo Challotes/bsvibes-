@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Real-Time Feed, Optimistic Posts & Identity Warning
+
+- Added `/api/posts` GET endpoint (returns posts + bootboard as JSON, dynamic/no-cache)
+- Created `useFeedPolling` hook: polls every 5s, pauses when tab is hidden, resumes on visibilitychange
+- Feed.tsx wired to polling hook — server-rendered initial data stays fresh without any page reload
+- Optimistic UI: post appears immediately after submit with spinner + 50% opacity; auto-pruned when polling confirms it
+- Identity chip now shows an amber pulsing dot (like a notification badge) until user opens the dropdown for the first time; stored in localStorage as `bsvibes_identity_backed_up`
+
 ## 2026-03-25 — Security, Error Handling, UX & Streaming Sprint
 
 - Server-side ECDSA signature verification added (rejects invalid/malformed sigs, unsigned posts still allowed)

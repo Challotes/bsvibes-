@@ -5,7 +5,11 @@ import { useIdentityContext } from '@/contexts/IdentityContext';
 import { createPost } from './actions';
 import { AgentChat } from './AgentChat';
 
-export function PostForm(): React.JSX.Element {
+interface PostFormProps {
+  onPostCreated?: (content: string, author: string) => void;
+}
+
+export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -47,6 +51,7 @@ export function PostForm(): React.JSX.Element {
       }
 
       await createPost(formData);
+      onPostCreated?.(content.trim(), identity.name);
       formRef.current?.reset();
       setHasContent(false);
       setJustPosted(true);

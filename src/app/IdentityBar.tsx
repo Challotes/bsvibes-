@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
+
+const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
 
 function maskWif(wif: string): string {
   return `\u2022\u2022\u2022\u2022\u2022\u2022${wif.slice(-4)}`;
@@ -12,8 +14,25 @@ export function IdentityChip(): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  // null = not yet hydrated (avoid SSR mismatch)
+  const [backedUp, setBackedUp] = useState<boolean | null>(null);
+
+  // Hydrate from localStorage after mount
+  useEffect(() => {
+    setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
+  }, []);
 
   if (isLoading || !identity) return null;
+
+  function handleOpen(): void {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    // First time the dropdown is opened — mark as backed-up-aware
+    if (nextOpen && !backedUp) {
+      localStorage.setItem(BACKED_UP_KEY, '1');
+      setBackedUp(true);
+    }
+  }
 
   function handleCopy(): void {
     if (!identity) return;
@@ -40,14 +59,26 @@ export function IdentityChip(): React.JSX.Element | null {
     URL.revokeObjectURL(url);
   }
 
+  // Show the amber dot only once we've hydrated and the user hasn't opened the
+  // dropdown yet.
+  const showWarningDot = backedUp === false;
+
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
+        onClick={handleOpen}
+        className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
       >
         <span className="w-2 h-2 rounded-full bg-emerald-500" />
         <span className="text-zinc-300">{identity.name}</span>
+
+        {/* Amber dot — nudges user to save their identity at least once */}
+        {showWarningDot && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+          </span>
+        )}
       </button>
 
       {open && (

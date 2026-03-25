@@ -33,6 +33,12 @@
 - [x] Boot button UX: oval pill, vertically centered right of post, count below
 - [x] Scrollable bootboard history with reboot buttons (up to 50 entries)
 
+## Phase 1.6: Real-Time & UX — COMPLETE
+
+- [x] Real-time feed polling (GET /api/posts every 5s, pauses when tab hidden, resumes on visibility)
+- [x] Optimistic UI on posting (post appears immediately with spinner + reduced opacity, auto-removed when server confirms)
+- [x] Identity loss warning dot (amber pulsing dot on identity chip until user opens dropdown for first time)
+
 ## Phase 2: Security Hardening — IN PROGRESS
 
 - [x] Server-side signature verification (ECDSA verify via @bsv/sdk, rejects invalid sigs)

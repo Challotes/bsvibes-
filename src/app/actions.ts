@@ -51,15 +51,31 @@ export async function createPost(formData: FormData): Promise<void> {
   revalidatePath('/');
 }
 
-export async function getPosts(): Promise<Post[]> {
+export async function getPosts(beforeId?: number): Promise<Post[]> {
+  if (beforeId !== undefined) {
+    return db.prepare(`
+      SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
+      FROM posts p
+      LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
+        ON bc.post_id = p.id
+      WHERE p.id < ?
+      ORDER BY p.id DESC
+      LIMIT 100
+    `).all(beforeId) as Post[];
+  }
   return db.prepare(`
     SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
     FROM posts p
     LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
       ON bc.post_id = p.id
-    ORDER BY p.created_at DESC
+    ORDER BY p.id DESC
     LIMIT 100
   `).all() as Post[];
+}
+
+export async function getOlderPosts(beforeId: number): Promise<Post[]> {
+  if (!Number.isInteger(beforeId) || beforeId <= 0) return [];
+  return getPosts(beforeId);
 }
 
 export async function getBootboard(): Promise<BootboardData> {

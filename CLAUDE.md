@@ -35,12 +35,14 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent)
 - `src/app/agent-action.ts` — Server action for agent chat (legacy, kept for backward compat)
 - `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
+- `src/app/api/posts/route.ts` — Feed polling endpoint (GET, returns posts + bootboard as JSON, dynamic/no-cache)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
 - `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load for all components)
 - `src/hooks/useIdentity.ts` — React hook for identity management (used inside IdentityProvider)
 - `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking, genesis visited state
+- `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s; pauses on hidden tab, resumes on visibility; returns live posts + bootboard
 - `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
 - `src/lib/utils.ts` — Shared utilities (cn, generateAnonName)
 - `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration
