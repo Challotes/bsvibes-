@@ -1,6 +1,10 @@
 import { rateLimit } from '@/lib/rate-limit';
 import { AGENT_SYSTEM_PROMPT } from '@/data/agent-prompt';
 
+// Concurrency limiter — max 3 simultaneous Anthropic requests
+let _activeRequests = 0;
+const MAX_CONCURRENT = 3;
+
 export async function POST(req: Request) {
   // Validate input
   let body: { messages?: { from: string; text: string }[] };
@@ -16,6 +20,11 @@ export async function POST(req: Request) {
   }
 
   // Rate limit (use a generic key since we don't have user identity in route handlers)
+  // Concurrency check — prevent overwhelming the Anthropic API
+  if (_activeRequests >= MAX_CONCURRENT) {
+    return new Response('Agent is busy — try again in a moment.', { status: 429 });
+  }
+
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
   const rl = rateLimit(`agent:${ip}`, { limit: 30, windowMs: 60_000 });
   if (!rl.success) {
@@ -36,6 +45,7 @@ export async function POST(req: Request) {
       content: m.text.slice(0, 2000),
     }));
 
+  _activeRequests++;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -54,6 +64,7 @@ export async function POST(req: Request) {
     });
 
     if (!res.ok || !res.body) {
+      _activeRequests--;
       const err = await res.text();
       console.error('Agent API error:', err);
       return new Response('Agent had a hiccup — try again in a moment.', { status: 502 });
@@ -101,6 +112,7 @@ export async function POST(req: Request) {
         } catch (e) {
           console.error('Stream processing error:', e);
         } finally {
+          _activeRequests--;
           controller.close();
         }
       },
@@ -114,6 +126,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
+    _activeRequests--;
     console.error('Agent error:', e);
     return new Response("Couldn't reach the agent right now.", { status: 502 });
   }

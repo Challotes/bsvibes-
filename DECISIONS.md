@@ -74,10 +74,13 @@
 
 ## Agent Chat (settled)
 
-- **AI-powered:** Uses Claude Haiku 4.5 via Anthropic API with full project context as system prompt
+- **AI-powered:** Uses Claude Haiku 4.5 via Anthropic API with streaming SSE responses
+- **System prompt:** Single source of truth in `src/data/agent-prompt.ts`
+- **Endpoint:** `/api/agent` route handler (POST, streams text chunks)
 - **Cost:** ~$0.001 per question (~25,000 questions per $25 credits)
-- **Fallback:** Static keyword-matched knowledge base still exists in `src/data/agent-knowledge.ts` if API is unavailable
-- **Location:** Triggered from post box area, opens as centered modal with backdrop blur
+- **Rate limiting:** 30 requests/min per IP + max 3 concurrent requests (prevents Anthropic API overload)
+- **Input limits:** Max 20 messages, 2000 chars each per request
+- **Location:** "Ask AI" pill button below compose box, opens as centered modal (bottom sheet on mobile)
 - **Post button:** Telegram-style — mic icon when empty, amber send arrow when text is present
 
 ## Genesis Section (settled)
