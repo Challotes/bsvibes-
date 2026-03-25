@@ -33,11 +33,14 @@
 - [x] Boot button UX: oval pill, vertically centered right of post, count below
 - [x] Scrollable bootboard history with reboot buttons (up to 50 entries)
 
-## Phase 1.6: Real-Time & UX — COMPLETE
+## Phase 1.6: Real-Time, UX & Deployment — COMPLETE
 
 - [x] Real-time feed polling (GET /api/posts every 5s, pauses when tab hidden, resumes on visibility)
 - [x] Optimistic UI on posting (post appears immediately with spinner + reduced opacity, auto-removed when server confirms)
 - [x] Identity loss warning dot (amber pulsing dot on identity chip until user opens dropdown for first time)
+- [x] Cursor-based pagination ("Load earlier posts" button, getOlderPosts server action)
+- [x] PWA manifest + icons (Add to Home Screen on iOS/Android/Desktop)
+- [x] Deployment prep (Railway config, Dockerfile, env var DB path, .env.example)
 
 ## Phase 2: Security Hardening — IN PROGRESS
 

@@ -115,6 +115,11 @@
 - **ISR:** 10-second background revalidation on page.tsx (other users see new posts without manual refresh)
 - **bootPost:** Wrapped in SQLite transaction with input validation (prevents race conditions on concurrent boots)
 - **Foreign keys:** PRAGMA foreign_keys = ON (was decorative before)
+- **Real-time:** Client polls /api/posts every 5s (pauses when tab hidden). Replaces ISR-only approach for live feel
+- **Optimistic UI:** Posts appear instantly in local state, pruned when server confirms via polling
+- **Pagination:** Cursor-based by post ID (not timestamp — IDs are monotonic, no collision risk)
+- **Deployment:** Railway with persistent /data volume for SQLite. Dockerfile as alternative. DB path via DATABASE_PATH env var
+- **PWA:** manifest.json + SVG icon. No service worker / offline support yet — just home screen install
 
 ## Critical Bugs Known
 
