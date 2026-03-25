@@ -30,7 +30,7 @@ function LiveTimer({ since }: { since: string }) {
   return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
 }
 
-function HistoryRow({ entry }: { entry: BootboardData['history'][0] }) {
+function HistoryRow({ entry, onBooted }: { entry: BootboardData['history'][0]; onBooted?: () => void }) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
 
@@ -38,6 +38,7 @@ function HistoryRow({ entry }: { entry: BootboardData['history'][0] }) {
     if (!identity) return;
     startTransition(async () => {
       await bootPost(entry.post_id, identity.name);
+      onBooted?.();
     });
   }
 
@@ -60,7 +61,7 @@ function HistoryRow({ entry }: { entry: BootboardData['history'][0] }) {
   );
 }
 
-export function Bootboard({ data }: { data: BootboardData }) {
+export function Bootboard({ data, onBooted }: { data: BootboardData; onBooted?: () => void }) {
   const { current, history } = data;
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);
@@ -144,7 +145,7 @@ export function Bootboard({ data }: { data: BootboardData }) {
               {history.length > 0 && (
                 <div className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
                   {history.map((h, i) => (
-                    <HistoryRow key={i} entry={h} />
+                    <HistoryRow key={i} entry={h} onBooted={onBooted} />
                   ))}
                 </div>
               )}
