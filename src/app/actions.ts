@@ -2,25 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-
-interface PostRow {
-  id: number;
-  content: string;
-  author_name: string;
-  signature: string | null;
-  pubkey: string | null;
-  tx_id: string | null;
-  created_at: string;
-}
-
-function generateAnonName(): string {
-  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
-  let suffix = '';
-  for (let i = 0; i < 4; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return `anon_${suffix}`;
-}
+import { generateAnonName } from '@/lib/utils';
+import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
 export async function createPost(formData: FormData): Promise<void> {
   const content = formData.get('content');
@@ -47,7 +30,7 @@ export async function createPost(formData: FormData): Promise<void> {
   revalidatePath('/');
 }
 
-export async function getPosts(): Promise<(PostRow & { boot_count: number })[]> {
+export async function getPosts(): Promise<Post[]> {
   return db.prepare(`
     SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
     FROM posts p
@@ -55,35 +38,10 @@ export async function getPosts(): Promise<(PostRow & { boot_count: number })[]> 
       ON bc.post_id = p.id
     ORDER BY p.created_at DESC
     LIMIT 100
-  `).all() as (PostRow & { boot_count: number })[];
+  `).all() as Post[];
 }
 
-interface BootboardRow {
-  id: number;
-  post_id: number;
-  boosted_by: string;
-  booted_at: string;
-  held_until: string | null;
-  content: string;
-  author_name: string;
-  signature: string | null;
-}
-
-interface BootboardHistoryRow {
-  post_id: number;
-  boosted_by: string;
-  booted_at: string;
-  held_until: string;
-  duration_seconds: number;
-  content: string;
-  author_name: string;
-}
-
-export async function getBootboard(): Promise<{
-  current: BootboardRow | null;
-  history: BootboardHistoryRow[];
-  totalBoots: number;
-}> {
+export async function getBootboard(): Promise<BootboardData> {
   const current = db.prepare(`
     SELECT b.*, p.content, p.author_name, p.signature
     FROM bootboard b
@@ -114,18 +72,34 @@ export async function getBootboard(): Promise<{
 export async function bootPost(postId: number, boostedBy: string): Promise<{ processingMs: number }> {
   const start = performance.now();
 
-  // Close out current bootboard holder
-  db.prepare(`
-    UPDATE bootboard SET held_until = datetime('now')
-    WHERE held_until IS NULL
-  `).run();
+  // Input validation
+  if (!Number.isInteger(postId) || postId <= 0) return { processingMs: 0 };
+  if (
+    typeof boostedBy !== 'string' ||
+    boostedBy.length > 20 ||
+    !/^anon_[a-z0-9]{4}$/.test(boostedBy)
+  ) return { processingMs: 0 };
 
-  // New post takes the spot
-  db.prepare(`
-    INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
-  `).run(postId, boostedBy);
+  const processingMs = db.transaction(() => {
+    // Validate postId exists
+    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
+    if (!post) return null;
 
-  const processingMs = Math.round((performance.now() - start) * 100) / 100;
+    // Close out current bootboard holder
+    db.prepare(`
+      UPDATE bootboard SET held_until = datetime('now')
+      WHERE held_until IS NULL
+    `).run();
+
+    // New post takes the spot
+    db.prepare(`
+      INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
+    `).run(postId, boostedBy);
+
+    return Math.round((performance.now() - start) * 100) / 100;
+  })();
+
+  if (processingMs === null) return { processingMs: 0 };
 
   revalidatePath('/');
   return { processingMs };

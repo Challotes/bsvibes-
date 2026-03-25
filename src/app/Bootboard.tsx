@@ -3,29 +3,8 @@
 import { useEffect, useState, useRef, useTransition } from 'react';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
-import { useIdentity } from '@/hooks/useIdentity';
-
-interface BootboardData {
-  current: {
-    id: number;
-    post_id: number;
-    boosted_by: string;
-    booted_at: string;
-    content: string;
-    author_name: string;
-    signature: string | null;
-  } | null;
-  history: {
-    post_id: number;
-    boosted_by: string;
-    booted_at: string;
-    held_until: string;
-    duration_seconds: number;
-    content: string;
-    author_name: string;
-  }[];
-  totalBoots: number;
-}
+import { useIdentityContext } from '@/contexts/IdentityContext';
+import type { BootboardData } from '@/types';
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -52,7 +31,7 @@ function LiveTimer({ since }: { since: string }) {
 }
 
 function HistoryRow({ entry }: { entry: BootboardData['history'][0] }) {
-  const { identity } = useIdentity();
+  const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
 
   function handleReboot() {

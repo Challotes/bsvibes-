@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useIdentity } from '@/hooks/useIdentity';
+import { useIdentityContext } from '@/contexts/IdentityContext';
+
+function maskWif(wif: string): string {
+  return `\u2022\u2022\u2022\u2022\u2022\u2022${wif.slice(-4)}`;
+}
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading } = useIdentity();
+  const { identity, isLoading } = useIdentityContext();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
   if (isLoading || !identity) return null;
 
@@ -51,7 +56,7 @@ export function IdentityChip(): React.JSX.Element | null {
             This key proves you wrote your posts. Save it somewhere safe.
           </p>
           <div className="bg-zinc-800 rounded-lg px-3 py-2 font-mono text-xs text-zinc-300 break-all mb-2">
-            {identity.wif}
+            {revealed ? identity.wif : maskWif(identity.wif)}
           </div>
           <div className="flex gap-2">
             <button
@@ -65,6 +70,12 @@ export function IdentityChip(): React.JSX.Element | null {
               className="bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-700 transition-colors"
             >
               Download
+            </button>
+            <button
+              onClick={() => setRevealed(!revealed)}
+              className="ml-auto bg-zinc-800 text-amber-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-700 hover:text-amber-300 transition-colors"
+            >
+              {revealed ? 'Hide' : 'Reveal'}
             </button>
           </div>
         </div>

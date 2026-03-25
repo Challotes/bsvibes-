@@ -1,335 +1,95 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useTransition, useMemo } from 'react';
-import { PostForm } from './PostForm';
+import { useMemo } from 'react';
 import { Bootboard } from './Bootboard';
-import { bootPost } from './actions';
-import { useIdentity } from '@/hooks/useIdentity';
-import { BootIcon } from '@/components/icons/BootIcon';
-import { Genesis } from './Genesis';
-import { IdentityChip } from './IdentityBar';
-
-interface Post {
-  id: number;
-  content: string;
-  author_name: string;
-  signature: string | null;
-  pubkey: string | null;
-  tx_id: string | null;
-  created_at: string;
-  boot_count: number;
-}
-
-interface BootboardData {
-  current: {
-    id: number;
-    post_id: number;
-    boosted_by: string;
-    booted_at: string;
-    content: string;
-    author_name: string;
-    signature: string | null;
-  } | null;
-  history: {
-    post_id: number;
-    boosted_by: string;
-    booted_at: string;
-    held_until: string;
-    duration_seconds: number;
-    content: string;
-    author_name: string;
-  }[];
-  totalBoots: number;
-}
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr + 'Z').getTime();
-  const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
-
-function BootButton({ postId, bootCount }: { postId: number; bootCount: number }) {
-  const { identity } = useIdentity();
-  const [isPending, startTransition] = useTransition();
-
-  function handleBoot() {
-    if (!identity) return;
-    startTransition(async () => {
-      await bootPost(postId, identity.name);
-    });
-  }
-
-  return (
-    <div className="flex flex-col items-center">
-      <button
-        onClick={handleBoot}
-        disabled={isPending || !identity}
-        className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
-          bootCount > 0
-            ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
-            : 'text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50'
-        }`}
-        title="Boot to the board"
-      >
-        {isPending ? <span className="text-[11px]">...</span> : <BootIcon size={13} className={bootCount > 0 ? 'text-amber-500' : ''} />}
-      </button>
-      {bootCount > 0 && (
-        <span className="text-[9px] text-zinc-600 mt-0.5">{bootCount}</span>
-      )}
-    </div>
-  );
-}
+import { PostForm } from './PostForm';
+import { Header } from './Header';
+import { PostList } from './PostList';
+import { IdentityProvider } from '@/contexts/IdentityContext';
+import { useScrollTracker } from '@/hooks/useScrollTracker';
+import type { Post, BootboardData } from '@/types';
 
 export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: BootboardData }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const genesisRef = useRef<HTMLDivElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [isAtTop, setIsAtTop] = useState(false);
-  const [genesisVisited, setGenesisVisited] = useState(false);
-  const [genesisHydrated, setGenesisHydrated] = useState(false);
-
-  // Hydrate from localStorage after mount
-  useEffect(() => {
-    if (localStorage.getItem('bsvibes_genesis_visited') === '1') {
-      setGenesisVisited(true);
-    }
-    setGenesisHydrated(true);
-  }, []);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const prevCountRef = useRef(posts.length);
-
-  const scrollToGenesis = useCallback(() => {
-    genesisRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setUnreadCount(0);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    function onScroll() {
-      if (!el) return;
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      setIsAtBottom(atBottom);
-      const atTop = el.scrollTop < 80;
-      setIsAtTop(atTop);
-      if (atTop && !genesisVisited) {
-        setGenesisVisited(true);
-        localStorage.setItem('bsvibes_genesis_visited', '1');
-      }
-      if (atBottom) setUnreadCount(0);
-    }
-
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Track unread post IDs
-  const unreadIdsRef = useRef<Set<number>>(new Set());
-
-  useEffect(() => {
-    const newPosts = posts.length - prevCountRef.current;
-    prevCountRef.current = posts.length;
-
-    if (newPosts > 0) {
-      if (isAtBottom) {
-        requestAnimationFrame(() => scrollToBottom());
-      } else {
-        // Mark the newest posts as unread
-        const sorted = [...posts].sort((a, b) => b.id - a.id);
-        for (let i = 0; i < newPosts; i++) {
-          unreadIdsRef.current.add(sorted[i].id);
-        }
-        setUnreadCount(unreadIdsRef.current.size);
-      }
-    }
-  }, [posts.length, isAtBottom, scrollToBottom]);
-
-  // Observer to mark posts as read when they scroll into view
-  const observerRef = useRef<IntersectionObserver | null>(null);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        let changed = false;
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const id = Number(entry.target.getAttribute('data-post-id'));
-            if (unreadIdsRef.current.has(id)) {
-              unreadIdsRef.current.delete(id);
-              changed = true;
-            }
-          }
-        }
-        if (changed) {
-          setUnreadCount(unreadIdsRef.current.size);
-        }
-      },
-      { root: container, threshold: 0.5 }
-    );
-
-    return () => observerRef.current?.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, []);
-
   const chronological = useMemo(() => [...posts].reverse(), [posts]);
+  const postIds = useMemo(() => posts.map((p) => p.id), [posts]);
+
+  const {
+    scrollRef,
+    bottomRef,
+    genesisRef,
+    observerRef,
+    isAtBottom,
+    isAtTop,
+    unreadCount,
+    genesisVisited,
+    genesisHydrated,
+    scrollToBottom,
+    scrollToGenesis,
+  } = useScrollTracker({ postCount: posts.length, postIds });
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="shrink-0 border-b border-zinc-800 bg-black">
-        <div className="relative mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight leading-none"><span className="text-amber-400">BS</span>Vibes</h1>
-            <p className="text-[10px] text-zinc-600 tracking-wide">Agentic Fairness</p>
+    <IdentityProvider>
+      <div className="flex flex-col h-screen">
+        <Header
+          isAtTop={isAtTop}
+          genesisHydrated={genesisHydrated}
+          genesisVisited={genesisVisited}
+          onScrollToGenesis={scrollToGenesis}
+        />
+
+        {/* Pinned bootboard */}
+        <div className="shrink-0 relative">
+          <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
+            <Bootboard data={bootboard} />
           </div>
+          <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
+        </div>
 
-          {/* Genesis button — center of header */}
-          <div className="absolute left-1/2 -translate-x-1/2">
-            {genesisHydrated && !isAtTop && (
-              genesisVisited ? (
-                <button
-                  onClick={scrollToGenesis}
-                  className="hover:text-amber-400 transition-colors"
-                  title="Back to Genesis"
-                >
-                  <svg width="16" height="8" viewBox="0 0 16 8" fill="none" className="text-zinc-700 hover:text-amber-400/60">
-                    <path d="M1 7l7-5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  onClick={scrollToGenesis}
-                  className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-2 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="text-amber-400">
-                    <path d="M8 13V3m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="hidden sm:inline">Genesis</span>
-                  <span className="sm:hidden">Origin</span>
-                </button>
-              )
-            )}
+        {/* Scrollable posts area */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto relative scrollbar-hide"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          <PostList
+            posts={chronological}
+            genesisRef={genesisRef}
+            bottomRef={bottomRef}
+            observerRef={observerRef}
+          />
+        </div>
+
+        {/* Scroll-to-bottom button */}
+        {!isAtBottom && (
+          <div className="shrink-0 flex justify-end mx-auto max-w-2xl px-4">
+            <button
+              onClick={scrollToBottom}
+              className="relative -mb-5 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 border border-zinc-700 shadow-lg hover:bg-zinc-700 transition-colors mr-2"
+            >
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" className="text-zinc-300">
+                <path d="M8 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-1 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-amber-500 text-black text-[11px] font-bold px-1.5">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
           </div>
+        )}
 
-          <IdentityChip />
-        </div>
-      </header>
-
-      {/* Pinned bootboard — top */}
-      <div className="shrink-0 relative">
-        <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
-          <Bootboard data={bootboard} />
-        </div>
-        {/* Fade edge — feed scrolls under this */}
-        <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
-      </div>
-
-      {/* Scrollable posts area */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto relative scrollbar-hide"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        <div className="mx-auto max-w-2xl px-4 pt-3">
-          {/* Genesis anchor */}
-          <div ref={genesisRef} />
-          <Genesis />
-
-          {chronological.length === 0 && (
-            <p className="py-16 text-center text-sm text-zinc-600">
-              No posts yet. Be the first to share an idea.
-            </p>
-          )}
-          <div className="divide-y divide-zinc-800/60">
-            {chronological.map((post) => (
-              <article
-                key={post.id}
-                data-post-id={post.id}
-                ref={(el) => {
-                  if (el && observerRef.current) {
-                    observerRef.current.observe(el);
-                  }
-                }}
-                className="py-3.5 group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-xs text-zinc-500">
-                      <span className="font-medium text-zinc-300">
-                        {post.author_name}
-                      </span>
-                      {post.signature && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
-                      )}
-                      <span>·</span>
-                      <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
-                    </div>
-                    <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-all">
-                      {post.content}
-                    </p>
-                  </div>
-                  <div className="shrink-0 self-center">
-                    <BootButton postId={post.id} bootCount={post.boot_count} />
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div ref={bottomRef} />
-        </div>
-
-        </div>
-
-      {/* Telegram-style scroll-to-bottom button */}
-      {!isAtBottom && (
-        <div className="shrink-0 flex justify-end mx-auto max-w-2xl px-4">
-          <button
-            onClick={scrollToBottom}
-            className="relative -mb-5 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 border border-zinc-700 shadow-lg hover:bg-zinc-700 transition-colors mr-2"
-          >
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" className="text-zinc-300">
-              <path d="M8 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-1 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-amber-500 text-black text-[11px] font-bold px-1.5">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Pinned bottom — seamless, no footer look */}
-      <div className="shrink-0">
-        <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
-          <PostForm />
-          <div className="flex justify-center mt-1">
-            <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
-              created with bopen.ai
-            </a>
+        {/* Pinned bottom — compose area */}
+        <div className="shrink-0">
+          <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
+            <PostForm />
+            <div className="flex justify-center mt-1">
+              <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
+                created with bopen.ai
+              </a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </IdentityProvider>
   );
 }

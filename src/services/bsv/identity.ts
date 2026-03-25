@@ -13,27 +13,22 @@ interface StoredIdentity {
   address: string;
 }
 
-export interface Identity {
-  name: string;
-  address: string;
-  wif: string;
-}
+import type { Identity } from '@/types';
+export type { Identity };
 
-function generateAnonName(): string {
-  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
-  let suffix = '';
-  for (let i = 0; i < 4; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return `anon_${suffix}`;
-}
+import { generateAnonName } from '@/lib/utils';
 
 /** Get existing identity from storage (no BSV SDK needed). */
 function getStoredIdentity(): StoredIdentity | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
-  const parsed = JSON.parse(raw);
+  let parsed: StoredIdentity;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
   // Check if it has a valid wif (old format may not)
   if (!parsed.wif) return null;
   return parsed as StoredIdentity;
@@ -48,7 +43,12 @@ function getOldIdentityName(): string | null {
   // Old format: bfn_keypair stored without a wif
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
-    const parsed = JSON.parse(raw);
+    let parsed: StoredIdentity;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
     if (!parsed.wif && parsed.name) return parsed.name;
   }
   return null;

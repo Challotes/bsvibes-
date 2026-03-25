@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition, useEffect } from 'react';
-import { useIdentity } from '@/hooks/useIdentity';
+import { useIdentityContext } from '@/contexts/IdentityContext';
 import { createPost } from './actions';
 import { AgentChat } from './AgentChat';
 
@@ -12,7 +12,7 @@ export function PostForm(): React.JSX.Element {
   const [isListening, setIsListening] = useState(false);
   const [hasContent, setHasContent] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const { identity, sign } = useIdentity();
+  const { identity, sign } = useIdentityContext();
 
   // Clean up recognition on unmount
   useEffect(() => {

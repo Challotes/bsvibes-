@@ -24,21 +24,28 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 ## Key Files
 
-- `src/app/page.tsx` — Main entry (server component, fetches posts + bootboard)
-- `src/app/Feed.tsx` — Client component: scrollable feed, header, pinned sections, scroll tracking
+- `src/app/page.tsx` — Main entry (server component, fetches posts + bootboard, 10s ISR)
+- `src/app/Feed.tsx` — Client orchestrator: composes Header, PostList, Bootboard, PostForm
+- `src/app/Header.tsx` — Top bar with BSVibes logo, genesis navigation, identity chip
+- `src/app/PostList.tsx` — Post rendering, BootButton, timeAgo, Genesis anchor
 - `src/app/PostForm.tsx` — Compose box with enter-to-post, voice-to-text mic, agent chat trigger
-- `src/app/IdentityBar.tsx` — Identity chip in header with dropdown key backup
+- `src/app/IdentityBar.tsx` — Identity chip with dropdown, WIF masked by default with reveal toggle
 - `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
 - `src/app/Genesis.tsx` — Founding conversation display (collapsible, at top of feed)
 - `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, Claude Haiku API)
-- `src/app/agent-action.ts` — Server action for agent chat (Claude API call with project context)
-- `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost)
+- `src/app/agent-action.ts` — Server action for agent chat (Claude API, input capped at 20 msgs / 2000 chars)
+- `src/app/actions.ts` — Server actions (createPost, getPosts, getBootboard, bootPost with transaction)
+- `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
+- `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load for all components)
+- `src/hooks/useIdentity.ts` — React hook for identity management (used inside IdentityProvider)
+- `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking, genesis visited state
+- `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
+- `src/lib/utils.ts` — Shared utilities (cn, generateAnonName)
+- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration
+- `src/services/bsv/identity.ts` — BSV keypair generation & signing
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon component
-- `src/hooks/useIdentity.ts` — React hook for identity management
-- `src/services/bsv/identity.ts` — BSV keypair generation & signing
-- `src/lib/db.ts` — SQLite database setup with auto-migration (posts + bootboard tables)
 - `src/types/speech.d.ts` — SpeechRecognition API TypeScript types
 
 ## Coding Standards
@@ -76,16 +83,18 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - Private keys stored in localStorage (acceptable for idea board phase, no real money yet)
 - Server should verify signatures (TODO — currently decorative)
 - Rate limiting needed (TODO)
-- CSP headers configured in next.config.ts
-- Node polyfills shimmed via next.config.ts for browser compatibility
+- CSP headers configured in next.config.ts (Content-Security-Policy, HSTS, Permissions-Policy)
+- Node polyfills shimmed via next.config.ts for browser compatibility (empty-module.mjs)
 - See DECISIONS.md for full security findings and upgrade plan
 
 ## Development
 
 ```bash
-npm run dev    # Start dev server
-npm run build  # Production build
-npm run start  # Start production server
+npm run dev      # Start dev server
+npm run build    # Production build
+npm run start    # Start production server
+npm run lint     # Biome linting
+npm run format   # Biome formatting
 ```
 
 ## Context Files

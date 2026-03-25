@@ -41,11 +41,14 @@ export async function askAgent(messages: { from: string; text: string }[]): Prom
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "Agent is offline — no API key configured.";
 
-  const apiMessages = messages
+  // Cap to last 20 messages and limit content length
+  const cappedMessages = messages.slice(-20);
+
+  const apiMessages = cappedMessages
     .filter(m => m.from === 'user' || m.from === 'agent')
     .map(m => ({
       role: m.from === 'user' ? 'user' as const : 'assistant' as const,
-      content: m.text,
+      content: m.text.slice(0, 2000),
     }));
 
   try {

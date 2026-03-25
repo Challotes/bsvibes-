@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-03-24
+> Last updated: 2026-03-25
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -37,9 +37,13 @@
 
 - [ ] Server-side signature verification (prevent impersonation)
 - [ ] Rate limiting (per-address + per-IP)
-- [ ] Hide WIF from DOM (download-only, never display raw key)
-- [ ] JSON.parse try/catch (corrupted storage crashes app)
-- [ ] CSP headers enhancement
+- [x] Hide WIF from DOM (masked by default, reveal toggle, copy/download still work)
+- [x] JSON.parse try/catch in identity.ts (corrupted storage returns null instead of crash)
+- [x] CSP headers (Content-Security-Policy, HSTS, Permissions-Policy added)
+- [x] bootPost input validation + transaction wrapper (prevents race conditions)
+- [x] Foreign key enforcement enabled in SQLite
+- [x] Agent chat input capped (20 messages, 2000 chars each)
+- [x] Error boundary added (error.tsx)
 - [ ] Rename UI labels ("keep your name" not "save your key")
 
 ## Phase 3: On-Chain Integration — PLANNED

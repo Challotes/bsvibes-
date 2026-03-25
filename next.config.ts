@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactCompiler: true,
   turbopack: {
     resolveAlias: {
-      crypto: { browser: './empty-module.js' },
-      https: { browser: './empty-module.js' },
-      http: { browser: './empty-module.js' },
-      stream: { browser: './empty-module.js' },
-      buffer: { browser: './empty-module.js' },
+      crypto: { browser: './empty-module.mjs' },
+      https: { browser: './empty-module.mjs' },
+      http: { browser: './empty-module.mjs' },
+      stream: { browser: './empty-module.mjs' },
+      buffer: { browser: './empty-module.mjs' },
     },
   },
   webpack: (config, { isServer }) => {
@@ -29,6 +30,26 @@ const nextConfig: NextConfig = {
       {
         source: '/(.*)',
         headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "connect-src 'self'",
+              "font-src 'self'",
+              "frame-ancestors 'none'",
+            ].join('; '),
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(self), geolocation=()',
+          },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

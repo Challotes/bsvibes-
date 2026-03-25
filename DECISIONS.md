@@ -100,6 +100,12 @@
 - Telegram/X/GPT hybrid UI — feed-first, dark theme, pinned compose
 - Server components by default, client only when needed
 - Dynamic imports for @bsv/sdk
+- **Linter:** Biome (replaced ESLint 2026-03-25 — ESLint script was broken, Biome is faster and simpler)
+- **React Compiler:** Enabled (auto-memoization, free perf wins with React 19)
+- **Identity:** Shared via IdentityProvider context (replaces 4 independent useIdentity() calls that each loaded BSV SDK)
+- **ISR:** 10-second background revalidation on page.tsx (other users see new posts without manual refresh)
+- **bootPost:** Wrapped in SQLite transaction with input validation (prevents race conditions on concurrent boots)
+- **Foreign keys:** PRAGMA foreign_keys = ON (was decorative before)
 
 ## Critical Bugs Known
 
@@ -107,9 +113,9 @@
 |---|-------|----------|--------|
 | 1 | Server never verifies signatures | Critical | TODO |
 | 2 | No rate limiting | Critical | TODO |
-| 3 | WIF displayed raw in DOM | High | TODO |
+| 3 | WIF displayed raw in DOM | High | FIXED (2026-03-25) — masked by default, reveal toggle |
 | 4 | Backup file contains raw WIF | High | TODO |
-| 5 | JSON.parse without try/catch | Medium | TODO |
+| 5 | JSON.parse without try/catch | Medium | FIXED (2026-03-25) — returns null on parse failure |
 | 6 | Database file in project root | Low | TODO |
 
 ## Wallet Integration (future)

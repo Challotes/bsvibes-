@@ -4,6 +4,7 @@ import path from 'path';
 const db = new Database(path.join(process.cwd(), 'local.db'));
 
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS posts (

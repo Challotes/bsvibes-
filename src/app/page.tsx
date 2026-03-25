@@ -1,6 +1,8 @@
 import { getPosts, getBootboard } from './actions';
 import { Feed } from './Feed';
 
+export const revalidate = 10;
+
 export default async function Home() {
   const [posts, bootboard] = await Promise.all([getPosts(), getBootboard()]);
 

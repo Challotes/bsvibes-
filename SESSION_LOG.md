@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Agent Team Review & 18-Item Fix Sprint
+
+- Dispatched 5 specialist agents (Architecture, Design, Next.js, Agent/AI, Security) to review the entire codebase
+- Applied 18 fixes across 4 waves: critical fixes, security hardening, structural cleanup, Next.js optimization
+- Wave 1: bootPost transaction + validation, FK pragma, JSON.parse try/catch, metadata fix, error boundary
+- Wave 2: CSP/HSTS/Permissions-Policy headers, agent input rate-limiting, WIF hidden from DOM with reveal toggle
+- Wave 3: Types consolidated to src/types/, generateAnonName shared, IdentityProvider context (replaces 4 independent hooks), Feed.tsx broken into Header + PostList + useScrollTracker
+- Wave 4: 10s ISR revalidation, React Compiler enabled, ESM empty-module, Biome replacing ESLint
+- Removed unused src/components/ui/ (Button, Card, Input — dead code)
+- All changes verified with clean production build
+
 ## 2026-03-25 — Boot Button UX & Bootboard History
 
 - Boot button redesigned: oval pill with border, vertically centered right of each post, count below
