@@ -79,7 +79,7 @@ export function Bootboard({ data }: { data: BootboardData }) {
 
   return (
     <div
-      className={`rounded-xl border bg-amber-500/5 px-3 py-2.5 transition-all duration-300 ${
+      className={`rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
         glowing
           ? 'border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
           : 'border-amber-500/30'
@@ -88,18 +88,18 @@ export function Bootboard({ data }: { data: BootboardData }) {
       {current ? (
         <div className={slideIn ? 'animate-[slideUp_0.4s_ease-out]' : ''}>
           {/* Meta line — label + author + timer + expand toggle */}
-          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <BootIcon size={14} filled className="text-amber-400" />
-              <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
-              <span className="text-zinc-700">·</span>
-              <span className="font-medium text-amber-300">{current.author_name}</span>
+          <div className="flex flex-wrap items-center justify-between text-xs text-zinc-500 mb-1.5 gap-y-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <BootIcon size={14} filled className="text-amber-400 shrink-0" />
+              <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide shrink-0">Bootboard</span>
+              <span className="text-zinc-700 shrink-0">·</span>
+              <span className="font-medium text-amber-300 truncate">{current.author_name}</span>
               {current.signature && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Signed" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <LiveTimer since={current.booted_at} />
               <button
                 onClick={() => setExpanded(!expanded)}

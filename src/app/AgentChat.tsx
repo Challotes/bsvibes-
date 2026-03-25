@@ -92,9 +92,9 @@ export function AgentChat() {
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
-          className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] shadow-2xl"
+          className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -115,7 +115,7 @@ export function AgentChat() {
 
           {/* Messages */}
           <div
-            className="h-[320px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
+            className="h-[50vh] sm:h-[320px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
             style={{ scrollbarWidth: 'none' }}
           >
             {messages.map((msg, i) => (

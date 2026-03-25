@@ -54,7 +54,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d`;
 }
 
-function BootButton({ postId }: { postId: number }) {
+function BootButton({ postId, bootCount }: { postId: number; bootCount: number }) {
   const { identity } = useIdentity();
   const [isPending, startTransition] = useTransition();
 
@@ -69,10 +69,15 @@ function BootButton({ postId }: { postId: number }) {
     <button
       onClick={handleBoot}
       disabled={isPending || !identity}
-      className="text-zinc-500 hover:text-amber-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      className="flex items-center w-10 justify-end gap-1 text-[11px] transition-all disabled:opacity-30 disabled:cursor-not-allowed sm:hover:scale-110 text-zinc-600 hover:text-amber-400 sm:opacity-0 sm:group-hover:opacity-100"
       title="Boot to the board"
     >
-      {isPending ? '...' : <BootIcon size={16} />}
+      {isPending ? '...' : (
+        <>
+          {bootCount > 0 && <span className="text-amber-500/70">{bootCount}</span>}
+          <BootIcon size={16} className={bootCount > 0 ? 'text-amber-500' : ''} />
+        </>
+      )}
     </button>
   );
 }
@@ -186,7 +191,7 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <header className="shrink-0 border-b border-zinc-800 bg-black/80 backdrop-blur-md">
+      <header className="shrink-0 border-b border-zinc-800 bg-black">
         <div className="relative mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <div>
             <h1 className="text-lg font-semibold tracking-tight leading-none"><span className="text-amber-400">BS</span>Vibes</h1>
@@ -209,12 +214,13 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
               ) : (
                 <button
                   onClick={scrollToGenesis}
-                  className="flex items-center gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                  className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-2 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
                 >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-amber-400">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="text-amber-400">
                     <path d="M8 13V3m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Genesis
+                  <span className="hidden sm:inline">Genesis</span>
+                  <span className="sm:hidden">Origin</span>
                 </button>
               )
             )}
@@ -225,10 +231,12 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
       </header>
 
       {/* Pinned bootboard — top */}
-      <div className="shrink-0">
-        <div className="mx-auto max-w-2xl px-4 pt-2 pb-1">
+      <div className="shrink-0 relative">
+        <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
           <Bootboard data={bootboard} />
         </div>
+        {/* Fade edge — feed scrolls under this */}
+        <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
       </div>
 
       {/* Scrollable posts area */}
@@ -270,17 +278,7 @@ export function Feed({ posts, bootboard }: { posts: Post[]; bootboard: Bootboard
                     <span>·</span>
                     <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {post.boot_count > 0 && (
-                      <span className="flex items-center gap-1 text-[11px] text-amber-500">
-                        <BootIcon size={12} filled className="text-amber-500" />
-                        {post.boot_count}
-                      </span>
-                    )}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <BootButton postId={post.id} />
-                    </span>
-                  </div>
+                  <BootButton postId={post.id} bootCount={post.boot_count} />
                 </div>
                 <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-all">
                   {post.content}

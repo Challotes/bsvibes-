@@ -39,14 +39,14 @@ export function IdentityChip(): React.JSX.Element | null {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm hover:border-zinc-700 transition-colors"
+        className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
       >
         <span className="w-2 h-2 rounded-full bg-emerald-500" />
         <span className="text-zinc-300">{identity.name}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50">
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 p-3 border border-zinc-800 rounded-xl shadow-2xl z-50" style={{ backgroundColor: '#18181b' }}>
           <p className="text-sm text-zinc-400 mb-2">
             This key proves you wrote your posts. Save it somewhere safe.
           </p>
