@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Bug Fixes, Code Hygiene & Efficient Polling
+
+- Fixed PostList stale state bug: lifted pagination state to Feed.tsx so polled updates flow through
+- Fixed timeAgo logic error (hours branch was broken): extracted to shared src/lib/utils.ts
+- Fixed AgentChat stale closure: messagesRef pattern prevents lost conversation history on rapid messages
+- Added click-outside handler to identity dropdown
+- Extracted system prompt to src/data/agent-prompt.ts, removed dead agent-action.ts
+- Added DB indexes on bootboard.post_id and bootboard.held_until
+- Added .dockerignore, fixed break-all to break-words on post content
+- Incremental polling via ?since_id=N — only fetches new posts instead of all 100 every 5s
+
 ## 2026-03-25 — Real-Time Feed, Optimistic Posts & Identity Warning
 
 - Added `/api/posts` GET endpoint (returns posts + bootboard as JSON, dynamic/no-cache)

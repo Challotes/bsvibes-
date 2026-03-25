@@ -25,27 +25,27 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 ## Key Files
 
 - `src/app/page.tsx` — Main entry (server component, fetches posts + bootboard, 10s ISR)
-- `src/app/Feed.tsx` — Client orchestrator: composes Header, PostList, Bootboard, PostForm; handles real-time polling, optimistic posts
+- `src/app/Feed.tsx` — Client orchestrator: real-time polling, optimistic posts, pagination state, composes all feed components
 - `src/app/Header.tsx` — Top bar with BSVibes logo, genesis navigation, identity chip
-- `src/app/PostList.tsx` — Post rendering, BootButton, timeAgo, Genesis anchor, cursor-based pagination ("Load earlier posts")
+- `src/app/PostList.tsx` — Pure rendering component for posts, BootButton, Genesis anchor, "Load earlier posts" button
 - `src/app/PostForm.tsx` — Compose box with enter-to-post, voice-to-text mic, agent chat trigger, optimistic post callback
 - `src/app/IdentityBar.tsx` — Identity chip with dropdown, WIF masked with reveal toggle, amber warning dot until first backup
 - `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
 - `src/app/Genesis.tsx` — Founding conversation display (always visible at top of feed, NOT collapsible by design)
 - `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent)
-- `src/app/agent-action.ts` — Server action for agent chat (legacy, kept for backward compat)
+- `src/data/agent-prompt.ts` — Shared system prompt for agent chat (single source of truth)
 - `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
-- `src/app/api/posts/route.ts` — Feed polling endpoint (GET, returns posts + bootboard as JSON, dynamic/no-cache)
+- `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
-- `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts with pagination, getBootboard, bootPost with transaction, getOlderPosts)
+- `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts/getNewPosts/getOlderPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
 - `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load for all components)
 - `src/hooks/useIdentity.ts` — React hook for identity management (used inside IdentityProvider)
 - `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking, genesis visited state
-- `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s; pauses on hidden tab, resumes on visibility; returns live posts + bootboard
+- `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s with since_id; pauses on hidden tab; merges incremental updates
 - `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
-- `src/lib/utils.ts` — Shared utilities (cn, generateAnonName)
-- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration
+- `src/lib/utils.ts` — Shared utilities (cn, generateAnonName, timeAgo)
+- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration, indexes on bootboard
 - `src/services/bsv/identity.ts` — BSV keypair generation & signing
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)

@@ -41,8 +41,12 @@
 - [x] Cursor-based pagination ("Load earlier posts" button, getOlderPosts server action)
 - [x] PWA manifest + icons (Add to Home Screen on iOS/Android/Desktop)
 - [x] Deployment prep (Railway config, Dockerfile, env var DB path, .env.example)
+- [x] Incremental polling via ?since_id (only fetches new posts, not full 100 every 5s)
+- [x] DB indexes on bootboard (post_id, held_until)
+- [x] Bug fixes: PostList stale state, timeAgo logic error, AgentChat stale closure, dropdown click-outside
+- [x] Code hygiene: shared system prompt, dead code removed, .dockerignore, break-words
 
-## Phase 2: Security Hardening — IN PROGRESS
+## Phase 2: Security Hardening — COMPLETE
 
 - [x] Server-side signature verification (ECDSA verify via @bsv/sdk, rejects invalid sigs)
 - [x] Rate limiting (in-memory sliding window: 10 posts/min, 5 boots/min, 10 agent calls/min)
