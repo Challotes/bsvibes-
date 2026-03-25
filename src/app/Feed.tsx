@@ -41,7 +41,7 @@ export function Feed({
   posts: Post[];
   bootboard: BootboardData;
 }) {
-  const { posts: serverPosts, bootboard } = useFeedPolling({
+  const { posts: serverPosts, bootboard, refresh } = useFeedPolling({
     initialPosts,
     initialBootboard,
     intervalMs: 5000,
@@ -68,7 +68,9 @@ export function Feed({
       },
       ...prev,
     ]);
-  }, []);
+    // Poll 500ms after posting to confirm quickly
+    setTimeout(refresh, 500);
+  }, [refresh]);
 
   const handleLoadEarlier = useCallback(() => {
     // Oldest post is either the last in olderPosts, or the last in chronological.
@@ -135,34 +137,22 @@ export function Feed({
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadEarlier={handleLoadEarlier}
+            onBooted={refresh}
           />
 
-          {/* Optimistic posts — appear at the bottom (newest) while pending */}
+          {/* Optimistic posts — appear at the bottom (newest), full opacity since server confirms in ~50ms */}
           {pendingOptimistic.length > 0 && (
             <div className="mx-auto max-w-2xl px-4 pb-2 divide-y divide-zinc-800/60">
               {pendingOptimistic.map((op) => (
-                <article key={op.id} className="py-3.5 opacity-50">
+                <article key={op.id} className="py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-xs text-zinc-500">
                         <span className="font-medium text-zinc-300">{op.author_name}</span>
                         <span>·</span>
                         <time>{timeAgo(op.created_at)}</time>
-                        {/* Pending indicator */}
-                        <span className="flex items-center gap-1 text-zinc-600">
-                          <svg
-                            className="animate-spin w-3 h-3"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                          </svg>
-                          sending
-                        </span>
                       </div>
-                      <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-all">
+                      <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">
                         {op.content}
                       </p>
                     </div>

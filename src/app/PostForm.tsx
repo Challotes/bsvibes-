@@ -43,23 +43,25 @@ export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
 
     formData.set('author', identity.name);
 
+    // Show optimistic post and clear form IMMEDIATELY — don't wait for signing or server
+    const trimmed = content.trim();
+    onPostCreated?.(trimmed, identity.name);
+    formRef.current?.reset();
+    setHasContent(false);
+    setJustPosted(true);
+    setTimeout(() => setJustPosted(false), 1500);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus();
+    }
+
     startTransition(async () => {
-      const sig = await sign(content.trim());
+      const sig = await sign(trimmed);
       if (sig) {
         formData.set('signature', sig.signature);
         formData.set('pubkey', sig.pubkey);
       }
-
       await createPost(formData);
-      onPostCreated?.(content.trim(), identity.name);
-      formRef.current?.reset();
-      setHasContent(false);
-      setJustPosted(true);
-      setTimeout(() => setJustPosted(false), 1500);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.focus();
-      }
     });
   }
 
@@ -123,7 +125,7 @@ export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
           placeholder={!identity ? 'Setting up your identity...' : 'Share an idea...'}
           autoFocus
           maxLength={1000}
-          disabled={isPending || !identity}
+          disabled={!identity}
           onKeyDown={handleKeyDown}
           className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide transition-colors duration-300 ${
             justPosted
@@ -145,7 +147,7 @@ export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
           <button
             type="button"
             onClick={submitForm}
-            disabled={isPending || !identity}
+            disabled={!identity}
             className="absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 bg-amber-500 text-black rounded-full p-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-amber-400"
             title="Post"
           >
@@ -157,7 +159,7 @@ export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
           <button
             type="button"
             onClick={toggleMic}
-            disabled={isPending || !identity}
+            disabled={!identity}
             className={`absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 rounded-full p-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
               isListening
                 ? 'bg-red-500 text-white hover:bg-red-600'

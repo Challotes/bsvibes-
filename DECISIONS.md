@@ -115,8 +115,10 @@
 - **ISR:** 10-second background revalidation on page.tsx (other users see new posts without manual refresh)
 - **bootPost:** Wrapped in SQLite transaction with input validation (prevents race conditions on concurrent boots)
 - **Foreign keys:** PRAGMA foreign_keys = ON (was decorative before)
-- **Real-time:** Client polls /api/posts every 5s (pauses when tab hidden). Replaces ISR-only approach for live feel
-- **Optimistic UI:** Posts appear instantly in local state, pruned when server confirms via polling
+- **Real-time:** Client polls /api/posts every 5s with since_id (pauses when tab hidden). Exposes `refresh()` for on-demand polling after post/boot
+- **Optimistic UI:** Posts appear instantly at full opacity (no spinner — server confirms in ~50ms). Pruned on next poll (500ms early poll after post). Boot count increments optimistically
+- **revalidatePath removed:** ISR `revalidate = 10` handles cold loads for new visitors. Polling handles active users. revalidatePath was adding 50-200ms of blocking server work per action with zero user benefit
+- **BSV SDK caching:** Client-side SDK loaded once via singleton promise (`getBsvSdk()`), kicked off on page load. PrivateKey parsed from WIF once per session. Eliminated ~280ms cold import + repeated BigNumber work on every post
 - **Pagination:** Cursor-based by post ID (not timestamp — IDs are monotonic, no collision risk)
 - **Deployment:** Railway with persistent /data volume for SQLite. Dockerfile as alternative. DB path via DATABASE_PATH env var
 - **PWA:** manifest.json + SVG icon. No service worker / offline support yet — just home screen install

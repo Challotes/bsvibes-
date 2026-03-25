@@ -96,5 +96,5 @@ export function useFeedPolling({
     }
   }, [fetchFeed, intervalMs])
 
-  return { posts, setPosts, bootboard, setBootboard }
+  return { posts, setPosts, bootboard, setBootboard, refresh: fetchFeed }
 }

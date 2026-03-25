@@ -18,6 +18,25 @@ export type { Identity };
 
 import { generateAnonName } from '@/lib/utils';
 
+/**
+ * Cached BSV SDK module promise — imported once, reused everywhere.
+ * The chunk starts downloading the first time getBsvSdk() is called.
+ */
+let _bsvSdkPromise: Promise<typeof import('@bsv/sdk')> | null = null;
+
+function getBsvSdk(): Promise<typeof import('@bsv/sdk')> {
+  if (!_bsvSdkPromise) {
+    _bsvSdkPromise = import('@bsv/sdk');
+  }
+  return _bsvSdkPromise;
+}
+
+/**
+ * Cached PrivateKey — WIF never changes for a session, so parse it once.
+ */
+let _cachedWif: string | null = null;
+let _cachedPrivateKey: import('@bsv/sdk').PrivateKey | null = null;
+
 /** Get existing identity from storage (no BSV SDK needed). */
 function getStoredIdentity(): StoredIdentity | null {
   if (typeof window === 'undefined') return null;
@@ -29,7 +48,6 @@ function getStoredIdentity(): StoredIdentity | null {
   } catch {
     return null;
   }
-  // Check if it has a valid wif (old format may not)
   if (!parsed.wif) return null;
   return parsed as StoredIdentity;
 }
@@ -37,10 +55,8 @@ function getStoredIdentity(): StoredIdentity | null {
 /** Check for old identity format (just a name string, no keypair). */
 function getOldIdentityName(): string | null {
   if (typeof window === 'undefined') return null;
-  // Old format: bfn_identity stored just the name string
   const oldName = localStorage.getItem(OLD_IDENTITY_KEY);
   if (oldName && /^anon_[a-z0-9]{4}$/.test(oldName)) return oldName;
-  // Old format: bfn_keypair stored without a wif
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     let parsed: StoredIdentity;
@@ -60,20 +76,19 @@ export async function getIdentity(): Promise<Identity | null> {
 
   const stored = getStoredIdentity();
   if (stored) {
+    // Kick off SDK download now so it's ready when user posts
+    getBsvSdk();
     return { name: stored.name, address: stored.address, wif: stored.wif };
   }
 
-  // Check for old identity to preserve the anon name
   const oldName = getOldIdentityName();
 
-  // Generate keypair (dynamic import to avoid bundling issues)
-  const { PrivateKey } = await import('@bsv/sdk');
+  const { PrivateKey } = await getBsvSdk();
   const key = PrivateKey.fromRandom();
   const address = key.toAddress().toString();
   const name = oldName ?? generateAnonName();
   const wif = key.toWif();
 
-  // Re-read localStorage before writing — another tab may have raced and written first
   const raceCheck = getStoredIdentity();
   if (raceCheck) {
     return { name: raceCheck.name, address: raceCheck.address, wif: raceCheck.wif };
@@ -83,15 +98,14 @@ export async function getIdentity(): Promise<Identity | null> {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch (err) {
-    console.warn('BSVibes: could not persist identity to localStorage (private mode or storage full). Identity is valid for this session only.', err);
+    console.warn('BSVibes: could not persist identity to localStorage', err);
   }
 
-  // Clean up old key
   if (oldName) {
     try {
       localStorage.removeItem(OLD_IDENTITY_KEY);
     } catch {
-      // Non-critical — ignore
+      // Non-critical
     }
   }
 
@@ -105,13 +119,24 @@ export async function signPost(content: string): Promise<{ signature: string; pu
   const stored = getStoredIdentity();
   if (!stored) return null;
 
-  const { PrivateKey } = await import('@bsv/sdk');
-  const key = PrivateKey.fromWif(stored.wif);
+  const { PrivateKey } = await getBsvSdk();
+
+  // Cache the parsed key — fromWif() is expensive BigNumber work
+  if (_cachedWif !== stored.wif || !_cachedPrivateKey) {
+    _cachedWif = stored.wif;
+    _cachedPrivateKey = PrivateKey.fromWif(stored.wif);
+  }
+
   const messageBytes = Array.from(new TextEncoder().encode(content));
-  const sig = key.sign(messageBytes);
+  const sig = _cachedPrivateKey.sign(messageBytes);
 
   return {
     signature: sig.toDER('hex') as string,
-    pubkey: key.toPublicKey().toString(),
+    pubkey: _cachedPrivateKey.toPublicKey().toString(),
   };
+}
+
+/** Pre-warm the BSV SDK by starting the download early. */
+export function preWarmBsvSdk(): void {
+  getBsvSdk();
 }

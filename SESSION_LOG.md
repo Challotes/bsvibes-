@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-25 — Performance: Instant Posts & Boots
+
+- Root-caused 3s perceived delay: optimistic posts showed "sending" spinner until next poll (up to 5s)
+- Removed revalidatePath from createPost/bootPost — was adding 50-200ms blocking server work, redundant with polling
+- BSV SDK now cached as singleton promise on client, PrivateKey parsed once per session (was re-importing on every post)
+- Optimistic posts render at full opacity with no spinner (server confirms in ~50ms)
+- Early poll at 500ms after post/boot via exposed refresh() function
+- Optimistic boot count increments instantly, resets when server confirms
+- Textarea no longer disabled during background signing/server work
+- Validated by architecture reviewer: all changes safe, no regressions
+
 ## 2026-03-25 — Bug Fixes, Code Hygiene & Efficient Polling
 
 - Fixed PostList stale state bug: lifted pagination state to Feed.tsx so polled updates flow through

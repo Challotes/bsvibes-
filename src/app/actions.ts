@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { generateAnonName } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
@@ -33,9 +32,9 @@ export async function createPost(formData: FormData): Promise<void> {
         messageBytes,
         Signature.fromDER(signature, 'hex'),
       );
-      if (!verified) return; // Signature invalid — reject post
+      if (!verified) return;
     } catch {
-      return; // Malformed signature or pubkey — reject post
+      return;
     }
   }
 
@@ -48,7 +47,6 @@ export async function createPost(formData: FormData): Promise<void> {
     typeof pubkey === 'string' ? pubkey : null
   );
 
-  revalidatePath('/');
 }
 
 export async function getPosts(beforeId?: number): Promise<Post[]> {
@@ -154,6 +152,5 @@ export async function bootPost(postId: number, boostedBy: string): Promise<{ pro
 
   if (processingMs === null) return { processingMs: 0 };
 
-  revalidatePath('/');
   return { processingMs };
 }

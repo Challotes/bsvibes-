@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
@@ -8,16 +8,25 @@ import { useIdentityContext } from '@/contexts/IdentityContext';
 import { Genesis } from './Genesis';
 import { timeAgo } from '@/lib/utils';
 
-function BootButton({ postId, bootCount }: { postId: number; bootCount: number }) {
+function BootButton({ postId, bootCount, onBooted }: { postId: number; bootCount: number; onBooted?: () => void }) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
+  const [optimisticBoots, setOptimisticBoots] = useState(0);
+
+  useEffect(() => {
+    setOptimisticBoots(0);
+  }, [bootCount]);
 
   function handleBoot() {
     if (!identity) return;
+    setOptimisticBoots((prev) => prev + 1);
     startTransition(async () => {
       await bootPost(postId, identity.name);
+      onBooted?.();
     });
   }
+
+  const displayCount = bootCount + optimisticBoots;
 
   return (
     <div className="flex flex-col items-center">
@@ -25,20 +34,16 @@ function BootButton({ postId, bootCount }: { postId: number; bootCount: number }
         onClick={handleBoot}
         disabled={isPending || !identity}
         className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
-          bootCount > 0
+          displayCount > 0
             ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
             : 'text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50'
         }`}
         title="Boot to the board"
       >
-        {isPending ? (
-          <span className="text-[11px]">...</span>
-        ) : (
-          <BootIcon size={13} className={bootCount > 0 ? 'text-amber-500' : ''} />
-        )}
+        <BootIcon size={13} className={displayCount > 0 ? 'text-amber-500' : ''} />
       </button>
-      {bootCount > 0 && (
-        <span className="text-[9px] text-zinc-600 mt-0.5">{bootCount}</span>
+      {displayCount > 0 && (
+        <span className="text-[9px] text-zinc-600 mt-0.5">{displayCount}</span>
       )}
     </div>
   );
@@ -52,6 +57,7 @@ interface PostListProps {
   hasMore: boolean;
   isLoadingMore: boolean;
   onLoadEarlier: () => void;
+  onBooted?: () => void;
 }
 
 export function PostList({
@@ -62,6 +68,7 @@ export function PostList({
   hasMore,
   isLoadingMore,
   onLoadEarlier,
+  onBooted,
 }: PostListProps) {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
@@ -113,7 +120,7 @@ export function PostList({
                 </p>
               </div>
               <div className="shrink-0 self-center">
-                <BootButton postId={post.id} bootCount={post.boot_count} />
+                <BootButton postId={post.id} bootCount={post.boot_count} onBooted={onBooted} />
               </div>
             </div>
           </article>

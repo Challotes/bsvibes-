@@ -16,7 +16,7 @@ export function generateAnonName(): string {
 
 export function timeAgo(dateStr: string): string {
   const now = Date.now();
-  const then = new Date(dateStr + 'Z').getTime();
+  const then = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
   const seconds = Math.max(0, Math.floor((now - then) / 1000));
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
