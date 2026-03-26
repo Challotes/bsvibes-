@@ -118,6 +118,7 @@ When you finish significant work on this project:
 
 1. Update ROADMAP.md if you completed or started a task
 2. Update DECISIONS.md if you made a non-obvious technical choice
-3. Update DIRECTION.md only if the project direction changed
-4. Update this file (CLAUDE.md) if you added new key files or changed architecture
-5. Add a session summary to SESSION_LOG.md (date, 3-5 bullet points of what was done)
+3. Update FAIRNESS.md if you changed the revenue model, fairness parameters, or contribution scoring
+4. Update DIRECTION.md only if the project direction changed
+5. Update this file (CLAUDE.md) if you added new key files or changed architecture
+6. Add a session summary to SESSION_LOG.md (date, 3-5 bullet points of what was done)
