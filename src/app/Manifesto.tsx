@@ -66,6 +66,12 @@ export function Manifesto({ onAskAgent }: ManifestoProps) {
           This is what happens when the builders keep what they build.
         </p>
 
+        {/* Founder quote — handwritten style */}
+        <p className="my-6 pl-3 border-l border-amber-500/50 font-[family-name:var(--font-caveat)] text-lg sm:text-xl text-amber-200 leading-snug">
+          "You will not succeed as a solo developer. Not anymore. Success is micro-contributions,
+          ideas, value — humans and agents working together with combined effort."
+        </p>
+
         <p className="text-zinc-300">
           Be part of it.{' '}
           {onAskAgent ? (
