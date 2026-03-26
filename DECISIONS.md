@@ -105,6 +105,8 @@
 - **Phase 3:** AI adjusts within bounds, humans can override
 - **Phase 4:** Fully agentic, humans only intervene on disputes
 - The name describes the vision, not just today's implementation
+- **Revenue model:** Boot fees split directly to contributors via multi-output BSV transaction. See **FAIRNESS.md** for the full model, formula, parameters, and gaming analysis
+- **This is a demo model** — simple post-count + engagement + recency. Will evolve as real value contributions emerge (code, design, community). The point is proving the mechanism works first
 
 ## Tech Stack (settled)
 
