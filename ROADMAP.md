@@ -119,9 +119,11 @@
 - [x] Boot shares API endpoint (/api/boot-shares — contributor list for client tx building)
 - [x] Boot confirmation API endpoint (/api/boot-confirm — audit trail after client broadcast)
 - [x] Auto-switch: free → server pays, has BSV → client pays trustlessly, no balance → fund QR
-- [ ] UI: boot price display on buttons and bootboard
-- [ ] UI: earnings display on identity chip + dropdown
-- [ ] UI: free boot counter on boot buttons
+- [x] UI: boot price display on buttons (tooltip) and bootboard (empty state)
+- [x] UI: free boot counter ("FREE" badge + remaining count in tooltip)
+- [x] UI: fund address modal (shows deposit address when user has no BSV balance)
+- [x] Boot button handles full flow: free → server, paid → client trustless, no funds → QR modal
+- [ ] UI: earnings display on identity chip + dropdown (needs payout query)
 
 ## Phase 7: The Recursive Model — PLANNED
 

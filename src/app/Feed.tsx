@@ -9,6 +9,7 @@ import { IdentityProvider } from '@/contexts/IdentityContext';
 import { useScrollTracker } from '@/hooks/useScrollTracker';
 import { useFeedPolling } from '@/hooks/useFeedPolling';
 import { getOlderPosts } from './actions';
+import { FundAddress } from './FundAddress';
 import type { Post, BootboardData } from '@/types';
 import { timeAgo } from '@/lib/utils';
 
@@ -52,6 +53,10 @@ export function Feed({
   const [hasMore, setHasMore] = useState(initialPosts.length === 100);
   const [isLoadingMore, startLoadingMore] = useTransition();
   const [agentHighlight, setAgentHighlight] = useState(false);
+  const [bootPrice, setBootPrice] = useState(1000); // floor default
+  const [freeBootsRemaining, setFreeBootsRemaining] = useState(15);
+  const [showFundModal, setShowFundModal] = useState(false);
+  const [userAddress, setUserAddress] = useState('');
 
   // Prune confirmed posts on every render — no extra effect needed.
   const pendingOptimistic = useMemo(
@@ -125,7 +130,7 @@ export function Feed({
         {/* Pinned bootboard */}
         <div className="shrink-0 relative">
           <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
-            <Bootboard data={bootboard} onBooted={refresh} />
+            <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} />
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
         </div>
@@ -146,6 +151,9 @@ export function Feed({
             onLoadEarlier={handleLoadEarlier}
             onBooted={refresh}
             onAskAgent={handleAskAgent}
+            onFundNeeded={() => setShowFundModal(true)}
+            bootPrice={bootPrice}
+            freeBootsRemaining={freeBootsRemaining}
           />
 
           {/* Optimistic posts — appear at the bottom (newest), full opacity since server confirms in ~50ms */}
@@ -202,6 +210,15 @@ export function Feed({
           </div>
         </div>
       </div>
+
+      {/* Fund address modal */}
+      {showFundModal && userAddress && (
+        <FundAddress
+          address={userAddress}
+          bootPrice={bootPrice}
+          onClose={() => setShowFundModal(false)}
+        />
+      )}
     </IdentityProvider>
   );
 }

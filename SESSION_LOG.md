@@ -2,6 +2,15 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — Phase 6 UI Wiring: Boot Payments Live
+
+- Boot button now handles full flow: free (server pays) → paid (client trustless) → no funds (QR modal)
+- BootButton shows price in tooltip, "FREE" badge when free boots remain
+- Bootboard shows boot cost in empty state
+- FundAddress modal appears when user has no BSV balance
+- Feed.tsx manages boot price, free boots remaining, fund modal state
+- PostList passes boot info through to every BootButton
+
 ## 2026-03-26 — Phase 6 Backend: Fairness Engine + Revenue Splitting
 
 - Built complete fairness engine: config.ts, pricing.ts, weights.ts, split.ts

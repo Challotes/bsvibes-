@@ -4,11 +4,22 @@ import { useState, useEffect, useTransition } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
+import { clientSideBoot } from '@/services/bsv/client-boot';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { Genesis } from './Genesis';
 import { timeAgo } from '@/lib/utils';
 
-function BootButton({ postId, bootCount, onBooted }: { postId: number; bootCount: number; onBooted?: () => void }) {
+interface BootButtonProps {
+  postId: number;
+  bootCount: number;
+  postPubkey: string | null;
+  bootPrice: number;
+  freeBootsRemaining: number;
+  onBooted?: () => void;
+  onFundNeeded?: () => void;
+}
+
+function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded }: BootButtonProps) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
   const [optimisticBoots, setOptimisticBoots] = useState(0);
@@ -17,33 +28,85 @@ function BootButton({ postId, bootCount, onBooted }: { postId: number; bootCount
     setOptimisticBoots(0);
   }, [bootCount]);
 
-  function handleBoot() {
-    if (!identity) return;
+  const isFree = freeBootsRemaining > 0;
+  const canBoot = identity && postPubkey; // Must be signed post + signed user
+
+  async function handleBoot() {
+    if (!identity || !postPubkey) return;
     setOptimisticBoots((prev) => prev + 1);
+
     startTransition(async () => {
-      await bootPost(postId, identity.name);
+      // Try server-side boot first (handles free boots)
+      const result = await bootPost(postId, identity.wif ? identity.name : identity.name);
+
+      if (result.requiresPayment) {
+        // Paid boot — client builds trustless tx
+        const sharesRes = await fetch(`/api/boot-shares?postId=${postId}&pubkey=${encodeURIComponent(identity.address)}`);
+        if (!sharesRes.ok) {
+          setOptimisticBoots((prev) => Math.max(0, prev - 1));
+          return;
+        }
+        const sharesData = await sharesRes.json();
+
+        const bootResult = await clientSideBoot(
+          identity.wif,
+          identity.address,
+          postId,
+          sharesData.shares,
+          sharesData.bootPrice,
+        );
+
+        if (bootResult.status === 'insufficient_funds') {
+          setOptimisticBoots((prev) => Math.max(0, prev - 1));
+          onFundNeeded?.();
+          return;
+        }
+
+        if (bootResult.status === 'success' && bootResult.txid) {
+          // Confirm on server for audit trail
+          await fetch('/api/boot-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId, txid: bootResult.txid, booterPubkey: identity.address }),
+          });
+        } else {
+          setOptimisticBoots((prev) => Math.max(0, prev - 1));
+          return;
+        }
+      }
+
       onBooted?.();
     });
   }
 
   const displayCount = bootCount + optimisticBoots;
+  const title = !postPubkey
+    ? 'Unsigned post — cannot be booted'
+    : !identity
+    ? 'Sign in to boot'
+    : isFree
+    ? `Boot to the board (FREE — ${freeBootsRemaining} remaining)`
+    : `Boot to the board (${bootPrice.toLocaleString()} sats)`;
 
   return (
     <div className="flex flex-col items-center">
       <button
         onClick={handleBoot}
-        disabled={isPending || !identity}
+        disabled={isPending || !canBoot}
         className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
           displayCount > 0
             ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
             : 'text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50'
         }`}
-        title="Boot to the board"
+        title={title}
       >
         <BootIcon size={13} className={displayCount > 0 ? 'text-amber-500' : ''} />
       </button>
       {displayCount > 0 && (
         <span className="text-[9px] text-zinc-600 mt-0.5">{displayCount}</span>
+      )}
+      {isFree && canBoot && (
+        <span className="text-[8px] text-emerald-600 mt-0.5">FREE</span>
       )}
     </div>
   );
@@ -59,6 +122,9 @@ interface PostListProps {
   onLoadEarlier: () => void;
   onBooted?: () => void;
   onAskAgent?: () => void;
+  onFundNeeded?: () => void;
+  bootPrice: number;
+  freeBootsRemaining: number;
 }
 
 export function PostList({
@@ -71,6 +137,9 @@ export function PostList({
   onLoadEarlier,
   onBooted,
   onAskAgent,
+  onFundNeeded,
+  bootPrice,
+  freeBootsRemaining,
 }: PostListProps) {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
@@ -136,7 +205,15 @@ export function PostList({
                 </p>
               </div>
               <div className="shrink-0 self-center">
-                <BootButton postId={post.id} bootCount={post.boot_count} onBooted={onBooted} />
+                <BootButton
+                  postId={post.id}
+                  bootCount={post.boot_count}
+                  postPubkey={post.pubkey}
+                  bootPrice={bootPrice}
+                  freeBootsRemaining={freeBootsRemaining}
+                  onBooted={onBooted}
+                  onFundNeeded={onFundNeeded}
+                />
               </div>
             </div>
           </article>

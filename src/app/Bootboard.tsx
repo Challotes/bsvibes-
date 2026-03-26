@@ -61,7 +61,7 @@ function HistoryRow({ entry, onBooted }: { entry: BootboardData['history'][0]; o
   );
 }
 
-export function Bootboard({ data, onBooted }: { data: BootboardData; onBooted?: () => void }) {
+export function Bootboard({ data, onBooted, bootPrice }: { data: BootboardData; onBooted?: () => void; bootPrice?: number }) {
   const { current, history } = data;
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);
@@ -158,6 +158,12 @@ export function Bootboard({ data, onBooted }: { data: BootboardData; onBooted?: 
           <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
           <span className="text-zinc-700">·</span>
           <span className="text-zinc-600">Boost any post to claim the spotlight</span>
+          {bootPrice !== undefined && bootPrice > 0 && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span className="text-zinc-600">{bootPrice.toLocaleString()} sats</span>
+            </>
+          )}
         </div>
       )}
     </div>
