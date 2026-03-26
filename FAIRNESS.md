@@ -61,7 +61,7 @@ The boosted creator also gets their normal pool share on top of the bonus.
    - Change output back to server if needed
 5. Transaction broadcasts to BSV network
 6. Every contributor gets paid directly in that single transaction
-7. Contributors below the minimum payout threshold accumulate balance for next boot
+7. Every sat goes out in the same transaction — true no-custody, no database balances, no IOUs
 
 ### OP_RETURN Audit Trail
 
@@ -102,7 +102,7 @@ This makes every split publicly verifiable on-chain. Anyone can look up the tran
 | 500 | 16 sats | ~95 above threshold | ~4,200 sats |
 | 5,000 | 1.6 sats | ~2 above threshold | ~250 sats |
 
-At high contributor counts, most users fall below the 100-sat minimum payout threshold. Their shares accumulate in the database and pay out when they cross the threshold on a future boot. The transaction stays lean.
+True no-custody: every contributor gets their share in the same transaction, even if it's 1 sat. No database balances, no accumulation, no IOUs. At high contributor counts with small shares, users receive tiny UTXOs — that's their money in their address, not the platform's problem.
 
 ## Phase Progression
 
@@ -120,32 +120,36 @@ This model maps to the Agentic Fairness phases from DECISIONS.md:
 ### Database Schema
 
 ```sql
--- Accumulated balances for contributors below payout threshold
-CREATE TABLE IF NOT EXISTS contributor_balances (
+-- Free boot grants per user (tracked by pubkey)
+CREATE TABLE IF NOT EXISTS boot_grants (
   pubkey TEXT PRIMARY KEY,
-  address TEXT NOT NULL,
-  pending_sats INTEGER DEFAULT 0,
-  total_earned_sats INTEGER DEFAULT 0,
-  last_payout_at TEXT
+  free_boots_used INTEGER DEFAULT 0,
+  total_boots INTEGER DEFAULT 0
 );
 
--- Individual payout records
+-- Payout records (audit trail — no balances held)
 CREATE TABLE IF NOT EXISTS payouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   boot_event_id INTEGER NOT NULL,
   recipient_pubkey TEXT NOT NULL,
+  recipient_address TEXT NOT NULL,
   amount_sats INTEGER NOT NULL,
   payout_type TEXT NOT NULL, -- 'pool_share' | 'boost_bonus' | 'platform'
-  txid TEXT, -- BSV transaction ID (null until broadcast)
+  txid TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
 ```
 
-### Key Files (when implemented)
+No `contributor_balances` table — true no-custody means no stored balances.
 
-- `src/services/fairness/weights.ts` — Weight calculation from posts
-- `src/services/fairness/split.ts` — Payout split logic
-- `src/services/fairness/config.ts` — Tunable parameters
+### Key Files
+
+- `src/services/fairness/config.ts` — Tunable parameters (governance surface)
+- `src/services/fairness/weights.ts` — Weight calculation with migration chain resolution
+- `src/services/fairness/split.ts` — Payout split (no custody, all sats out in same tx)
+- `src/services/fairness/pricing.ts` — Dynamic boot price with floor/ceiling
+- `src/services/fairness/boot-orchestrator.ts` — Full boot workflow coordinator
+- `src/services/fairness/boot-payment.ts` — Multi-output BSV transaction builder
 
 ### BSV Transaction
 

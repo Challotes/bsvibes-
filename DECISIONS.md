@@ -116,6 +116,15 @@
 - **Revenue model:** Boot fees split directly to contributors via multi-output BSV transaction. See **FAIRNESS.md** for the full model, formula, parameters, and gaming analysis
 - **This is a demo model** — simple post-count + engagement + recency. Will evolve as real value contributions emerge (code, design, community). The point is proving the mechanism works first
 
+### Revenue Distribution Rules (settled)
+- **True no-custody:** Every sat in = every sat out in the same transaction. No database balances, no pending payouts, no IOUs. Even 1-sat shares get a UTXO output.
+- **Boots require signed identity:** Booter must have a pubkey. Prevents free boot abuse (can't fake a new identity to get more free boots). Unsigned users can post but not boot.
+- **Only signed posts are boostable:** The creator bonus (15%) needs an address to pay. Unsigned posts can't be booted. Encourages identity adoption.
+- **Zero pool recipients → creator gets 95%:** If nobody qualifies for the pool (e.g., only 1 contributor who is the creator), the 80% pool goes to the creator. 5% still goes to platform.
+- **Dynamic pricing formula:** `boot_fee = max(1000, min(250000, active_contributors × 156))`. Active = posted in last 30 days, counted by pubkey only. Price cached 1 hour. Rationale: 156 ensures bottom-25% contributors clear meaningful payouts under Pareto distribution.
+- **Free boots:** First 15 per pubkey, tracked in SQLite `boot_grants` table. Server wallet pays at dynamic price. After 15, user funds their address via QR code.
+- **$50/month operator budget:** Covers subsidised boots, on-chain posting, hosting, API. Sustainable through ~200 users, then user-paid boots and 5% platform cut take over.
+
 ## Tech Stack (settled)
 
 - Next.js 16 + TypeScript + Tailwind v4 + SQLite + BSV
