@@ -6,6 +6,8 @@ import { rateLimit } from '@/lib/rate-limit';
 import { PublicKey, Signature } from '@bsv/sdk';
 import { logPostOnChain } from '@/services/bsv/onchain';
 import { postMigrationOnChain } from '@/services/bsv/migration';
+import { executeBoot } from '@/services/fairness/boot-orchestrator';
+import { getBootPriceForUser } from '@/services/fairness/pricing';
 import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
 export async function createPost(formData: FormData): Promise<void> {
@@ -133,43 +135,61 @@ export async function getBootboard(): Promise<BootboardData> {
   return { current: current ?? null, history, totalBoots: stats.total_boots };
 }
 
-export async function bootPost(postId: number, boostedBy: string): Promise<{ processingMs: number }> {
+export interface BootPostResult {
+  processingMs: number
+  // Present on success
+  success?: boolean
+  isFree?: boolean
+  txid?: string
+  recipients?: number
+  // Present when the client must handle payment
+  requiresPayment?: boolean
+  bootPrice?: number
+  // Present on failure
+  error?: string
+}
+
+export async function bootPost(postId: number, boostedBy: string): Promise<BootPostResult> {
   const start = performance.now();
 
   // Input validation
-  if (!Number.isInteger(postId) || postId <= 0) return { processingMs: 0 };
+  if (!Number.isInteger(postId) || postId <= 0) return { processingMs: 0, error: 'Invalid postId' };
   if (
     typeof boostedBy !== 'string' ||
-    boostedBy.length > 20 ||
-    !/^anon_[a-z0-9]{4}$/.test(boostedBy)
-  ) return { processingMs: 0 };
+    boostedBy.length > 200 ||
+    boostedBy.trim().length === 0
+  ) return { processingMs: 0, error: 'Invalid boostedBy' };
 
   // 5 boots per minute per caller.
   const rl = rateLimit(`bootPost:${boostedBy}`, { limit: 5, windowMs: 60_000 });
-  if (!rl.success) return { processingMs: 0 };
+  if (!rl.success) return { processingMs: 0, error: 'Rate limit exceeded' };
 
-  const processingMs = db.transaction(() => {
-    // Validate postId exists
-    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
-    if (!post) return null;
+  // Check whether this boot is free (server pays) or paid (client must build tx)
+  const { isFree, price: bootPrice } = getBootPriceForUser(db, boostedBy);
 
-    // Close out current bootboard holder
-    db.prepare(`
-      UPDATE bootboard SET held_until = datetime('now')
-      WHERE held_until IS NULL
-    `).run();
+  if (!isFree) {
+    // Paid boot: client must build and broadcast the split transaction itself,
+    // then call /api/boot-confirm. Return the price so the client can proceed.
+    const processingMs = Math.round((performance.now() - start) * 100) / 100;
+    return { processingMs, requiresPayment: true, bootPrice, isFree: false };
+  }
 
-    // New post takes the spot
-    db.prepare(`
-      INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
-    `).run(postId, boostedBy);
+  // Free boot: server wallet pays, orchestrator handles the full workflow.
+  const result = await executeBoot(db, postId, boostedBy);
 
-    return Math.round((performance.now() - start) * 100) / 100;
-  })();
+  const processingMs = Math.round((performance.now() - start) * 100) / 100;
 
-  if (processingMs === null) return { processingMs: 0 };
+  if (!result.success) {
+    return { processingMs, error: result.error ?? 'Boot failed', isFree: true };
+  }
 
-  return { processingMs };
+  return {
+    processingMs,
+    success: true,
+    isFree: true,
+    txid: result.txid,
+    recipients: result.recipients,
+  };
 }
 
 export async function migrateIdentity(

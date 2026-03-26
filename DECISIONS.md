@@ -124,6 +124,8 @@
 - **Dynamic pricing formula:** `boot_fee = max(1000, min(250000, active_contributors × 156))`. Active = posted in last 30 days, counted by pubkey only. Price cached 1 hour. Rationale: 156 ensures bottom-25% contributors clear meaningful payouts under Pareto distribution.
 - **Free boots:** First 15 per pubkey, tracked in SQLite `boot_grants` table. Server wallet pays at dynamic price. After 15, user funds their address via QR code.
 - **$50/month operator budget:** Covers subsidised boots, on-chain posting, hosting, API. Sustainable through ~200 users, then user-paid boots and 5% platform cut take over.
+- **Trustless P2P payments:** Paid boots are built client-side — user's browser constructs the multi-output BSV transaction directly to every contributor. Server never touches user funds. Server only provides the contributor list. The transaction itself is the verifiable proof. Free boots use the server wallet (server is the payer, not custodian).
+- **Auto-switch:** Free boots → server pays. User has BSV balance → client builds trustless tx. No balance → show fund address QR. One click, ~800ms, zero custody.
 
 ## Tech Stack (settled)
 
