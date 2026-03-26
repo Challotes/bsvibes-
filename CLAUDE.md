@@ -46,12 +46,19 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s with since_id; pauses on hidden tab; merges incremental updates
 - `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
 - `src/lib/utils.ts` — Shared utilities (cn, generateAnonName, timeAgo)
-- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration, indexes on bootboard
+- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables
 - `src/services/bsv/identity.ts` — BSV keypair generation, signing, encrypted storage, upgrade + unlock
 - `src/services/bsv/crypto.ts` — AES-256-GCM encrypt/decrypt for WIF keys (Web Crypto API)
 - `src/services/bsv/migration.ts` — Key rotation with on-chain migration via OP_RETURN
-- `src/services/bsv/wallet.ts` — Server wallet (BSV_SERVER_WIF, UTXO fetching, ARC broadcast)
+- `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (reservation, 0-conf chaining, multi-input)
 - `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget, returns txid)
+- `src/services/fairness/config.ts` — Tunable fairness parameters (governance surface for AI agent)
+- `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached)
+- `src/services/fairness/weights.ts` — Contribution scoring (sqrt × decay × engagement, migration chain)
+- `src/services/fairness/split.ts` — No-custody payout split (every sat out in same tx)
+- `src/services/fairness/boot-payment.ts` — Multi-output BSV split transaction builder
+- `src/services/fairness/boot-orchestrator.ts` — Full boot workflow (validate → price → score → split → broadcast → record)
+- `src/app/FundAddress.tsx` — Deposit address panel (QR/copy for users who exhaust free boots)
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon component

@@ -2,6 +2,19 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — Phase 6 Backend: Fairness Engine + Revenue Splitting
+
+- Built complete fairness engine: config.ts, pricing.ts, weights.ts, split.ts
+- Dynamic boot pricing: contributors × 156 sats with floor/ceiling
+- Contribution weights: sqrt(engagement) × time-decay, resolves migration chain
+- True no-custody split: every sat out in same BSV transaction, no DB balances
+- Rewrote wallet.ts: UTXO reservation, 0-conf chaining, multi-input aggregation
+- Boot orchestrator: full workflow from validation through broadcast and audit recording
+- Boot payment builder: multi-output P2PKH + OP_RETURN audit trail
+- New DB tables: boot_grants (free boot tracking), payouts (audit trail)
+- FundAddress.tsx component for users who exhaust free boots
+- Settled decisions documented: no custody, boots require pubkey, only signed posts boostable
+
 ## 2026-03-26 — Security Upgrade System (Phase 4)
 
 - AES-256-GCM passphrase encryption via Web Crypto API (crypto.ts)

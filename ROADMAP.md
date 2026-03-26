@@ -102,11 +102,23 @@
 - [ ] Daily posting limits (5 free/day)
 - [ ] QR code funding when limit reached
 
-## Phase 6: Fairness & Revenue — PLANNED
+## Phase 6: Fairness & Revenue — IN PROGRESS
 
-- [ ] Fairness agent v1 (timing, impact, quality, engagement scoring)
-- [ ] Revenue distribution based on contribution history
-- [ ] On-chain migration messages (MAP + AIP) for key upgrades
+- [x] Fairness config (tunable parameters, governance surface)
+- [x] Dynamic boot pricing (contributors × 156, floor 1000, ceiling 250000, cached 1h)
+- [x] Contribution weight calculation (sqrt × decay × engagement, migration chain resolution)
+- [x] No-custody payout split (every sat out in same tx, no DB balances)
+- [x] UTXO manager (reservation, 0-conf chaining, multi-input aggregation)
+- [x] Multi-output split transaction builder (P2PKH outputs + OP_RETURN audit)
+- [x] Boot orchestrator (full workflow: validate → price → score → split → broadcast → record)
+- [x] Boot grants table (15 free boots per pubkey)
+- [x] Payouts audit table (records every split for transparency)
+- [x] FundAddress component (deposit address panel for users who exhaust free boots)
+- [ ] Wire bootPost action to orchestrator (replace raw SQLite boot with paid/free flow)
+- [ ] UI: boot price display on buttons and bootboard
+- [ ] UI: earnings display on identity chip + dropdown
+- [ ] UI: free boot counter on boot buttons
+- [ ] API endpoint for boot pricing info
 
 ## Phase 7: The Recursive Model — PLANNED
 
