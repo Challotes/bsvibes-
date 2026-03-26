@@ -44,6 +44,36 @@ Context lives in the repo (CLAUDE.md, DIRECTION.md, DECISIONS.md, ROADMAP.md). A
 
 Enforcement is phased: start with instructions only, add hooks when contributors arrive, add CI when patterns of breakage emerge.
 
+## Competitive Positioning
+
+BSVibes combines elements that exist separately elsewhere, but nobody has put them all together on a chain where the economics actually work.
+
+### Why existing approaches failed
+
+| Platform | What they tried | Why it failed | BSVibes' response |
+|----------|----------------|---------------|-------------------|
+| **Steemit/Hive** | Community-rewarded on-chain posts | Whale-dominated voting, inflationary tokens, reward farming | AI-adjudicated fairness, real revenue not inflation, no stake-weighted politics |
+| **SourceCred** | Algorithmic contribution scoring | Synthetic tokens not real money, organization dissolved | Real BSV micropayments, sustainable revenue from boot fees |
+| **Coordinape** | Peer-based contribution allocation | Subjective, political, doesn't scale | AI removes human politics from distribution |
+| **Twetch** | BSV on-chain social with micropayments | Required wallet upfront, killed onboarding | 2-click onboarding, identity generated silently |
+| **Friend.tech/DeSo** | Social tokens, speculation on creators | Pure speculation, no intrinsic value, bubbles pop | Rewards actual contribution, not speculation |
+| **Botto** | AI + community + value distribution | Token-weighted voting (plutocracy risk), aesthetic not contribution | AI evaluates contribution quality, inverted agency model |
+
+### What makes BSVibes possible (and why nobody else did it)
+
+**BSV's micropayment economics.** A single transaction splitting payment to 30 contributors costs ~$0.003 on BSV. This is economically impossible on Ethereum (gas) or BTC (block space). The reason Steemit used token inflation, SourceCred used synthetic "Grain", and Coordinape uses peer tokens is that real-money micropayment splitting to dozens of contributors doesn't work on high-fee chains. BSV removes that constraint.
+
+### The 4 genuine innovations
+
+1. **Agentic Fairness as a governance framework** — The 4-phase autonomy ramp (human-set → AI suggests → AI adjusts → fully agentic) with constraint-bounded parameter tuning. No other project has productized this.
+2. **Zero-friction crypto identity** — Keypair generates silently on first visit. User never knows they "have crypto." Progressive security upgrade when it matters.
+3. **On-chain key migration** — Old key cryptographically signs handoff to new key, posted on-chain. Contribution history follows across rotations.
+4. **Real-money contribution splitting** — Single BSV transaction, dozens of outputs, sub-cent fees. Revenue-based, not inflationary. The fairness model cannot be faithfully replicated on other chains.
+
+### The proof moment
+
+The innovation lives or dies on one demo: **a user posts an idea, someone boots it, and the user receives satoshis without ever having set up a wallet.** Everything else is table stakes until that flow works end-to-end.
+
 ## What This Is NOT
 
 - Not a crypto wallet app
