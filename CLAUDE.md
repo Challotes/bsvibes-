@@ -47,7 +47,9 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
 - `src/lib/utils.ts` — Shared utilities (cn, generateAnonName, timeAgo)
 - `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration, indexes on bootboard
-- `src/services/bsv/identity.ts` — BSV keypair generation & signing
+- `src/services/bsv/identity.ts` — BSV keypair generation & signing (cached SDK + PrivateKey)
+- `src/services/bsv/wallet.ts` — Server wallet (BSV_SERVER_WIF, UTXO fetching, ARC broadcast)
+- `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget, returns txid)
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon component

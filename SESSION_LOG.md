@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — On-Chain Posting (Phase 3)
+
+- Server wallet service: loads BSV_SERVER_WIF, fetches UTXOs from WhatsOnChain, broadcasts via ARC
+- OP_RETURN post logging: OP_FALSE OP_RETURN with JSON payload (app, type, content, author, sig, pubkey, ts)
+- Fire-and-forget after DB insert — posts save instantly, on-chain logging is async/best-effort
+- tx_id updated on post row after successful broadcast
+- Green chain-link icon on posts with tx_id, links to WhatsOnChain transaction viewer
+- Wallet generation script (scripts/generate-wallet.mjs) for easy setup
+- Graceful degradation: no BSV_SERVER_WIF = DB-only mode, no errors
+- Phase 3 marked COMPLETE in ROADMAP.md
+
 ## 2026-03-26 — Manifesto, Vision Copy & Concept-to-UI Gap
 
 - Created Manifesto.tsx with V2 "The Signal" vision copy (amber left-border accent, bold heading)

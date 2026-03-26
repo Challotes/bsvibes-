@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { generateAnonName } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
 import { PublicKey, Signature } from '@bsv/sdk';
+import { logPostOnChain } from '@/services/bsv/onchain';
 import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
 export async function createPost(formData: FormData): Promise<void> {
@@ -38,7 +39,7 @@ export async function createPost(formData: FormData): Promise<void> {
     }
   }
 
-  db.prepare(
+  const result = db.prepare(
     'INSERT INTO posts (content, author_name, signature, pubkey) VALUES (?, ?, ?, ?)'
   ).run(
     content.trim(),
@@ -47,6 +48,21 @@ export async function createPost(formData: FormData): Promise<void> {
     typeof pubkey === 'string' ? pubkey : null
   );
 
+  // Fire-and-forget: log on-chain, update tx_id if successful
+  const postId = result.lastInsertRowid as number;
+  const trimmedContent = content.trim();
+  const sigStr = typeof signature === 'string' ? signature : null;
+  const pkStr = typeof pubkey === 'string' ? pubkey : null;
+
+  logPostOnChain({ content: trimmedContent, author: authorName, signature: sigStr, pubkey: pkStr })
+    .then((txid) => {
+      if (txid) {
+        db.prepare('UPDATE posts SET tx_id = ? WHERE id = ?').run(txid, postId);
+      }
+    })
+    .catch(() => {
+      // On-chain logging is best-effort — post still exists in SQLite
+    });
 }
 
 export async function getPosts(beforeId?: number): Promise<Post[]> {

@@ -116,6 +116,20 @@ export function PostList({
                   )}
                   <span>·</span>
                   <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
+                  {post.tx_id && (
+                    <a
+                      href={`https://whatsonchain.com/tx/${post.tx_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="View on chain"
+                      className="inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                    </a>
+                  )}
                 </div>
                 <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">
                   {post.content}

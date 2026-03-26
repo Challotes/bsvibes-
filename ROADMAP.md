@@ -72,11 +72,14 @@
 - [x] "Agentic Fairness" subtitle clickable (scrolls to manifesto)
 - [x] "Chat with the agent" link in manifesto scrolls to bottom + highlights Ask AI button
 
-## Phase 3: On-Chain Integration — PLANNED
+## Phase 3: On-Chain Integration — COMPLETE
 
-- [ ] OP_RETURN posting (server-funded, ~0.00001 BSV per post)
-- [ ] Transaction ID storage (store tx_id with each post)
-- [ ] On-chain verification link (view post on blockchain)
+- [x] Server wallet service (BSV_SERVER_WIF env var, UTXO fetching via WhatsOnChain, ARC broadcast)
+- [x] OP_RETURN posting (OP_FALSE OP_RETURN with JSON payload, fire-and-forget after DB insert)
+- [x] Transaction ID storage (tx_id updated on post row after successful broadcast)
+- [x] On-chain verification link (green chain icon on posts, links to WhatsOnChain)
+- [x] Wallet generation script (scripts/generate-wallet.mjs)
+- [x] Graceful degradation (no BSV_SERVER_WIF = DB-only, no errors)
 
 ## Phase 4: Security Upgrades — PLANNED
 
