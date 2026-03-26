@@ -59,11 +59,37 @@ try {
     )
   `);
 
+  // Boot grants — free boot tracking per user (no custody)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS boot_grants (
+      pubkey TEXT PRIMARY KEY,
+      free_boots_used INTEGER NOT NULL DEFAULT 0,
+      total_boots INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Payout records — audit trail only, no balances held
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      boot_event_id INTEGER NOT NULL,
+      recipient_pubkey TEXT NOT NULL,
+      recipient_address TEXT NOT NULL,
+      amount_sats INTEGER NOT NULL,
+      payout_type TEXT NOT NULL,
+      txid TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Indexes for query performance
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_post_id ON bootboard(post_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_held_until ON bootboard(held_until)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_from ON migrations(from_pubkey)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_to ON migrations(to_pubkey)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pubkey ON posts(pubkey)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_boot ON payouts(boot_event_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_recipient ON payouts(recipient_pubkey)');
 } catch (err) {
   throw new Error(`BSVibes DB: failed during schema init — ${err instanceof Error ? err.message : String(err)}`);
 }

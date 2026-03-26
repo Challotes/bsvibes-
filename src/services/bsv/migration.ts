@@ -38,14 +38,14 @@ export async function postMigrationOnChain(migration: MigrationData): Promise<st
     opReturnScript.writeOpCode(OP.OP_RETURN);
     opReturnScript.writeBin(Array.from(new TextEncoder().encode(payload)));
 
-    const txid = await buildAndBroadcast([
+    const result = await buildAndBroadcast([
       {
         lockingScript: opReturnScript as import('@bsv/sdk').LockingScript,
         satoshis: 0,
       },
     ]);
 
-    return txid;
+    return result.status === 'success' ? result.txid : null;
   } catch (e) {
     console.error('BSVibes: migration on-chain logging failed', e);
     return null;

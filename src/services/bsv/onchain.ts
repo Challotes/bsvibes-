@@ -37,14 +37,14 @@ export async function logPostOnChain(postData: PostData): Promise<string | null>
     opReturnScript.writeOpCode(OP.OP_RETURN);
     opReturnScript.writeBin(Array.from(new TextEncoder().encode(payload)));
 
-    const txid = await buildAndBroadcast([
+    const result = await buildAndBroadcast([
       {
         lockingScript: opReturnScript as LockingScript,
         satoshis: 0,
       },
     ]);
 
-    return txid;
+    return result.status === 'success' ? result.txid : null;
   } catch (e) {
     console.error('BSVibes: on-chain logging failed', e);
     return null;
