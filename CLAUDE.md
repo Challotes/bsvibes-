@@ -39,6 +39,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
 - `src/app/api/boot-shares/route.ts` — Returns contributor shares + boot price for client-side tx building
 - `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (audit trail + bootboard update)
+- `src/app/api/earnings/route.ts` — Returns total earned sats + recent payouts for an address
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts/getNewPosts/getOlderPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)

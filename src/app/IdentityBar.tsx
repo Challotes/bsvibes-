@@ -18,6 +18,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [revealed, setRevealed] = useState(false);
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
   const [isProtected, setIsProtected] = useState(false);
+  const [earnedSats, setEarnedSats] = useState(0);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -29,6 +30,15 @@ export function IdentityChip(): React.JSX.Element | null {
     setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
     setIsProtected(isIdentityEncrypted());
   }, []);
+
+  // Fetch earnings when identity is available
+  useEffect(() => {
+    if (!identity?.address) return;
+    fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
+      .then((res) => res.json())
+      .then((data) => setEarnedSats(data.totalEarned ?? 0))
+      .catch(() => {});
+  }, [identity?.address]);
 
   useEffect(() => {
     if (!open) return;
@@ -127,6 +137,9 @@ export function IdentityChip(): React.JSX.Element | null {
       >
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
+        {earnedSats > 0 && (
+          <span className="text-emerald-400 text-[10px] font-medium">{earnedSats.toLocaleString()} sats</span>
+        )}
 
         {showWarningDot && (
           <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
@@ -166,6 +179,19 @@ export function IdentityChip(): React.JSX.Element | null {
               {revealed ? 'Hide' : 'Reveal'}
             </button>
           </div>
+
+          {/* Earnings */}
+          {earnedSats > 0 && (
+            <div className="flex items-center justify-between py-2 border-t border-zinc-800">
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                <span className="text-xs text-zinc-400">Total earned</span>
+              </div>
+              <span className="text-xs text-emerald-400 font-medium">{earnedSats.toLocaleString()} sats</span>
+            </div>
+          )}
 
           {/* Security status */}
           <div className="flex items-center gap-2 py-2 border-t border-zinc-800">

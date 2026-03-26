@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — Phase 6 Complete: Earnings Display
+
+- Earnings API endpoint (/api/earnings) — sums payouts by recipient address
+- Identity chip shows "X sats" earned next to anon name when earnings > 0
+- Identity dropdown shows "Total earned" section with emerald accent
+- Phase 6 marked COMPLETE in ROADMAP.md
+
 ## 2026-03-26 — Phase 6 UI Wiring: Boot Payments Live
 
 - Boot button now handles full flow: free (server pays) → paid (client trustless) → no funds (QR modal)

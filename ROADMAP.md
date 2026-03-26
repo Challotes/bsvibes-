@@ -102,7 +102,7 @@
 - [ ] Daily posting limits (5 free/day)
 - [ ] QR code funding when limit reached
 
-## Phase 6: Fairness & Revenue — IN PROGRESS
+## Phase 6: Fairness & Revenue — COMPLETE
 
 - [x] Fairness config (tunable parameters, governance surface)
 - [x] Dynamic boot pricing (contributors × 156, floor 1000, ceiling 250000, cached 1h)
@@ -123,7 +123,8 @@
 - [x] UI: free boot counter ("FREE" badge + remaining count in tooltip)
 - [x] UI: fund address modal (shows deposit address when user has no BSV balance)
 - [x] Boot button handles full flow: free → server, paid → client trustless, no funds → QR modal
-- [ ] UI: earnings display on identity chip + dropdown (needs payout query)
+- [x] UI: earnings display on identity chip (sats earned) + dropdown (total earned section)
+- [x] Earnings API endpoint (/api/earnings — sum payouts by address)
 
 ## Phase 7: The Recursive Model — PLANNED
 
