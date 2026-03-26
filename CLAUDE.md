@@ -37,6 +37,8 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/data/agent-prompt.ts` — Shared system prompt for agent chat (single source of truth)
 - `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
 - `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
+- `src/app/api/boot-shares/route.ts` — Returns contributor shares + boot price for client-side tx building
+- `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (audit trail + bootboard update)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts/getNewPosts/getOlderPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
@@ -50,6 +52,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/services/bsv/identity.ts` — BSV keypair generation, signing, encrypted storage, upgrade + unlock
 - `src/services/bsv/crypto.ts` — AES-256-GCM encrypt/decrypt for WIF keys (Web Crypto API)
 - `src/services/bsv/migration.ts` — Key rotation with on-chain migration via OP_RETURN
+- `src/services/bsv/client-boot.ts` — Client-side trustless boot tx builder (browser → contributors directly, zero custody)
 - `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (reservation, 0-conf chaining, multi-input)
 - `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget, returns txid)
 - `src/services/fairness/config.ts` — Tunable fairness parameters (governance surface for AI agent)

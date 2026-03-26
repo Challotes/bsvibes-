@@ -114,11 +114,14 @@
 - [x] Boot grants table (15 free boots per pubkey)
 - [x] Payouts audit table (records every split for transparency)
 - [x] FundAddress component (deposit address panel for users who exhaust free boots)
-- [ ] Wire bootPost action to orchestrator (replace raw SQLite boot with paid/free flow)
+- [x] Wire bootPost action to orchestrator (free boots → server, paid → client trustless)
+- [x] Client-side trustless boot tx builder (browser builds split tx directly to contributors)
+- [x] Boot shares API endpoint (/api/boot-shares — contributor list for client tx building)
+- [x] Boot confirmation API endpoint (/api/boot-confirm — audit trail after client broadcast)
+- [x] Auto-switch: free → server pays, has BSV → client pays trustlessly, no balance → fund QR
 - [ ] UI: boot price display on buttons and bootboard
 - [ ] UI: earnings display on identity chip + dropdown
 - [ ] UI: free boot counter on boot buttons
-- [ ] API endpoint for boot pricing info
 
 ## Phase 7: The Recursive Model — PLANNED
 
