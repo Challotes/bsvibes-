@@ -5,6 +5,7 @@ import { generateAnonName } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
 import { PublicKey, Signature } from '@bsv/sdk';
 import { logPostOnChain } from '@/services/bsv/onchain';
+import { postMigrationOnChain } from '@/services/bsv/migration';
 import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
 export async function createPost(formData: FormData): Promise<void> {
@@ -169,4 +170,47 @@ export async function bootPost(postId: number, boostedBy: string): Promise<{ pro
   if (processingMs === null) return { processingMs: 0 };
 
   return { processingMs };
+}
+
+export async function migrateIdentity(
+  oldPubkey: string,
+  newPubkey: string,
+  migrationSig: string,
+  migrationMessage: string
+): Promise<{ success: boolean }> {
+  // Verify the migration signature — old key must have signed the message
+  try {
+    const messageBytes = Array.from(new TextEncoder().encode(migrationMessage));
+    const verified = PublicKey.fromString(oldPubkey).verify(
+      messageBytes,
+      Signature.fromDER(migrationSig, 'hex'),
+    );
+    if (!verified) return { success: false };
+  } catch {
+    return { success: false };
+  }
+
+  // Store migration record
+  db.prepare(
+    'INSERT INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+  ).run(oldPubkey, newPubkey, migrationSig);
+
+  // Fire-and-forget: post migration on-chain
+  postMigrationOnChain({
+    oldPubkey,
+    newPubkey,
+    migrationMessage,
+    migrationSignature: migrationSig,
+  })
+    .then((txid) => {
+      if (txid) {
+        db.prepare('UPDATE migrations SET tx_id = ? WHERE from_pubkey = ? AND to_pubkey = ?')
+          .run(txid, oldPubkey, newPubkey);
+      }
+    })
+    .catch(() => {
+      // On-chain logging is best-effort
+    });
+
+  return { success: true };
 }

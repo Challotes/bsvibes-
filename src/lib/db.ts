@@ -47,9 +47,23 @@ try {
     db.exec('ALTER TABLE posts ADD COLUMN pubkey TEXT');
   }
 
+  // Migrations table — tracks key rotations
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_pubkey TEXT NOT NULL,
+      to_pubkey TEXT NOT NULL,
+      signature TEXT NOT NULL,
+      tx_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Indexes for query performance
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_post_id ON bootboard(post_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_held_until ON bootboard(held_until)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_from ON migrations(from_pubkey)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_to ON migrations(to_pubkey)');
 } catch (err) {
   throw new Error(`BSVibes DB: failed during schema init — ${err instanceof Error ? err.message : String(err)}`);
 }

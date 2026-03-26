@@ -81,12 +81,18 @@
 - [x] Wallet generation script (scripts/generate-wallet.mjs)
 - [x] Graceful degradation (no BSV_SERVER_WIF = DB-only, no errors)
 
-## Phase 4: Security Upgrades — PLANNED
+## Phase 4: Security Upgrades — COMPLETE
 
-- [ ] Passphrase encryption for localStorage (AES-256, min 8 chars)
-- [ ] Encrypted backup files
-- [ ] Passkey wrapping (WebAuthn PRF, biometric unlock)
-- [ ] Firefox passphrase fallback
+- [x] AES-256-GCM passphrase encryption (Web Crypto API, PBKDF2 100k iterations)
+- [x] "Upgrade Security" button in identity dropdown (optional, user-initiated)
+- [x] Key rotation on upgrade (new keypair, old key signs migration)
+- [x] On-chain migration record (OP_RETURN linking old pubkey → new pubkey)
+- [x] Server-side migration verification + DB storage (migrations table)
+- [x] Protected/Unprotected shield indicator in identity dropdown
+- [x] Session-cached decrypted identity (plaintext never written back to localStorage)
+- [ ] Passkey wrapping (WebAuthn PRF, biometric unlock) — future
+- [ ] Firefox passphrase fallback — future
+- [ ] Deferred activation prompt (nudge at earnings threshold) — future
 
 ## Phase 5: Self-Funded Posting — PLANNED
 

@@ -35,10 +35,18 @@
 6. **Stage 5:** Revenue + daily limits — 5 free posts/day, QR to fund, fairness agent routes revenue
 7. **Stage 6:** Server HSM / threshold signing — required before significant funds flow
 
-### The 5-minute window problem (settled)
+### The 5-minute window problem (settled + implemented)
 - Any key that existed as plaintext in localStorage must be assumed potentially compromised
-- When real money starts flowing: generate NEW key, old key signs on-chain migration message (MAP + AIP protocol)
-- For idea-board phase with zero funds: risk is near-zero, defer rotation until revenue phase
+- **Implemented:** "Upgrade Security" in identity dropdown generates NEW key, old key signs migration, new key encrypted with AES-256
+- Migration posted on-chain via OP_RETURN — permanent verifiable link from old pubkey to new pubkey
+- All contribution history and future payments follow the migration chain
+- Old key becomes useless after migration — someone stealing it gains nothing
+
+### Security upgrade model (settled)
+- **Self-service:** "Upgrade Security" button always visible in identity dropdown
+- **Deferred activation (future):** System nudges users when earnings reach a threshold (e.g., $5) but haven't upgraded yet
+- **Zero friction for new users:** No passphrase required on first visit. Upgrade is optional and user-initiated
+- **Key rotation on upgrade:** Fresh keypair born encrypted, never existed as plaintext
 
 ### Passkey-wrapped keys (chosen approach)
 - BSV key encrypted with AES-256

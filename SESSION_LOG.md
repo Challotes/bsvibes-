@@ -2,6 +2,16 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — Security Upgrade System (Phase 4)
+
+- AES-256-GCM passphrase encryption via Web Crypto API (crypto.ts)
+- Key rotation on upgrade: new keypair generated, old key signs on-chain migration
+- Migration service posts OP_RETURN linking old pubkey → new pubkey
+- Server action verifies migration signature + stores in migrations table with indexes
+- IdentityBar: "Upgrade Security" button, passphrase form, Protected/Unprotected shield
+- identity.ts handles both plaintext and encrypted storage, session-cached decryption
+- Phase 4 marked COMPLETE (passkey wrapping + deferred activation deferred to future)
+
 ## 2026-03-26 — On-Chain Posting (Phase 3)
 
 - Server wallet service: loads BSV_SERVER_WIF, fetches UTXOs from WhatsOnChain, broadcasts via ARC
