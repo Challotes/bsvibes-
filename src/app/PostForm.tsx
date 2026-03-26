@@ -7,9 +7,10 @@ import { AgentChat } from './AgentChat';
 
 interface PostFormProps {
   onPostCreated?: (content: string, author: string) => void;
+  agentHighlight?: boolean;
 }
 
-export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
+export function PostForm({ onPostCreated, agentHighlight }: PostFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -186,7 +187,7 @@ export function PostForm({ onPostCreated }: PostFormProps): React.JSX.Element {
           </span>
         </div>
         <p className="text-[11px] text-zinc-600 sm:hidden">&nbsp;</p>
-        <AgentChat />
+        <AgentChat highlight={agentHighlight} />
       </div>
     </form>
   );

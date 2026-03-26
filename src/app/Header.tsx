@@ -17,7 +17,12 @@ export function Header({ isAtTop, genesisHydrated, genesisVisited, onScrollToGen
           <h1 className="text-lg font-semibold tracking-tight leading-none">
             <span className="text-amber-400">BS</span>Vibes
           </h1>
-          <p className="text-[10px] text-zinc-600 tracking-wide">Agentic Fairness</p>
+          <button
+            onClick={onScrollToGenesis}
+            className="text-[11px] text-zinc-500 tracking-wide hover:text-amber-400 transition-colors duration-150"
+          >
+            Agentic Fairness
+          </button>
         </div>
 
         <div className="absolute left-1/2 -translate-x-1/2">

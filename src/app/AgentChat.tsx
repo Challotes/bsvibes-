@@ -14,7 +14,7 @@ const SUGGESTED = [
   'How do I post?',
 ];
 
-export function AgentChat() {
+export function AgentChat({ highlight }: { highlight?: boolean }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -133,9 +133,13 @@ export function AgentChat() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs text-zinc-400 border border-zinc-800 rounded-full px-2.5 py-1 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900 transition-colors mt-1"
+        className={`flex items-center gap-1.5 text-xs border rounded-full px-2.5 py-1 transition-all mt-1 ${
+          highlight
+            ? 'text-amber-300 border-amber-500 bg-amber-500/10 scale-110 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+            : 'text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900'
+        }`}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 animate-pulse flex-shrink-0" />
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${highlight ? 'bg-amber-400 animate-ping' : 'bg-cyan-400/70 animate-pulse'}`} />
         Ask AI
       </button>
     );

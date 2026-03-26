@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-26 — Manifesto, Vision Copy & Concept-to-UI Gap
+
+- Created Manifesto.tsx with V2 "The Signal" vision copy (amber left-border accent, bold heading)
+- Genesis.tsx now renders Manifesto above founding conversation with bridge divider
+- "Agentic Fairness" subtitle in header is now clickable (scrolls to manifesto)
+- "Chat with the agent to learn more" link scrolls to bottom and pulses the Ask AI button amber for 2s
+- Phase 2 fully complete: UI labels item marked done (identity dropdown copy already updated)
+
 ## 2026-03-25 — Performance: Instant Posts & Boots
 
 - Root-caused 3s perceived delay: optimistic posts showed "sending" spinner until next poll (up to 5s)

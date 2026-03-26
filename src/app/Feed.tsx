@@ -51,6 +51,7 @@ export function Feed({
   const [olderPosts, setOlderPosts] = useState<Post[]>([]);
   const [hasMore, setHasMore] = useState(initialPosts.length === 100);
   const [isLoadingMore, startLoadingMore] = useTransition();
+  const [agentHighlight, setAgentHighlight] = useState(false);
 
   // Prune confirmed posts on every render — no extra effect needed.
   const pendingOptimistic = useMemo(
@@ -105,6 +106,12 @@ export function Feed({
     scrollToGenesis,
   } = useScrollTracker({ postCount: serverPosts.length, postIds });
 
+  const handleAskAgent = useCallback(() => {
+    scrollToBottom();
+    setAgentHighlight(true);
+    setTimeout(() => setAgentHighlight(false), 2000);
+  }, [scrollToBottom]);
+
   return (
     <IdentityProvider>
       <div className="flex flex-col h-screen">
@@ -138,6 +145,7 @@ export function Feed({
             isLoadingMore={isLoadingMore}
             onLoadEarlier={handleLoadEarlier}
             onBooted={refresh}
+            onAskAgent={handleAskAgent}
           />
 
           {/* Optimistic posts — appear at the bottom (newest), full opacity since server confirms in ~50ms */}
@@ -185,7 +193,7 @@ export function Feed({
         {/* Pinned bottom — compose area */}
         <div className="shrink-0">
           <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
-            <PostForm onPostCreated={handlePostCreated} />
+            <PostForm onPostCreated={handlePostCreated} agentHighlight={agentHighlight} />
             <div className="flex justify-center mt-1">
               <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
                 created with bopen.ai

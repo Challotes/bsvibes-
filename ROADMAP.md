@@ -67,7 +67,10 @@
 - [x] Agent chat discoverable ("Ask AI" pill button replaces hidden text)
 - [x] Identity loading state (dynamic placeholder + pulse animation)
 - [x] Streaming agent responses (SSE via /api/agent route, progressive text display)
-- [ ] Rename UI labels ("keep your name" not "save your key")
+- [x] UI labels updated (identity dropdown copy rewritten, no longer says "key")
+- [x] Manifesto / vision TLDR above Genesis section (V2 "The Signal" copy)
+- [x] "Agentic Fairness" subtitle clickable (scrolls to manifesto)
+- [x] "Chat with the agent" link in manifesto scrolls to bottom + highlights Ask AI button
 
 ## Phase 3: On-Chain Integration — PLANNED
 

@@ -31,8 +31,9 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/PostForm.tsx` — Compose box with enter-to-post, voice-to-text mic, agent chat trigger, optimistic post callback
 - `src/app/IdentityBar.tsx` — Identity chip with dropdown, WIF masked with reveal toggle, amber warning dot until first backup
 - `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
-- `src/app/Genesis.tsx` — Founding conversation display (always visible at top of feed, NOT collapsible by design)
-- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent)
+- `src/app/Manifesto.tsx` — Vision TLDR block above Genesis (amber accent, "Chat with the agent" link)
+- `src/app/Genesis.tsx` — Manifesto + founding conversation (always visible at top of feed, NOT collapsible by design)
+- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent, highlight-on-demand)
 - `src/data/agent-prompt.ts` — Shared system prompt for agent chat (single source of truth)
 - `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
 - `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)

@@ -58,6 +58,7 @@ interface PostListProps {
   isLoadingMore: boolean;
   onLoadEarlier: () => void;
   onBooted?: () => void;
+  onAskAgent?: () => void;
 }
 
 export function PostList({
@@ -69,11 +70,12 @@ export function PostList({
   isLoadingMore,
   onLoadEarlier,
   onBooted,
+  onAskAgent,
 }: PostListProps) {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
       <div ref={genesisRef} />
-      <Genesis />
+      <Genesis onAskAgent={onAskAgent} />
 
       {hasMore && (
         <div className="flex justify-center py-4">
