@@ -152,6 +152,7 @@ export function Feed({
             onBooted={refresh}
             onAskAgent={handleAskAgent}
             onFundNeeded={(address) => { setUserAddress(address); setShowFundModal(true); }}
+            onFreeBootUsed={() => setFreeBootsRemaining(0)}
             bootPrice={bootPrice}
             freeBootsRemaining={freeBootsRemaining}
           />

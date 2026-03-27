@@ -17,9 +17,10 @@ interface BootButtonProps {
   freeBootsRemaining: number;
   onBooted?: () => void;
   onFundNeeded?: (address: string) => void;
+  onFreeBootUsed?: () => void;
 }
 
-function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded }: BootButtonProps) {
+function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded, onFreeBootUsed }: BootButtonProps) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
   const [optimisticBoots, setOptimisticBoots] = useState(0);
@@ -33,13 +34,17 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
 
   async function handleBoot() {
     if (!identity || !postPubkey) return;
-    setOptimisticBoots((prev) => prev + 1);
 
     startTransition(async () => {
+      setOptimisticBoots((prev) => prev + 1);
+
       // Try server-side boot first (handles free boots)
       const result = await bootPost(postId, identity.address, identity.name);
 
       if (result.requiresPayment) {
+        // Server says free quota is exhausted — sync client state immediately
+        onFreeBootUsed?.();
+
         // Paid boot — client builds trustless tx
         const sharesRes = await fetch(`/api/boot-shares?postId=${postId}&pubkey=${encodeURIComponent(identity.address)}`);
         if (!sharesRes.ok) {
@@ -69,10 +74,11 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ postId, txid: bootResult.txid, booterPubkey: identity.address, booterName: identity.name }),
           });
+          onBooted?.();
         } else {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));
-          return;
         }
+        return;
       }
 
       onBooted?.();
@@ -123,6 +129,7 @@ interface PostListProps {
   onBooted?: () => void;
   onAskAgent?: () => void;
   onFundNeeded?: (address: string) => void;
+  onFreeBootUsed?: () => void;
   bootPrice: number;
   freeBootsRemaining: number;
 }
@@ -138,6 +145,7 @@ export function PostList({
   onBooted,
   onAskAgent,
   onFundNeeded,
+  onFreeBootUsed,
   bootPrice,
   freeBootsRemaining,
 }: PostListProps) {
@@ -213,6 +221,7 @@ export function PostList({
                   freeBootsRemaining={freeBootsRemaining}
                   onBooted={onBooted}
                   onFundNeeded={onFundNeeded}
+                  onFreeBootUsed={onFreeBootUsed}
                 />
               </div>
             </div>
