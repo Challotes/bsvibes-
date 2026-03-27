@@ -165,7 +165,8 @@ export async function buildAndBroadcast(
       tx.addOutput(output);
     }
 
-    // Change output back to server
+    // Change output back to server — track its index for 0-conf chaining
+    const changeOutputIndex = tx.outputs.length; // will be at this index after addOutput
     tx.addOutput({
       lockingScript: new P2PKH().lock(key.toPublicKey().toAddress()),
       change: true,
@@ -174,24 +175,43 @@ export async function buildAndBroadcast(
     await tx.fee();
     await tx.sign();
 
+    // If the fee consumed all remaining funds the change output will have 0 satoshis.
+    // A 0-sat output is non-standard on BSV — remove it to avoid broadcast rejection.
+    let hasChangeOutput = true;
+    const changeOutputAfterFee = tx.outputs[changeOutputIndex];
+    if (!changeOutputAfterFee?.satoshis || changeOutputAfterFee.satoshis <= 0) {
+      tx.outputs.splice(changeOutputIndex, 1);
+      hasChangeOutput = false;
+    }
+
     const broadcastResult = await tx.broadcast();
 
     if (broadcastResult.status === 'success') {
       const txid = tx.id('hex') as string;
 
-      // 0-conf chain: add change output as immediately spendable UTXO
-      const changeIndex = tx.outputs.length - 1;
-      const changeSats = tx.outputs[changeIndex].satoshis;
-      if (changeSats && changeSats > 0) {
-        _pendingChange.push({
-          tx_hash: txid,
-          tx_pos: changeIndex,
-          value: changeSats,
-          sourceTransaction: tx, // Keep the tx object for signing
-        });
+      // Remove the spent UTXOs from pending change (they've been consumed)
+      const spentKeys = new Set(utxos.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+      for (let i = _pendingChange.length - 1; i >= 0; i--) {
+        const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+        if (spentKeys.has(pendingKey)) {
+          _pendingChange.splice(i, 1);
+        }
+      }
 
-        // Clean up old pending UTXOs (keep last 50)
-        while (_pendingChange.length > 50) _pendingChange.shift();
+      // 0-conf chain: register change output as immediately spendable
+      if (hasChangeOutput) {
+        const changeSats = tx.outputs[changeOutputIndex].satoshis;
+        if (changeSats && changeSats > 0) {
+          _pendingChange.push({
+            tx_hash: txid,
+            tx_pos: changeOutputIndex,
+            value: changeSats,
+            sourceTransaction: tx, // Keep the tx object for signing
+          });
+
+          // Cap pending change queue to avoid unbounded growth
+          while (_pendingChange.length > 50) _pendingChange.shift();
+        }
       }
 
       // Release the spent UTXOs (they're consumed now)

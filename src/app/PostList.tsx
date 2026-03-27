@@ -41,6 +41,19 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
       // Try server-side boot first (handles free boots)
       const result = await bootPost(postId, identity.address, identity.name);
 
+      if (result.error) {
+        // Server-side error — roll back the optimistic increment
+        setOptimisticBoots((prev) => Math.max(0, prev - 1));
+        return;
+      }
+
+      if (result.success && result.isFree) {
+        // Successful free boot — decrement local counter to stay in sync with server quota
+        onFreeBootUsed?.();
+        onBooted?.();
+        return;
+      }
+
       if (result.requiresPayment) {
         // Server says free quota is exhausted — sync client state immediately
         onFreeBootUsed?.();

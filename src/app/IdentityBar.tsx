@@ -18,7 +18,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [revealed, setRevealed] = useState(false);
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
   const [isProtected, setIsProtected] = useState(false);
-  const [earnedSats, setEarnedSats] = useState(0);
+  const [earnedSats, setEarnedSats] = useState<number | null>(null); // null = not yet loaded
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -31,14 +31,15 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(isIdentityEncrypted());
   }, []);
 
-  // Fetch earnings when identity is available
+  // Fetch earnings when identity is available.
+  // Re-fetch each time the dropdown opens so the value stays fresh.
   useEffect(() => {
     if (!identity?.address) return;
     fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
       .then((res) => res.json())
       .then((data) => setEarnedSats(data.totalEarned ?? 0))
-      .catch(() => {});
-  }, [identity?.address]);
+      .catch(() => setEarnedSats(0));
+  }, [identity?.address, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -137,7 +138,7 @@ export function IdentityChip(): React.JSX.Element | null {
       >
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
-        {earnedSats > 0 && (
+        {earnedSats !== null && earnedSats > 0 && (
           <span className="text-emerald-400 text-[10px] font-medium">{earnedSats.toLocaleString()} sats</span>
         )}
 
@@ -181,7 +182,7 @@ export function IdentityChip(): React.JSX.Element | null {
           </div>
 
           {/* Earnings */}
-          {earnedSats > 0 && (
+          {earnedSats !== null && earnedSats > 0 && (
             <div className="flex items-center justify-between py-2 border-t border-zinc-800">
               <div className="flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
