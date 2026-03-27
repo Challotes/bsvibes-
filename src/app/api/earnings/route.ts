@@ -20,21 +20,24 @@ export async function GET(request: Request) {
     'SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address = ? ORDER BY created_at DESC LIMIT 10'
   ).all(address) as Array<{ amount_sats: number; payout_type: string; txid: string; created_at: string }>;
 
-  // Recent boots by this user (outgoing) — join payouts to get actual cost per boot event.
-  // If payouts exist for a bootboard entry, sum them = actual boot price paid.
-  // If no payouts, the boot was free (server paid or pre-payment era).
+  // Recent boots by this user (outgoing).
+  // is_free = 1 → server paid (free boot grant) → show as 0 cost to user.
+  // is_free = 0 → user paid → sum payouts to get actual amount spent.
+  // Note: free boots still have payouts recorded (server→contributors) but those
+  // are not the user's money, so we zero them out here via the is_free flag.
   const bootSpend = db.prepare(`
     SELECT
       b.id as boot_id,
       b.booted_at as created_at,
-      COALESCE(SUM(py.amount_sats), 0) as total_paid
+      b.is_free,
+      CASE WHEN b.is_free = 1 THEN 0 ELSE COALESCE(SUM(py.amount_sats), 0) END as total_paid
     FROM bootboard b
     LEFT JOIN payouts py ON py.boot_event_id = b.id
     WHERE b.boosted_by = ?
-    GROUP BY b.id, b.booted_at
+    GROUP BY b.id, b.booted_at, b.is_free
     ORDER BY b.booted_at DESC
     LIMIT 10
-  `).all(address) as Array<{ boot_id: number; created_at: string; total_paid: number }>;
+  `).all(address) as Array<{ boot_id: number; created_at: string; is_free: number; total_paid: number }>;
 
   // Merge into a unified activity feed
   type Activity = {

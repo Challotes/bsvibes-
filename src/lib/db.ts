@@ -40,11 +40,19 @@ try {
   // boosted_by now stores the BSV address (stable ID for queries),
   // boosted_by_name stores the display name (anon_XXXX).
   const bootboardCols = db.prepare("PRAGMA table_info(bootboard)").all() as { name: string }[];
-  if (!bootboardCols.map(c => c.name).includes('boosted_by_name')) {
+  const bootboardColNames = bootboardCols.map(c => c.name);
+  if (!bootboardColNames.includes('boosted_by_name')) {
     db.exec('ALTER TABLE bootboard ADD COLUMN boosted_by_name TEXT');
     // Back-fill: existing rows stored the display name in boosted_by,
     // so copy it to boosted_by_name (address unknown for old rows).
     db.exec("UPDATE bootboard SET boosted_by_name = boosted_by WHERE boosted_by_name IS NULL");
+  }
+  // Migrate bootboard: add is_free column if missing.
+  // is_free = 1 means the server paid for this boot (user used a free boot grant).
+  // is_free = 0 means the user paid out of their own wallet.
+  // Back-fill: existing rows pre-date this column, treat as paid (conservative — avoids hiding real costs).
+  if (!bootboardColNames.includes('is_free')) {
+    db.exec('ALTER TABLE bootboard ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0');
   }
 
   // Migrate: add columns if they don't exist yet

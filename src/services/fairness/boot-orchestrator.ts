@@ -100,9 +100,10 @@ export async function executeBoot(
     // New post takes the spot.
     // boosted_by = BSV address (used for activity feed queries by address)
     // boosted_by_name = human-readable display name (anon_XXXX)
+    // is_free = 1 when the server wallet paid (user had a free boot grant)
     const bootboardInsert = db.prepare(`
-      INSERT INTO bootboard (post_id, boosted_by, boosted_by_name) VALUES (?, ?, ?)
-    `).run(postId, booterPubkey, booterName);
+      INSERT INTO bootboard (post_id, boosted_by, boosted_by_name, is_free) VALUES (?, ?, ?, ?)
+    `).run(postId, booterPubkey, booterName, isFree ? 1 : 0);
 
     // Use the unique bootboard row ID as bootEventId so multiple boots on the
     // same post each get their own payout set — prevents double-counting in earnings.
