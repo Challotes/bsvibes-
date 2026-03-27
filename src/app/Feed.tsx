@@ -119,9 +119,9 @@ function FeedContent({
     setFreeBootsRemaining((prev) => Math.max(0, prev - 1));
   }, []);
 
-  // chronological = newest-first server posts reversed to oldest-first, then older pages appended.
+  // chronological = older pages first (oldest at top), then recent posts (newest at bottom).
   const chronological = useMemo(
-    () => [...[...serverPosts].reverse(), ...olderPosts],
+    () => [...olderPosts, ...[...serverPosts].reverse()],
     [serverPosts, olderPosts]
   );
   const postIds = useMemo(() => serverPosts.map((p) => p.id), [serverPosts]);
