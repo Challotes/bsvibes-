@@ -56,7 +56,12 @@ async function fetchUtxos(address: string): Promise<WocUtxo[]> {
   if (!res.ok) {
     throw new Error(`UTXO fetch failed: ${res.status} ${res.statusText}`);
   }
-  return (await res.json()) as WocUtxo[];
+  const data = await res.json();
+  // WoC returns null (not []) for addresses with no history at all
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data as WocUtxo[];
 }
 
 async function fetchSourceTxHex(txHash: string): Promise<string> {
@@ -158,21 +163,27 @@ export async function clientSideBoot(
     const utxos = await fetchUtxos(userAddress);
 
     if (utxos.length === 0) {
+      console.warn('[clientSideBoot] No UTXOs found for address:', userAddress, '— address may have no confirmed/unconfirmed outputs');
       return { status: 'insufficient_funds', balance: 0 };
     }
 
     const balance = utxos.reduce((sum, u) => sum + u.value, 0);
 
     // Estimate fee: ~150 bytes per input + ~34 per output + ~80 for OP_RETURN + overhead
+    // Fee rate: 1 sat/byte. Divide byte count by 1000 gives sats (rounds up to nearest sat).
+    const estimatedInputs = Math.min(utxos.length, 10);
     const estimatedFee = Math.max(
       1,
-      Math.ceil((150 * Math.min(utxos.length, 10) + 34 * (shares.length + 2) + 80) / 1000),
+      Math.ceil((150 * estimatedInputs + 34 * (shares.length + 2) + 80) / 1000),
     );
     const totalNeeded = bootPriceSats + estimatedFee;
 
     // ── Select UTXOs ────────────────────────────────────────
     const selection = selectUtxos(utxos, totalNeeded);
     if (!selection) {
+      console.warn(
+        `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${totalNeeded} sats (price=${bootPriceSats} + fee=${estimatedFee}), address=${userAddress}`,
+      );
       return { status: 'insufficient_funds', balance };
     }
 

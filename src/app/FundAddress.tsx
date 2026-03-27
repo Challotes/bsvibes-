@@ -5,10 +5,11 @@ import { useState } from 'react';
 interface FundAddressProps {
   address: string;
   bootPrice: number;
+  balance?: number;
   onClose: () => void;
 }
 
-export function FundAddress({ address, bootPrice, onClose }: FundAddressProps) {
+export function FundAddress({ address, bootPrice, balance, onClose }: FundAddressProps) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -16,6 +17,11 @@ export function FundAddress({ address, bootPrice, onClose }: FundAddressProps) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  // How much more the user needs to top up (at minimum enough for one boot + small buffer)
+  const shortfall = balance !== undefined && balance < bootPrice
+    ? bootPrice - balance
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -36,9 +42,29 @@ export function FundAddress({ address, bootPrice, onClose }: FundAddressProps) {
           </button>
         </div>
 
-        <p className="text-xs text-zinc-400 mb-3">
-          Send BSV to this address to keep booting posts. Each boot costs {bootPrice.toLocaleString()} sats.
-        </p>
+        {/* Balance breakdown when we know the user's current balance */}
+        {balance !== undefined ? (
+          <div className="bg-zinc-800/60 rounded-lg px-3 py-2.5 mb-3 text-xs space-y-1">
+            <div className="flex justify-between text-zinc-400">
+              <span>Your balance</span>
+              <span className="font-mono text-zinc-200">{balance.toLocaleString()} sats</span>
+            </div>
+            <div className="flex justify-between text-zinc-400">
+              <span>Boot costs</span>
+              <span className="font-mono text-zinc-200">{bootPrice.toLocaleString()} sats</span>
+            </div>
+            {shortfall !== null && (
+              <div className="flex justify-between text-amber-400 pt-1 border-t border-zinc-700/60">
+                <span>Top up needed</span>
+                <span className="font-mono">{shortfall.toLocaleString()} sats</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-400 mb-3">
+            Send BSV to this address to keep booting posts. Each boot costs {bootPrice.toLocaleString()} sats.
+          </p>
+        )}
 
         {/* Address display */}
         <div
@@ -56,7 +82,9 @@ export function FundAddress({ address, bootPrice, onClose }: FundAddressProps) {
         </button>
 
         <p className="text-[10px] text-zinc-600 text-center mt-2">
-          Even 10,000 sats covers many boots
+          {balance !== undefined && balance > 0
+            ? `Deposit at least ${shortfall !== null ? shortfall.toLocaleString() : bootPrice.toLocaleString()} more sats to this address`
+            : 'Even 10,000 sats covers many boots'}
         </p>
       </div>
     </div>

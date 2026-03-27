@@ -31,7 +31,7 @@ function LiveTimer({ since }: { since: string }) {
   return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
 }
 
-function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['history'][0]; onBooted?: () => void; onFundNeeded?: (address: string) => void }) {
+function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['history'][0]; onBooted?: () => void; onFundNeeded?: (address: string, balance?: number) => void }) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
 
@@ -55,7 +55,13 @@ function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['h
         );
 
         if (bootResult.status === 'insufficient_funds') {
-          onFundNeeded?.(identity.address);
+          console.warn('[HistoryRow] clientSideBoot insufficient_funds, balance:', bootResult.balance, 'address:', identity.address);
+          onFundNeeded?.(identity.address, bootResult.balance);
+          return;
+        }
+
+        if (bootResult.status === 'error' || bootResult.status === 'broadcast_failed') {
+          console.error('[HistoryRow] clientSideBoot failed:', bootResult.status, bootResult.error);
           return;
         }
 
@@ -93,7 +99,7 @@ function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['h
   );
 }
 
-export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: BootboardData; onBooted?: () => void; bootPrice?: number; onFundNeeded?: (address: string) => void }) {
+export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: BootboardData; onBooted?: () => void; bootPrice?: number; onFundNeeded?: (address: string, balance?: number) => void }) {
   const { current, history } = data;
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);

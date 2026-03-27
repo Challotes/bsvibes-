@@ -60,6 +60,7 @@ function FeedContent({
   const [freeBootsRemaining, setFreeBootsRemaining] = useState(0);
   const [showFundModal, setShowFundModal] = useState(false);
   const [userAddress, setUserAddress] = useState('');
+  const [userBalance, setUserBalance] = useState<number | undefined>(undefined);
 
   // Fetch the real boot status for this identity from the server once on load.
   useEffect(() => {
@@ -157,7 +158,7 @@ function FeedContent({
       {/* Pinned bootboard */}
       <div className="shrink-0 relative">
         <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
-          <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} onFundNeeded={(address) => { setUserAddress(address); setShowFundModal(true); }} />
+          <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} onFundNeeded={(address, balance) => { setUserAddress(address); setUserBalance(balance); setShowFundModal(true); }} />
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
       </div>
@@ -178,7 +179,7 @@ function FeedContent({
           onLoadEarlier={handleLoadEarlier}
           onBooted={refresh}
           onAskAgent={handleAskAgent}
-          onFundNeeded={(address) => { setUserAddress(address); setShowFundModal(true); }}
+          onFundNeeded={(address, balance) => { setUserAddress(address); setUserBalance(balance); setShowFundModal(true); }}
           onFreeBootUsed={handleFreeBootUsed}
           bootPrice={bootPrice}
           freeBootsRemaining={freeBootsRemaining}
@@ -243,7 +244,8 @@ function FeedContent({
         <FundAddress
           address={userAddress}
           bootPrice={bootPrice}
-          onClose={() => setShowFundModal(false)}
+          balance={userBalance}
+          onClose={() => { setShowFundModal(false); setUserBalance(undefined); }}
         />
       )}
     </div>
