@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { isIdentityEncrypted, upgradeIdentity } from '@/services/bsv/identity';
 import { migrateIdentity } from './actions';
+import { AnimatedBalance } from '@/components/AnimatedBalance';
 
 const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
 
@@ -159,7 +160,7 @@ export function IdentityChip(): React.JSX.Element | null {
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
         {balanceSats !== null && balanceSats > 0 && (
-          <span className="text-emerald-400 text-[10px] font-medium">{balanceSats.toLocaleString()} sats</span>
+          <AnimatedBalance sats={balanceSats} className="text-[10px]" />
         )}
 
         {showWarningDot && (
