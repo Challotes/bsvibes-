@@ -26,6 +26,7 @@ export interface BootboardRow {
   id: number;
   post_id: number;
   boosted_by: string;
+  boosted_by_name: string | null;
   booted_at: string;
   held_until: string | null;
   content: string;
@@ -36,6 +37,7 @@ export interface BootboardRow {
 export interface BootboardHistoryRow {
   post_id: number;
   boosted_by: string;
+  boosted_by_name: string | null;
   booted_at: string;
   held_until: string;
   duration_seconds: number;

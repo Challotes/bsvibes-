@@ -81,10 +81,12 @@ export async function POST(req: NextRequest) {
       WHERE held_until IS NULL
     `).run()
 
-    // Insert the new bootboard entry (store human-readable name for display)
+    // Insert the new bootboard entry.
+    // boosted_by = BSV address (used for activity feed queries by address)
+    // boosted_by_name = human-readable display name (anon_XXXX)
     db.prepare(`
-      INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
-    `).run(postId, displayName)
+      INSERT INTO bootboard (post_id, boosted_by, boosted_by_name) VALUES (?, ?, ?)
+    `).run(postId, booterPubkey, displayName)
 
     // Update or create boot_grants (paid boot — increment total_boots only)
     const existing = db.prepare(

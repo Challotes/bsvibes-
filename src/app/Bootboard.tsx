@@ -178,7 +178,7 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
           {expanded && (
             <div className="animate-[slideUp_0.2s_ease-out] mt-2 pt-2 border-t border-zinc-800/40">
               <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1.5">
-                <span>booted by {current.boosted_by}</span>
+                <span>booted by {current.boosted_by_name ?? current.boosted_by}</span>
               </div>
               {history.length > 0 && (
                 <div className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>

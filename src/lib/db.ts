@@ -36,6 +36,17 @@ try {
     )
   `);
 
+  // Migrate bootboard: add boosted_by_name column if missing.
+  // boosted_by now stores the BSV address (stable ID for queries),
+  // boosted_by_name stores the display name (anon_XXXX).
+  const bootboardCols = db.prepare("PRAGMA table_info(bootboard)").all() as { name: string }[];
+  if (!bootboardCols.map(c => c.name).includes('boosted_by_name')) {
+    db.exec('ALTER TABLE bootboard ADD COLUMN boosted_by_name TEXT');
+    // Back-fill: existing rows stored the display name in boosted_by,
+    // so copy it to boosted_by_name (address unknown for old rows).
+    db.exec("UPDATE bootboard SET boosted_by_name = boosted_by WHERE boosted_by_name IS NULL");
+  }
+
   // Migrate: add columns if they don't exist yet
   const columns = db.prepare("PRAGMA table_info(posts)").all() as { name: string }[];
   const columnNames = columns.map(c => c.name);

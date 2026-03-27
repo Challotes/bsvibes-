@@ -137,7 +137,7 @@ export async function getBootboard(): Promise<BootboardData> {
   `).get() as BootboardRow | undefined;
 
   const history = db.prepare(`
-    SELECT b.post_id, b.boosted_by, b.booted_at, b.held_until,
+    SELECT b.post_id, b.boosted_by, b.boosted_by_name, b.booted_at, b.held_until,
       CAST((julianday(b.held_until) - julianday(b.booted_at)) * 86400 AS INTEGER) as duration_seconds,
       p.content, p.author_name
     FROM bootboard b
