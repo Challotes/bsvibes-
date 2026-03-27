@@ -19,8 +19,9 @@ export function IdentityChip(): React.JSX.Element | null {
   const [revealed, setRevealed] = useState(false);
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
   const [isProtected, setIsProtected] = useState(false);
-  const [earnedSats, setEarnedSats] = useState<number | null>(null); // null = not yet loaded
+  const [earnedSats, setEarnedSats] = useState<number | null>(null);
   const [balanceSats, setBalanceSats] = useState<number | null>(null);
+  const [activity, setActivity] = useState<Array<{ amount: number; direction: 'in' | 'out'; label: string; created_at: string; txid?: string }>>([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -53,12 +54,15 @@ export function IdentityChip(): React.JSX.Element | null {
     return () => clearInterval(interval);
   }, [identity?.address]);
 
-  // Earnings: fetch on mount + each time dropdown opens
+  // Earnings + activity: fetch on mount + each time dropdown opens
   useEffect(() => {
     if (!identity?.address) return;
     fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
       .then((res) => res.json())
-      .then((data) => setEarnedSats(data.totalEarned ?? 0))
+      .then((data) => {
+        setEarnedSats(data.totalEarned ?? 0);
+        setActivity(data.recentActivity ?? []);
+      })
       .catch(() => setEarnedSats(0));
   }, [identity?.address, open]);
 
@@ -202,31 +206,33 @@ export function IdentityChip(): React.JSX.Element | null {
             </button>
           </div>
 
-          {/* Balance + Earnings */}
-          {(balanceSats !== null || earnedSats !== null) && (
-            <div className="py-2 border-t border-zinc-800 space-y-1.5">
-              {balanceSats !== null && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
-                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                    <span className="text-xs text-zinc-400">Balance</span>
+          {/* Activity feed */}
+          <div className="py-2 border-t border-zinc-800">
+            {balanceSats !== null && (
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-zinc-400">Balance</span>
+                <span className="text-xs text-emerald-400 font-medium">{balanceSats.toLocaleString()} sats</span>
+              </div>
+            )}
+            {activity.length > 0 && (
+              <div className="max-h-[140px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
+                {activity.map((a, i) => (
+                  <div key={i} className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500 truncate mr-2">{a.label}</span>
+                    <span className={`font-mono shrink-0 ${a.direction === 'in' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {a.direction === 'in' ? '+' : '-'}{a.amount.toLocaleString()}
+                    </span>
                   </div>
-                  <span className="text-xs text-emerald-400 font-medium">{balanceSats.toLocaleString()} sats</span>
-                </div>
-              )}
-              {earnedSats !== null && earnedSats > 0 && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-[14px]" />
-                    <span className="text-xs text-zinc-500">Total earned</span>
-                  </div>
-                  <span className="text-xs text-zinc-400">{earnedSats.toLocaleString()} sats</span>
-                </div>
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+            {earnedSats !== null && earnedSats > 0 && (
+              <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-800/60">
+                <span className="text-[10px] text-zinc-500">Total earned</span>
+                <span className="text-[10px] text-zinc-400">{earnedSats.toLocaleString()} sats</span>
+              </div>
+            )}
+          </div>
 
           {/* Security status */}
           <div className="flex items-center gap-2 py-2 border-t border-zinc-800">
