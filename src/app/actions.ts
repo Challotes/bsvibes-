@@ -160,8 +160,8 @@ export async function bootPost(postId: number, boostedBy: string): Promise<BootP
     boostedBy.trim().length === 0
   ) return { processingMs: 0, error: 'Invalid boostedBy' };
 
-  // 5 boots per minute per caller.
-  const rl = rateLimit(`bootPost:${boostedBy}`, { limit: 5, windowMs: 60_000 });
+  // 30 boots per minute per caller.
+  const rl = rateLimit(`bootPost:${boostedBy}`, { limit: 30, windowMs: 60_000 });
   if (!rl.success) return { processingMs: 0, error: 'Rate limit exceeded' };
 
   // Check whether this boot is free (server pays) or paid (client must build tx)
