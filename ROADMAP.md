@@ -125,6 +125,10 @@
 - [x] Boot button handles full flow: free → server, paid → client trustless, no funds → QR modal
 - [x] UI: earnings display on identity chip (sats earned) + dropdown (total earned section)
 - [x] Earnings API endpoint (/api/earnings — sum payouts by address)
+- [x] Boot status API endpoint (/api/boot-status — free boots remaining for client sync)
+- [x] UTXO reliability: spent-blacklist, retry logic, largest-first selection, error logging
+- [x] Fund modal with balance breakdown (shows actual balance vs boot cost)
+- [x] LIVE AND WORKING: posts on-chain, boots splitting payments, earnings accumulating
 
 ## Phase 7: The Recursive Model — PLANNED
 

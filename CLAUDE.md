@@ -54,7 +54,8 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/services/bsv/crypto.ts` — AES-256-GCM encrypt/decrypt for WIF keys (Web Crypto API)
 - `src/services/bsv/migration.ts` — Key rotation with on-chain migration via OP_RETURN
 - `src/services/bsv/client-boot.ts` — Client-side trustless boot tx builder (browser → contributors directly, zero custody)
-- `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (reservation, 0-conf chaining, multi-input)
+- `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (mutex, spent-blacklist, 0-conf chaining, largest-first selection)
+- `src/app/api/boot-status/route.ts` — Returns free boots remaining + boot price for a user address
 - `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget, returns txid)
 - `src/services/fairness/config.ts` — Tunable fairness parameters (governance surface for AI agent)
 - `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached)

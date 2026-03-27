@@ -2,6 +2,19 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-27 — Boot Reliability: UTXO Management + Paid Boot Flow
+
+- Fixed boot splits failing silently: spent-UTXO blacklist prevents double-spend from stale WhatsOnChain data
+- Added retry logic to boot split transactions (matches post OP_RETURN pattern)
+- Added error logging to boot orchestrator (was silently swallowing broadcast failures)
+- Sorted UTXOs largest-first so server wallet picks the big UTXO over tiny platform-cut UTXOs
+- Fixed disabled boot button after free boots: freeBootsRemaining now synced from server via /api/boot-status
+- Fixed fund modal not showing: onFundNeeded now passes user address + balance
+- Fund modal shows balance breakdown (your balance / boot cost / top up needed)
+- Added diagnostic logging to client-side boot for debugging
+- CSP updated: added arc.gorillapool.io (BSV SDK default broadcaster)
+- Confirmed: posts going on-chain consistently, green chain icons appearing, earnings accumulating
+
 ## 2026-03-27 — Boot Flow Fixes: 7 Bugs Fixed by BSV Agent
 
 - Fixed split calculation double-count (creator overpaid when no pool contributors)
