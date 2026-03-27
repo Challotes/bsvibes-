@@ -37,7 +37,7 @@ function HistoryRow({ entry, onBooted }: { entry: BootboardData['history'][0]; o
   function handleReboot() {
     if (!identity) return;
     startTransition(async () => {
-      await bootPost(entry.post_id, identity.name);
+      await bootPost(entry.post_id, identity.address);
       onBooted?.();
     });
   }

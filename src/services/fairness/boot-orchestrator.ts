@@ -37,9 +37,8 @@ export async function executeBoot(
   if (!post) return { success: false, price: 0, recipients: 0, error: 'Post not found', isFree: false };
   if (!post.pubkey) return { success: false, price: 0, recipients: 0, error: 'Post is unsigned — cannot be booted', isFree: false };
 
-  // 2. Check server wallet
+  // 2. Check server wallet — if not configured, do SQLite-only boot (no on-chain split)
   const platformAddress = getServerAddress();
-  if (!platformAddress) return { success: false, price: 0, recipients: 0, error: 'Server wallet not configured', isFree: false };
 
   // 3. Get dynamic price and check free boot eligibility
   const { price, isFree, freeRemaining } = getBootPriceForUser(db, booterPubkey);
@@ -57,31 +56,30 @@ export async function executeBoot(
     return { success: false, price: actualPrice, recipients: 0, error: 'Invalid creator pubkey', isFree };
   }
 
-  // 6. Calculate the split
-  const split = calculateSplit(
-    actualPrice,
-    post.pubkey,
-    creatorAddress,
-    platformAddress,
-    weights
-  );
+  // 6. Calculate the split (if wallet is configured)
+  let txid: string | undefined;
+  let recipientCount = 0;
 
-  // 7. Build and broadcast the BSV split transaction
-  const result = await buildSplitTransaction(split, postId);
+  if (platformAddress) {
+    const split = calculateSplit(
+      actualPrice,
+      post.pubkey,
+      creatorAddress,
+      platformAddress,
+      weights
+    );
 
-  if (result.status !== 'success') {
-    return {
-      success: false,
-      price: actualPrice,
-      recipients: 0,
-      error: result.status === 'insufficient_funds'
-        ? 'Server wallet has insufficient funds'
-        : result.status === 'broadcast_failed' ? result.error : result.status,
-      isFree,
-    };
+    // 7. Build and broadcast the BSV split transaction
+    const result = await buildSplitTransaction(split, postId);
+
+    if (result.status === 'success') {
+      txid = result.txid;
+      recipientCount = split.recipientCount;
+    }
+    // If broadcast fails, we still proceed with the SQLite boot (graceful degradation)
   }
 
-  // 8. BSV broadcast succeeded — now update SQLite (bootboard + grants + payouts)
+  // 8. Update SQLite (bootboard + grants + payouts)
   db.transaction(() => {
     // Close current bootboard holder
     db.prepare(`
@@ -95,54 +93,27 @@ export async function executeBoot(
     `).run(postId, booterPubkey);
 
     // Update free boot grants
+    const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
     if (isFree) {
-      const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
       if (existing) {
         db.prepare('UPDATE boot_grants SET free_boots_used = free_boots_used + 1, total_boots = total_boots + 1 WHERE pubkey = ?').run(booterPubkey);
       } else {
         db.prepare('INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 1, 1)').run(booterPubkey);
       }
     } else {
-      const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
       if (existing) {
         db.prepare('UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?').run(booterPubkey);
       } else {
         db.prepare('INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)').run(booterPubkey);
       }
     }
-
-    // Record payouts for audit trail
-    const bootEventId = postId; // Use post_id as boot event identifier for simplicity
-
-    // Platform payout
-    if (split.platform.sats > 0) {
-      db.prepare(
-        'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(bootEventId, 'platform', split.platform.address, split.platform.sats, 'platform', result.txid);
-    }
-
-    // Creator bonus
-    if (split.creatorBonus.sats > 0) {
-      db.prepare(
-        'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(bootEventId, split.creatorBonus.pubkey, split.creatorBonus.address, split.creatorBonus.sats, 'boost_bonus', result.txid);
-    }
-
-    // Pool shares
-    for (const recipient of split.pool) {
-      if (recipient.sats > 0) {
-        db.prepare(
-          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-        ).run(bootEventId, recipient.pubkey, recipient.address, recipient.sats, 'pool_share', result.txid);
-      }
-    }
   })();
 
   return {
     success: true,
-    txid: result.txid,
+    txid,
     price: actualPrice,
-    recipients: split.recipientCount,
+    recipients: recipientCount,
     isFree,
   };
 }

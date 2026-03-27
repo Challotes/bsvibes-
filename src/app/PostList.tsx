@@ -37,7 +37,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
 
     startTransition(async () => {
       // Try server-side boot first (handles free boots)
-      const result = await bootPost(postId, identity.wif ? identity.name : identity.name);
+      const result = await bootPost(postId, identity.address);
 
       if (result.requiresPayment) {
         // Paid boot — client builds trustless tx
