@@ -102,6 +102,25 @@ export async function getNewPosts(sinceId: number): Promise<Post[]> {
   `).all(sinceId) as Post[];
 }
 
+/**
+ * Get posts that have been updated since the client last saw them.
+ * Currently this means posts that recently received a tx_id (on-chain confirmation).
+ * Returns posts with id <= sinceId that have a tx_id (the client may have them without tx_id).
+ */
+export async function getUpdatedPosts(knownIds: number[]): Promise<Post[]> {
+  if (!knownIds.length) return [];
+  // Only check posts the client already has — return those that now have a tx_id
+  const placeholders = knownIds.map(() => '?').join(',');
+  return db.prepare(`
+    SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
+    FROM posts p
+    LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
+      ON bc.post_id = p.id
+    WHERE p.id IN (${placeholders}) AND p.tx_id IS NOT NULL
+    ORDER BY p.id DESC
+  `).all(...knownIds) as Post[];
+}
+
 export async function getOlderPosts(beforeId: number): Promise<Post[]> {
   if (!Number.isInteger(beforeId) || beforeId <= 0) return [];
   return getPosts(beforeId);

@@ -17,10 +17,11 @@ interface PostData {
 /**
  * Log a post on-chain via OP_RETURN.
  * Returns txid on success, null on failure.
+ * Retries once after 1 second on failure (handles UTXO contention).
  * Failures are non-fatal — the post still exists in SQLite.
  */
 export async function logPostOnChain(postData: PostData): Promise<string | null> {
-  try {
+  const attempt = async (): Promise<string | null> => {
     const payload = JSON.stringify({
       app: 'bsvibes',
       type: 'post',
@@ -45,6 +46,16 @@ export async function logPostOnChain(postData: PostData): Promise<string | null>
     ]);
 
     return result.status === 'success' ? result.txid : null;
+  };
+
+  try {
+    const txid = await attempt();
+    if (txid) return txid;
+
+    // First attempt failed — wait 1s and retry once with fresh UTXO state.
+    // The mutex ensures the retry waits for any in-flight transaction to finish.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await attempt();
   } catch (e) {
     console.error('BSVibes: on-chain logging failed', e);
     return null;

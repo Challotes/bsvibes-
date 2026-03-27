@@ -1,11 +1,31 @@
 /**
  * Server-side BSV wallet with UTXO management.
  * Supports reservation, 0-conf chaining, multi-UTXO aggregation.
+ * Uses a promise-based mutex to prevent UTXO contention between
+ * concurrent operations (post logging, boot splits, migrations).
  */
 
 import { PrivateKey, Transaction, P2PKH } from '@bsv/sdk';
 
 let _serverKey: PrivateKey | null = null;
+
+// ── Transaction Mutex ──────────────────────────────────────────
+// Only one buildAndBroadcast call executes at a time. Others queue.
+let _txMutexChain: Promise<void> = Promise.resolve();
+
+function acquireTxMutex(): Promise<() => void> {
+  // biome-ignore lint: release is assigned synchronously in Promise constructor
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Capture the current end of the chain as our "wait" point
+  const ticket = _txMutexChain.then(() => {});
+  // Extend the chain: next caller waits until we call release()
+  _txMutexChain = _txMutexChain.then(() => gate);
+  // When the previous operation finishes, hand back the release function
+  return ticket.then(() => release);
+}
 
 function getServerKey(): PrivateKey | null {
   if (_serverKey) return _serverKey;
@@ -50,20 +70,37 @@ function utxoKey(txHash: string, txPos: number): string {
   return `${txHash}:${txPos}`;
 }
 
-export async function getUtxos(): Promise<UTXO[]> {
+export async function getUtxos(neededSats?: number): Promise<UTXO[]> {
   const address = getServerAddress();
   if (!address) return [];
+
+  // If we have pending change UTXOs with enough value, skip the WoC fetch
+  // to avoid stale data and reduce API calls.
+  if (neededSats !== undefined && _pendingChange.length > 0) {
+    const pendingTotal = _pendingChange
+      .filter((u) => !_reserved.has(utxoKey(u.tx_hash, u.tx_pos)))
+      .reduce((sum, u) => sum + u.value, 0);
+    if (pendingTotal >= neededSats) {
+      return [..._pendingChange];
+    }
+  }
 
   try {
     const res = await fetch(
       `https://api.whatsonchain.com/v1/bsv/main/address/${address}/unspent`
     );
-    if (!res.ok) return [];
+    if (!res.ok) return [..._pendingChange];
     const confirmed = (await res.json()) as UTXO[];
-    // Merge confirmed UTXOs with pending change outputs
-    return [..._pendingChange, ...confirmed];
+
+    // Deduplicate: pending change UTXOs take priority over WoC data
+    // since they have sourceTransaction attached for 0-conf chaining.
+    const pendingKeys = new Set(_pendingChange.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+    const deduped = confirmed.filter((u) => !pendingKeys.has(utxoKey(u.tx_hash, u.tx_pos)));
+
+    // Pending change first — they're immediately spendable with 0-conf chaining
+    return [..._pendingChange, ...deduped];
   } catch {
-    return [];
+    return [..._pendingChange];
   }
 }
 
@@ -79,7 +116,7 @@ export async function getBalance(): Promise<number> {
  * Returns reserved UTXOs or null if insufficient funds.
  */
 async function reserveUtxos(neededSats: number): Promise<UTXO[] | null> {
-  const utxos = await getUtxos();
+  const utxos = await getUtxos(neededSats);
   const selected: UTXO[] = [];
   let total = 0;
 
@@ -130,6 +167,7 @@ async function getSourceTransaction(utxo: UTXO): Promise<Transaction | null> {
 /**
  * Build, sign, and broadcast a transaction with the given outputs.
  * Supports multi-UTXO inputs and 0-conf chaining.
+ * Uses a mutex to prevent concurrent calls from grabbing the same UTXOs.
  */
 export async function buildAndBroadcast(
   outputs: Array<{ lockingScript: any; satoshis: number }>
@@ -137,6 +175,23 @@ export async function buildAndBroadcast(
   const key = getServerKey();
   if (!key) return { status: 'no_wallet' };
 
+  // Acquire the mutex — only one transaction builds at a time
+  const release = await acquireTxMutex();
+
+  try {
+    return await _buildAndBroadcastInner(key, outputs);
+  } finally {
+    release();
+  }
+}
+
+/**
+ * Internal implementation — caller must hold the mutex.
+ */
+async function _buildAndBroadcastInner(
+  key: PrivateKey,
+  outputs: Array<{ lockingScript: any; satoshis: number }>
+): Promise<BroadcastResult> {
   const totalNeeded = outputs.reduce((sum, o) => sum + o.satoshis, 0) + 500; // +500 for estimated fee
   const utxos = await reserveUtxos(totalNeeded);
 
@@ -214,7 +269,7 @@ export async function buildAndBroadcast(
         }
       }
 
-      // Release the spent UTXOs (they're consumed now)
+      // Release the spent UTXOs from reservation (they're consumed now)
       releaseUtxos(utxos);
 
       return { status: 'success', txid };
