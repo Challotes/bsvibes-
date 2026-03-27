@@ -9,6 +9,7 @@ interface BootConfirmBody {
   postId: number
   txid: string
   booterPubkey: string
+  booterName: string
 }
 
 export async function POST(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { postId, txid, booterPubkey } = body
+  const { postId, txid, booterPubkey, booterName } = body
 
   if (!Number.isInteger(postId) || postId <= 0) {
     return NextResponse.json({ error: 'Invalid postId' }, { status: 400 })
@@ -30,6 +31,10 @@ export async function POST(req: NextRequest) {
   if (typeof booterPubkey !== 'string' || booterPubkey.trim().length === 0) {
     return NextResponse.json({ error: 'Missing booterPubkey' }, { status: 400 })
   }
+  // booterName defaults to booterPubkey if not provided (backward compat)
+  const displayName = (typeof booterName === 'string' && booterName.trim().length > 0)
+    ? booterName.trim()
+    : booterPubkey
 
   // Validate the post exists and has a pubkey (so we can pay the creator)
   const post = db.prepare(
@@ -76,10 +81,10 @@ export async function POST(req: NextRequest) {
       WHERE held_until IS NULL
     `).run()
 
-    // Insert the new bootboard entry
+    // Insert the new bootboard entry (store human-readable name for display)
     db.prepare(`
       INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
-    `).run(postId, booterPubkey)
+    `).run(postId, displayName)
 
     // Update or create boot_grants (paid boot — increment total_boots only)
     const existing = db.prepare(

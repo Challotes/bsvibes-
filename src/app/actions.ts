@@ -149,7 +149,7 @@ export interface BootPostResult {
   error?: string
 }
 
-export async function bootPost(postId: number, boostedBy: string): Promise<BootPostResult> {
+export async function bootPost(postId: number, boostedBy: string, boostedByName: string): Promise<BootPostResult> {
   const start = performance.now();
 
   // Input validation
@@ -159,6 +159,10 @@ export async function bootPost(postId: number, boostedBy: string): Promise<BootP
     boostedBy.length > 200 ||
     boostedBy.trim().length === 0
   ) return { processingMs: 0, error: 'Invalid boostedBy' };
+  if (
+    typeof boostedByName !== 'string' ||
+    boostedByName.trim().length === 0
+  ) return { processingMs: 0, error: 'Invalid boostedByName' };
 
   // 30 boots per minute per caller.
   const rl = rateLimit(`bootPost:${boostedBy}`, { limit: 30, windowMs: 60_000 });
@@ -175,7 +179,7 @@ export async function bootPost(postId: number, boostedBy: string): Promise<BootP
   }
 
   // Free boot: server wallet pays, orchestrator handles the full workflow.
-  const result = await executeBoot(db, postId, boostedBy);
+  const result = await executeBoot(db, postId, boostedBy, boostedByName);
 
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
 

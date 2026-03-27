@@ -9,7 +9,6 @@ import { getBootPrice, getBootPriceForUser } from './pricing';
 import { calculateWeights } from './weights';
 import { calculateSplit } from './split';
 import { buildSplitTransaction } from './boot-payment';
-import { FAIRNESS_CONFIG } from './config';
 import { getServerAddress } from '@/services/bsv/wallet';
 
 export interface BootResult {
@@ -23,11 +22,15 @@ export interface BootResult {
 
 /**
  * Execute a full boot: validate, price, score, split, broadcast, record.
+ *
+ * @param booterPubkey  Stable identifier for the booter (BSV address) — used for boot_grants tracking
+ * @param booterName    Human-readable name (e.g. anon_x4f2) — stored in bootboard for display
  */
 export async function executeBoot(
   db: BetterSqlite3.Database,
   postId: number,
-  booterPubkey: string
+  booterPubkey: string,
+  booterName: string,
 ): Promise<BootResult> {
   // 1. Validate the post exists and is boostable (has pubkey)
   const post = db.prepare(
@@ -56,25 +59,26 @@ export async function executeBoot(
     return { success: false, price: actualPrice, recipients: 0, error: 'Invalid creator pubkey', isFree };
   }
 
-  // 6. Calculate the split (if wallet is configured)
+  // 6. Calculate the split
   let txid: string | undefined;
   let recipientCount = 0;
+  let split: ReturnType<typeof calculateSplit> | null = null;
 
   if (platformAddress) {
-    const split = calculateSplit(
+    split = calculateSplit(
       actualPrice,
       post.pubkey,
       creatorAddress,
       platformAddress,
       weights
     );
+    recipientCount = split.recipientCount;
 
     // 7. Build and broadcast the BSV split transaction
     const result = await buildSplitTransaction(split, postId);
 
     if (result.status === 'success') {
       txid = result.txid;
-      recipientCount = split.recipientCount;
     }
     // If broadcast fails, we still proceed with the SQLite boot (graceful degradation)
   }
@@ -87,10 +91,10 @@ export async function executeBoot(
       WHERE held_until IS NULL
     `).run();
 
-    // New post takes the spot
+    // New post takes the spot (store human-readable name for display)
     db.prepare(`
       INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)
-    `).run(postId, booterPubkey);
+    `).run(postId, booterName);
 
     // Update free boot grants
     const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
@@ -105,6 +109,31 @@ export async function executeBoot(
         db.prepare('UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?').run(booterPubkey);
       } else {
         db.prepare('INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)').run(booterPubkey);
+      }
+    }
+
+    // Record payouts for audit trail (when split transaction was broadcast)
+    if (split && txid) {
+      const bootEventId = postId;
+
+      if (split.platform.sats > 0) {
+        db.prepare(
+          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(bootEventId, 'platform', split.platform.address, split.platform.sats, 'platform', txid);
+      }
+
+      if (split.creatorBonus.sats > 0) {
+        db.prepare(
+          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(bootEventId, split.creatorBonus.pubkey, split.creatorBonus.address, split.creatorBonus.sats, 'boost_bonus', txid);
+      }
+
+      for (const recipient of split.pool) {
+        if (recipient.sats > 0) {
+          db.prepare(
+            'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
+          ).run(bootEventId, recipient.pubkey, recipient.address, recipient.sats, 'pool_share', txid);
+        }
       }
     }
   })();

@@ -37,7 +37,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
 
     startTransition(async () => {
       // Try server-side boot first (handles free boots)
-      const result = await bootPost(postId, identity.address);
+      const result = await bootPost(postId, identity.address, identity.name);
 
       if (result.requiresPayment) {
         // Paid boot — client builds trustless tx
@@ -67,7 +67,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
           await fetch('/api/boot-confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId, txid: bootResult.txid, booterPubkey: identity.address }),
+            body: JSON.stringify({ postId, txid: bootResult.txid, booterPubkey: identity.address, booterName: identity.name }),
           });
         } else {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));

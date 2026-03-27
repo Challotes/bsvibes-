@@ -130,7 +130,7 @@ export function Feed({
         {/* Pinned bootboard */}
         <div className="shrink-0 relative">
           <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
-            <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} />
+            <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} onFundNeeded={(address) => { setUserAddress(address); setShowFundModal(true); }} />
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
         </div>

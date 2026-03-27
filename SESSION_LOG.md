@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-27 — Boot Flow Fixes: 7 Bugs Fixed by BSV Agent
+
+- Fixed split calculation double-count (creator overpaid when no pool contributors)
+- CSP updated: WhatsOnChain + ARC added to connect-src for client-side boots
+- Name vs address separation: bootboard shows anon names, grants tracked by address
+- HistoryRow reboot now handles paid boots (was silently failing)
+- Payout recording added for free boots (was only recording paid)
+- Placeholder address removed from boot-shares (proper 503 when no wallet)
+- boot-confirm accepts booterName for display
+- Server wallet funded with BSV for live testing
+
 ## 2026-03-26 — Phase 6 Complete: Earnings Display
 
 - Earnings API endpoint (/api/earnings) — sums payouts by recipient address

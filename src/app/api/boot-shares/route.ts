@@ -27,10 +27,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Post is unsigned — cannot be booted' }, { status: 422 })
   }
 
-  // Use server wallet address if configured, otherwise use a placeholder
-  // (the actual transaction will fail without a funded wallet, but the
-  // endpoint can still return shares for the UI flow / fund modal)
-  const platformAddress = getServerAddress() ?? '1BSVibesPlatformPlaceholder000000000'
+  // Require server wallet for split calculation — without it, platform share
+  // has no valid destination address
+  const platformAddress = getServerAddress()
+  if (!platformAddress) {
+    return NextResponse.json({ error: 'Server wallet not configured' }, { status: 503 })
+  }
 
   // Dynamic price — base price always needed even if this boot is free (server pays it)
   const basePrice = getBootPrice(db)

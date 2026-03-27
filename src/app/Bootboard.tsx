@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useTransition } from 'react';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
+import { clientSideBoot } from '@/services/bsv/client-boot';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import type { BootboardData } from '@/types';
 
@@ -30,14 +31,45 @@ function LiveTimer({ since }: { since: string }) {
   return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
 }
 
-function HistoryRow({ entry, onBooted }: { entry: BootboardData['history'][0]; onBooted?: () => void }) {
+function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['history'][0]; onBooted?: () => void; onFundNeeded?: (address: string) => void }) {
   const { identity } = useIdentityContext();
   const [isPending, startTransition] = useTransition();
 
   function handleReboot() {
     if (!identity) return;
     startTransition(async () => {
-      await bootPost(entry.post_id, identity.address);
+      const result = await bootPost(entry.post_id, identity.address, identity.name);
+
+      if (result.requiresPayment) {
+        // Paid boot: client builds trustless tx
+        const sharesRes = await fetch(`/api/boot-shares?postId=${entry.post_id}&pubkey=${encodeURIComponent(identity.address)}`);
+        if (!sharesRes.ok) return;
+        const sharesData = await sharesRes.json();
+
+        const bootResult = await clientSideBoot(
+          identity.wif,
+          identity.address,
+          entry.post_id,
+          sharesData.shares,
+          sharesData.bootPrice,
+        );
+
+        if (bootResult.status === 'insufficient_funds') {
+          onFundNeeded?.(identity.address);
+          return;
+        }
+
+        if (bootResult.status === 'success' && bootResult.txid) {
+          await fetch('/api/boot-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId: entry.post_id, txid: bootResult.txid, booterPubkey: identity.address, booterName: identity.name }),
+          });
+        } else {
+          return;
+        }
+      }
+
       onBooted?.();
     });
   }
@@ -61,7 +93,7 @@ function HistoryRow({ entry, onBooted }: { entry: BootboardData['history'][0]; o
   );
 }
 
-export function Bootboard({ data, onBooted, bootPrice }: { data: BootboardData; onBooted?: () => void; bootPrice?: number }) {
+export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: BootboardData; onBooted?: () => void; bootPrice?: number; onFundNeeded?: (address: string) => void }) {
   const { current, history } = data;
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);
@@ -145,7 +177,7 @@ export function Bootboard({ data, onBooted, bootPrice }: { data: BootboardData; 
               {history.length > 0 && (
                 <div className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
                   {history.map((h, i) => (
-                    <HistoryRow key={i} entry={h} onBooted={onBooted} />
+                    <HistoryRow key={i} entry={h} onBooted={onBooted} onFundNeeded={onFundNeeded} />
                   ))}
                 </div>
               )}

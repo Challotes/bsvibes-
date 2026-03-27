@@ -61,8 +61,10 @@ export function calculateSplit(
   // Remainder from rounding goes to the boosted post creator
   const remainder = poolSats - distributedPool;
 
-  // If pool is empty (no qualifying contributors), creator gets 95%
-  const creatorTotal = bonusSats + remainder + (pool.length === 0 ? poolSats : 0);
+  // Creator gets bonus + any rounding remainder.
+  // When pool is empty, remainder already equals poolSats (the full pool),
+  // so no extra addition is needed.
+  const creatorTotal = bonusSats + remainder;
 
   // Check if creator is already in the pool — if so, combine their amounts
   const creatorPoolEntry = pool.find((p) => p.pubkey === boostedPostPubkey);

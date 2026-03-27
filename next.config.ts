@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
-              "connect-src 'self'",
+              "connect-src 'self' https://api.whatsonchain.com https://arc.taal.com",
               "font-src 'self'",
               "frame-ancestors 'none'",
             ].join('; '),
