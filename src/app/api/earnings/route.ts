@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       b.booted_at as created_at,
       COALESCE(SUM(py.amount_sats), 0) as total_paid
     FROM bootboard b
-    LEFT JOIN payouts py ON py.boot_event_id = b.id
+    LEFT JOIN payouts py ON py.boot_event_id = b.post_id
     WHERE b.boosted_by = ?
     GROUP BY b.id, b.booted_at
     ORDER BY b.booted_at DESC
