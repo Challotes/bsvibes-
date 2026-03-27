@@ -65,6 +65,7 @@ export type BroadcastResult =
 
 const _reserved = new Set<string>();
 const _pendingChange: UTXO[] = []; // 0-conf change outputs from recent txs
+const _spent = new Set<string>();   // UTXOs consumed as inputs — blacklist for stale WoC data
 
 function utxoKey(txHash: string, txPos: number): string {
   return `${txHash}:${txPos}`;
@@ -95,10 +96,25 @@ export async function getUtxos(neededSats?: number): Promise<UTXO[]> {
     // Deduplicate: pending change UTXOs take priority over WoC data
     // since they have sourceTransaction attached for 0-conf chaining.
     const pendingKeys = new Set(_pendingChange.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
-    const deduped = confirmed.filter((u) => !pendingKeys.has(utxoKey(u.tx_hash, u.tx_pos)));
+    const deduped = confirmed.filter((u) => {
+      const key = utxoKey(u.tx_hash, u.tx_pos);
+      // Exclude UTXOs already in pending change (dedup) AND already spent (stale WoC data)
+      return !pendingKeys.has(key) && !_spent.has(key);
+    });
 
-    // Pending change first — they're immediately spendable with 0-conf chaining
-    return [..._pendingChange, ...deduped];
+    // When a spent UTXO no longer appears in the WoC response, it has been
+    // confirmed as spent — safe to remove from the blacklist.
+    const wocKeys = new Set(confirmed.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+    for (const spentKey of _spent) {
+      if (!wocKeys.has(spentKey)) {
+        _spent.delete(spentKey);
+      }
+    }
+
+    // Merge and sort largest first — ensures we pick the big UTXO over many tiny ones
+    const all = [..._pendingChange, ...deduped];
+    all.sort((a, b) => b.value - a.value);
+    return all;
   } catch {
     return [..._pendingChange];
   }
@@ -244,8 +260,12 @@ async function _buildAndBroadcastInner(
     if (broadcastResult.status === 'success') {
       const txid = tx.id('hex') as string;
 
-      // Remove the spent UTXOs from pending change (they've been consumed)
+      // Remove the spent UTXOs from pending change and blacklist them so
+      // stale WoC responses don't resurrect them as available.
       const spentKeys = new Set(utxos.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+      for (const sk of spentKeys) {
+        _spent.add(sk);
+      }
       for (let i = _pendingChange.length - 1; i >= 0; i--) {
         const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
         if (spentKeys.has(pendingKey)) {
@@ -264,8 +284,12 @@ async function _buildAndBroadcastInner(
             sourceTransaction: tx, // Keep the tx object for signing
           });
 
-          // Cap pending change queue to avoid unbounded growth
+          // Cap queues to avoid unbounded growth
           while (_pendingChange.length > 50) _pendingChange.shift();
+          while (_spent.size > 200) {
+            const first = _spent.values().next().value;
+            if (first) _spent.delete(first);
+          }
         }
       }
 

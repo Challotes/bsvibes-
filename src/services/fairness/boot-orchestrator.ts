@@ -79,8 +79,14 @@ export async function executeBoot(
 
     if (result.status === 'success') {
       txid = result.txid;
+    } else {
+      // Log the failure — graceful degradation continues with SQLite only,
+      // but we need visibility into WHY on-chain splits are failing.
+      const errorDetail = result.status === 'broadcast_failed' ? result.error : result.status;
+      console.error(
+        `BSVibes: boot split broadcast FAILED for post ${postId}: ${errorDetail}`,
+      );
     }
-    // If broadcast fails, we still proceed with the SQLite boot (graceful degradation)
   }
 
   // 8. Update SQLite (bootboard + grants + payouts)

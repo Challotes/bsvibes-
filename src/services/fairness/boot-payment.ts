@@ -11,6 +11,7 @@ import type { SplitResult } from './split';
 
 /**
  * Build and broadcast the split transaction for a boot.
+ * Retries once after 1 second on failure (handles stale UTXO contention).
  */
 export async function buildSplitTransaction(
   split: SplitResult,
@@ -86,5 +87,13 @@ export async function buildSplitTransaction(
     satoshis: 0,
   });
 
+  const result = await buildAndBroadcast(outputs);
+  if (result.status === 'success') return result;
+
+  // First attempt failed — wait 1s and retry once with fresh UTXO state.
+  // The mutex ensures the retry waits for any in-flight transaction to finish.
+  // Common cause: stale WoC data returned an already-spent UTXO.
+  console.warn(`BSVibes: boot split first attempt failed for post ${postId}, retrying in 1s...`, result);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
   return buildAndBroadcast(outputs);
 }
