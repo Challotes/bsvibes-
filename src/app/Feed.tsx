@@ -151,7 +151,7 @@ export function Feed({
             onLoadEarlier={handleLoadEarlier}
             onBooted={refresh}
             onAskAgent={handleAskAgent}
-            onFundNeeded={() => setShowFundModal(true)}
+            onFundNeeded={(address) => { setUserAddress(address); setShowFundModal(true); }}
             bootPrice={bootPrice}
             freeBootsRemaining={freeBootsRemaining}
           />

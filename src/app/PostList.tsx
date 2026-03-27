@@ -16,7 +16,7 @@ interface BootButtonProps {
   bootPrice: number;
   freeBootsRemaining: number;
   onBooted?: () => void;
-  onFundNeeded?: () => void;
+  onFundNeeded?: (address: string) => void;
 }
 
 function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded }: BootButtonProps) {
@@ -58,7 +58,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
 
         if (bootResult.status === 'insufficient_funds') {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));
-          onFundNeeded?.();
+          onFundNeeded?.(identity.address);
           return;
         }
 
@@ -122,7 +122,7 @@ interface PostListProps {
   onLoadEarlier: () => void;
   onBooted?: () => void;
   onAskAgent?: () => void;
-  onFundNeeded?: () => void;
+  onFundNeeded?: (address: string) => void;
   bootPrice: number;
   freeBootsRemaining: number;
 }
