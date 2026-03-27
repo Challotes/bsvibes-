@@ -84,9 +84,13 @@ export async function POST(req: NextRequest) {
     // Insert the new bootboard entry.
     // boosted_by = BSV address (used for activity feed queries by address)
     // boosted_by_name = human-readable display name (anon_XXXX)
-    db.prepare(`
+    const bootboardInsert = db.prepare(`
       INSERT INTO bootboard (post_id, boosted_by, boosted_by_name) VALUES (?, ?, ?)
     `).run(postId, booterPubkey, displayName)
+
+    // Use the unique bootboard row ID as bootEventId so multiple boots on the
+    // same post each get their own payout set — prevents double-counting in earnings.
+    const bootEventId = bootboardInsert.lastInsertRowid as number
 
     // Update or create boot_grants (paid boot — increment total_boots only)
     const existing = db.prepare(
@@ -104,8 +108,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Record payouts for the audit trail
-    const bootEventId = postId
-
     if (split.platform.sats > 0) {
       db.prepare(
         'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'

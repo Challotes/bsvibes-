@@ -100,9 +100,13 @@ export async function executeBoot(
     // New post takes the spot.
     // boosted_by = BSV address (used for activity feed queries by address)
     // boosted_by_name = human-readable display name (anon_XXXX)
-    db.prepare(`
+    const bootboardInsert = db.prepare(`
       INSERT INTO bootboard (post_id, boosted_by, boosted_by_name) VALUES (?, ?, ?)
     `).run(postId, booterPubkey, booterName);
+
+    // Use the unique bootboard row ID as bootEventId so multiple boots on the
+    // same post each get their own payout set — prevents double-counting in earnings.
+    const bootEventId = bootboardInsert.lastInsertRowid as number;
 
     // Update free boot grants
     const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
@@ -122,8 +126,6 @@ export async function executeBoot(
 
     // Record payouts for audit trail (when split transaction was broadcast)
     if (split && txid) {
-      const bootEventId = postId;
-
       if (split.platform.sats > 0) {
         db.prepare(
           'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
