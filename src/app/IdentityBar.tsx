@@ -19,6 +19,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
   const [isProtected, setIsProtected] = useState(false);
   const [earnedSats, setEarnedSats] = useState<number | null>(null); // null = not yet loaded
+  const [balanceSats, setBalanceSats] = useState<number | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -31,14 +32,21 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(isIdentityEncrypted());
   }, []);
 
-  // Fetch earnings when identity is available.
-  // Re-fetch each time the dropdown opens so the value stays fresh.
+  // Fetch earnings and balance when identity is available.
+  // Re-fetch each time the dropdown opens so values stay fresh.
   useEffect(() => {
     if (!identity?.address) return;
     fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
       .then((res) => res.json())
       .then((data) => setEarnedSats(data.totalEarned ?? 0))
       .catch(() => setEarnedSats(0));
+    fetch(`https://api.whatsonchain.com/v1/bsv/main/address/${identity.address}/unspent`)
+      .then((res) => res.json())
+      .then((utxos) => {
+        const total = Array.isArray(utxos) ? utxos.reduce((s: number, u: { value: number }) => s + u.value, 0) : 0;
+        setBalanceSats(total);
+      })
+      .catch(() => setBalanceSats(0));
   }, [identity?.address, open]);
 
   useEffect(() => {
@@ -138,8 +146,8 @@ export function IdentityChip(): React.JSX.Element | null {
       >
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
-        {earnedSats !== null && earnedSats > 0 && (
-          <span className="text-emerald-400 text-[10px] font-medium">{earnedSats.toLocaleString()} sats</span>
+        {balanceSats !== null && balanceSats > 0 && (
+          <span className="text-emerald-400 text-[10px] font-medium">{balanceSats.toLocaleString()} sats</span>
         )}
 
         {showWarningDot && (
@@ -181,16 +189,29 @@ export function IdentityChip(): React.JSX.Element | null {
             </button>
           </div>
 
-          {/* Earnings */}
-          {earnedSats !== null && earnedSats > 0 && (
-            <div className="flex items-center justify-between py-2 border-t border-zinc-800">
-              <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-                <span className="text-xs text-zinc-400">Total earned</span>
-              </div>
-              <span className="text-xs text-emerald-400 font-medium">{earnedSats.toLocaleString()} sats</span>
+          {/* Balance + Earnings */}
+          {(balanceSats !== null || earnedSats !== null) && (
+            <div className="py-2 border-t border-zinc-800 space-y-1.5">
+              {balanceSats !== null && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                    </svg>
+                    <span className="text-xs text-zinc-400">Balance</span>
+                  </div>
+                  <span className="text-xs text-emerald-400 font-medium">{balanceSats.toLocaleString()} sats</span>
+                </div>
+              )}
+              {earnedSats !== null && earnedSats > 0 && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-[14px]" />
+                    <span className="text-xs text-zinc-500">Total earned</span>
+                  </div>
+                  <span className="text-xs text-zinc-400">{earnedSats.toLocaleString()} sats</span>
+                </div>
+              )}
             </div>
           )}
 
