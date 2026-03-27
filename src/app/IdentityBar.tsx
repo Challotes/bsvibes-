@@ -161,16 +161,16 @@ export function IdentityChip(): React.JSX.Element | null {
 
   return (
     <div ref={dropdownRef} className="relative">
+      {/* Chip */}
       <button
         onClick={handleOpen}
         className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
       >
-        <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
+        <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
         {balanceSats !== null && balanceSats > 0 && (
           <AnimatedBalance sats={balanceSats} bsvPrice={bsvPrice} isGoat={isGoat} className="text-[10px]" />
         )}
-
         {showWarningDot && (
           <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
@@ -180,135 +180,187 @@ export function IdentityChip(): React.JSX.Element | null {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 p-3 border border-zinc-800 rounded-xl shadow-2xl z-50" style={{ backgroundColor: '#18181b' }}>
-          <p className="text-sm text-zinc-400 mb-2">
-            This is your identity. Save it somewhere safe — if you lose it, your posts can't be linked back to you.
-          </p>
-          <div className="bg-zinc-800 rounded-lg px-3 py-2 font-mono text-xs text-zinc-300 break-all mb-2">
-            {revealed ? identity.wif : maskWif(identity.wif)}
-          </div>
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: '#18181b' }}>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={handleCopy}
-              className="bg-white text-black rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-200 transition-colors"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-            <button
-              onClick={handleDownload}
-              className="bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-700 transition-colors"
-            >
-              Download
-            </button>
-            <button
-              onClick={() => setRevealed(!revealed)}
-              className="ml-auto bg-zinc-800 text-amber-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-700 hover:text-amber-300 transition-colors"
-            >
-              {revealed ? 'Hide' : 'Reveal'}
-            </button>
-          </div>
-
-          {/* Activity feed */}
-          <div className="py-2 border-t border-zinc-800">
-            {/* Balance + mode toggle */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-zinc-400">Balance</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-emerald-400 font-medium">
-                  {balanceSats !== null
-                    ? isGoat
-                      ? `${balanceSats.toLocaleString()} sats`
-                      : satsToDollars(balanceSats, bsvPrice)
-                    : '—'}
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleCurrency(); }}
-                  className="text-[11px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
-                  title={isGoat ? 'Switch to Noob Mode ($)' : 'Switch to Goat Mode (sats)'}
-                >
-                  {isGoat ? '🐐 Goat' : '💵 Noob'}
-                </button>
-              </div>
+          {/* ── Section 1: Security ── */}
+          {isProtected ? (
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-950/40 border-b border-emerald-900/40">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 shrink-0">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span className="text-xs text-emerald-400 font-medium">Identity protected</span>
             </div>
+          ) : (
+            <div className={`flex items-center gap-2 px-3 py-2.5 border-b border-red-900/40 ${showUpgrade ? 'bg-red-950/30' : 'bg-red-950/20'}`}>
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              </span>
+              <span className="text-xs text-red-400 font-medium flex-1">Not protected</span>
+              {!showUpgrade && (
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  className="text-[11px] bg-red-500 text-white rounded-md px-2 py-0.5 font-medium hover:bg-red-400 transition-colors shrink-0"
+                >
+                  Secure now
+                </button>
+              )}
+            </div>
+          )}
 
-            {activity.length > 0 && (
-              <div className="max-h-[140px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
-                {activity.map((a, i) => (
-                  <div key={i} className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500 truncate mr-2">{a.label}</span>
-                    <span className={`font-mono shrink-0 ${a.direction === 'in' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {a.direction === 'in' ? '+' : '-'}
-                      {isGoat
-                        ? a.amount.toLocaleString()
-                        : satsToDollars(a.amount, bsvPrice)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {earnedSats !== null && earnedSats > 0 && (
-              <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-800/60">
-                <span className="text-[10px] text-zinc-500">Total earned</span>
-                <span className="text-[10px] text-zinc-400">
-                  {isGoat ? `${earnedSats.toLocaleString()} sats` : satsToDollars(earnedSats, bsvPrice)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Security status */}
-          <div className="flex items-center gap-2 py-2 border-t border-zinc-800">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isProtected ? 'text-emerald-500' : 'text-amber-500'}>
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              {isProtected && <path d="m9 12 2 2 4-4" />}
-            </svg>
-            <span className={`text-xs ${isProtected ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {isProtected ? 'Protected' : 'Unprotected'}
-            </span>
-            {!isProtected && !showUpgrade && (
-              <button
-                onClick={() => setShowUpgrade(true)}
-                className="ml-auto text-xs bg-amber-500 text-black rounded-lg px-2.5 py-1 font-medium hover:bg-amber-400 transition-colors"
-              >
-                Upgrade Security
-              </button>
-            )}
-          </div>
-
-          {/* Upgrade form */}
+          {/* Upgrade form (inline, under security banner) */}
           {showUpgrade && !isProtected && (
-            <div className="mt-3 pt-3 border-t border-zinc-800 space-y-2">
-              <p className="text-xs text-zinc-400">
-                This creates a new, stronger identity protected by a passphrase. Your name stays the same.
+            <div className="px-3 py-3 border-b border-zinc-800 space-y-2 bg-zinc-900/50">
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Creates a new passphrase-protected identity. Your name stays the same.
               </p>
               <input
                 type="password"
                 placeholder="Passphrase (min 8 characters)"
                 value={passphrase}
                 onChange={(e) => { setPassphrase(e.target.value); setUpgradeError(''); }}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
               />
               <input
                 type="password"
                 placeholder="Confirm passphrase"
                 value={confirmPass}
                 onChange={(e) => { setConfirmPass(e.target.value); setUpgradeError(''); }}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
               />
-              {upgradeError && (
-                <p className="text-xs text-red-400">{upgradeError}</p>
-              )}
-              <button
-                onClick={handleUpgrade}
-                disabled={!canUpgrade}
-                className="w-full bg-amber-500 text-black rounded-lg px-3 py-2 text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {upgrading ? 'Upgrading...' : 'Upgrade'}
-              </button>
+              {upgradeError && <p className="text-[11px] text-red-400">{upgradeError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowUpgrade(false); setPassphrase(''); setConfirmPass(''); setUpgradeError(''); }}
+                  className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpgrade}
+                  disabled={!canUpgrade}
+                  className="flex-1 bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {upgrading ? 'Securing...' : 'Secure identity'}
+                </button>
+              </div>
             </div>
           )}
+
+          {/* ── Section 2: Balance + Currency toggle ── */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-zinc-800">
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-0.5">Balance</span>
+              <span className="text-sm text-emerald-400 font-medium tabular-nums">
+                {balanceSats !== null
+                  ? isGoat
+                    ? `${balanceSats.toLocaleString()} sats`
+                    : satsToDollars(balanceSats, bsvPrice)
+                  : '—'}
+              </span>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleCurrency(); }}
+              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
+              title={isGoat ? 'Switch to Noob Mode ($)' : 'Switch to Goat Mode (sats)'}
+            >
+              {isGoat ? (
+                <>
+                  <span>🐐</span>
+                  <span>Goat</span>
+                </>
+              ) : (
+                <>
+                  <span>💵</span>
+                  <span>Noob</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* ── Section 3: Activity ── */}
+          <div className="px-3 py-2.5 border-b border-zinc-800">
+            <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Activity</span>
+            {activity.length === 0 ? (
+              <p className="text-[11px] text-zinc-600 py-1">No activity yet</p>
+            ) : (
+              <div className="max-h-[120px] overflow-y-auto space-y-1" style={{ scrollbarWidth: 'none' }}>
+                {activity.map((a, i) => {
+                  const isFree = a.amount === 0;
+                  const isBoot = a.label.toLowerCase().includes('boot');
+                  return (
+                    <div key={i} className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-500 truncate mr-2">
+                        {a.label}
+                        {isBoot && (
+                          <span className={`ml-1 text-[10px] ${isFree ? 'text-zinc-600' : 'text-amber-600'}`}>
+                            {isFree
+                              ? '· free'
+                              : isGoat
+                                ? `· ${a.amount.toLocaleString()} sats`
+                                : `· ${satsToDollars(a.amount, bsvPrice)}`}
+                          </span>
+                        )}
+                      </span>
+                      <span className={`font-mono shrink-0 ${a.direction === 'in' ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                        {isFree ? (
+                          <span className="text-zinc-600 text-[10px] font-sans">FREE</span>
+                        ) : (
+                          <>
+                            {a.direction === 'in' ? '+' : '-'}
+                            {isGoat ? a.amount.toLocaleString() : satsToDollars(a.amount, bsvPrice)}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {earnedSats !== null && earnedSats > 0 && (
+              <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-800/60">
+                <span className="text-[10px] text-zinc-500">Total earned</span>
+                <span className="text-[10px] text-emerald-500 font-medium tabular-nums">
+                  {isGoat ? `${earnedSats.toLocaleString()} sats` : satsToDollars(earnedSats, bsvPrice)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Section 4: Identity backup ── */}
+          <div className="px-3 py-2.5">
+            <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Keep your name</span>
+            <div className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400 mb-2">
+              <span className="flex-1 break-all leading-relaxed">
+                {revealed ? identity.wif : maskWif(identity.wif)}
+              </span>
+              <button
+                onClick={() => setRevealed(!revealed)}
+                className="shrink-0 text-[10px] text-zinc-500 hover:text-amber-400 transition-colors px-1"
+              >
+                {revealed ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopy}
+                className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+              >
+                Download
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">
+              Save this to keep your name if you clear your browser data.
+            </p>
+          </div>
+
         </div>
       )}
     </div>

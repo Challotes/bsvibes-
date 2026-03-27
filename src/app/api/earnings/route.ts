@@ -20,16 +20,21 @@ export async function GET(request: Request) {
     'SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address = ? ORDER BY created_at DESC LIMIT 10'
   ).all(address) as Array<{ amount_sats: number; payout_type: string; txid: string; created_at: string }>;
 
-  // Recent boots by this user (outgoing) — look up by the boosted_by field
-  // boot_grants tracks by address, bootboard tracks by name — use boot_grants to find total
+  // Recent boots by this user (outgoing) — join payouts to get actual cost per boot event.
+  // If payouts exist for a bootboard entry, sum them = actual boot price paid.
+  // If no payouts, the boot was free (server paid or pre-payment era).
   const bootSpend = db.prepare(`
-    SELECT b.booted_at as created_at, 'boot' as type, b.boosted_by
+    SELECT
+      b.id as boot_id,
+      b.booted_at as created_at,
+      COALESCE(SUM(py.amount_sats), 0) as total_paid
     FROM bootboard b
-    WHERE b.boosted_by = ? OR b.boosted_by IN (
-      SELECT pubkey FROM boot_grants WHERE pubkey = ?
-    )
-    ORDER BY b.booted_at DESC LIMIT 10
-  `).all(address, address) as Array<{ created_at: string; type: string; boosted_by: string }>;
+    LEFT JOIN payouts py ON py.boot_event_id = b.id
+    WHERE b.boosted_by = ?
+    GROUP BY b.id, b.booted_at
+    ORDER BY b.booted_at DESC
+    LIMIT 10
+  `).all(address) as Array<{ boot_id: number; created_at: string; total_paid: number }>;
 
   // Merge into a unified activity feed
   type Activity = {
@@ -54,7 +59,7 @@ export async function GET(request: Request) {
 
   for (const b of bootSpend) {
     activity.push({
-      amount: 1000, // approximate — actual price varies
+      amount: b.total_paid, // 0 = free boot, >0 = paid boot with actual cost
       direction: 'out',
       label: 'Boot',
       created_at: b.created_at,
