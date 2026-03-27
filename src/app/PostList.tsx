@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
@@ -22,7 +22,7 @@ interface BootButtonProps {
 
 function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded, onFreeBootUsed }: BootButtonProps) {
   const { identity } = useIdentityContext();
-  const [isPending, startTransition] = useTransition();
+  const [isBooting, setIsBooting] = useState(false);
   const [optimisticBoots, setOptimisticBoots] = useState(0);
 
   useEffect(() => {
@@ -33,32 +33,33 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
   const canBoot = identity && postPubkey; // Must be signed post + signed user
 
   async function handleBoot() {
-    if (!identity || !postPubkey) return;
+    if (!identity || !postPubkey || isBooting) return;
 
-    startTransition(async () => {
-      setOptimisticBoots((prev) => prev + 1);
+    setIsBooting(true);
+    setOptimisticBoots((prev) => prev + 1);
 
-      // Try server-side boot first (handles free boots)
+    try {
+      // Try server-side boot first (handles free boots).
       const result = await bootPost(postId, identity.address, identity.name);
 
       if (result.error) {
-        // Server-side error — roll back the optimistic increment
         setOptimisticBoots((prev) => Math.max(0, prev - 1));
         return;
       }
 
       if (result.success && result.isFree) {
-        // Successful free boot — decrement local counter to stay in sync with server quota
+        // Successful free boot — decrement the parent counter immediately so the
+        // FREE badge disappears on this render, not after a round-trip.
         onFreeBootUsed?.();
         onBooted?.();
         return;
       }
 
       if (result.requiresPayment) {
-        // Server says free quota is exhausted — sync client state immediately
+        // Server says free quota is exhausted — sync client state immediately.
         onFreeBootUsed?.();
 
-        // Paid boot — client builds trustless tx
+        // Paid boot — client builds trustless tx.
         const sharesRes = await fetch(`/api/boot-shares?postId=${postId}&pubkey=${encodeURIComponent(identity.address)}`);
         if (!sharesRes.ok) {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));
@@ -87,7 +88,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
         }
 
         if (bootResult.status === 'success' && bootResult.txid) {
-          // Confirm on server for audit trail
+          // Confirm on server for audit trail.
           await fetch('/api/boot-confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -101,7 +102,9 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
       }
 
       onBooted?.();
-    });
+    } finally {
+      setIsBooting(false);
+    }
   }
 
   const displayCount = bootCount + optimisticBoots;
@@ -117,7 +120,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
     <div className="flex flex-col items-center">
       <button
         onClick={handleBoot}
-        disabled={isPending || !canBoot}
+        disabled={isBooting || !canBoot}
         className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
           displayCount > 0
             ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
