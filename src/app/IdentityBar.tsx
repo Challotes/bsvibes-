@@ -168,9 +168,7 @@ export function IdentityChip(): React.JSX.Element | null {
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
         {balanceSats !== null && balanceSats > 0 && (
-          isGoat
-            ? <AnimatedBalance sats={balanceSats} className="text-[10px]" />
-            : <span className="text-emerald-400 text-[10px] font-medium">{satsToDollars(balanceSats, bsvPrice)}</span>
+          <AnimatedBalance sats={balanceSats} bsvPrice={bsvPrice} isGoat={isGoat} className="text-[10px]" />
         )}
 
         {showWarningDot && (

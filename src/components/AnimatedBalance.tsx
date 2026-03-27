@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { satsToDollars } from '@/hooks/useBsvPrice';
 
 interface AnimatedBalanceProps {
   sats: number;
+  bsvPrice?: number;
+  isGoat?: boolean;
   className?: string;
 }
 
-export function AnimatedBalance({ sats, className = '' }: AnimatedBalanceProps) {
+export function AnimatedBalance({ sats, bsvPrice = 50, isGoat = true, className = '' }: AnimatedBalanceProps) {
   const [displayed, setDisplayed] = useState(sats);
   const [flash, setFlash] = useState(false);
   const [label, setLabel] = useState<string | null>(null);
@@ -32,7 +35,10 @@ export function AnimatedBalance({ sats, className = '' }: AnimatedBalanceProps) 
     const start = performance.now();
 
     setFlash(true);
-    setLabel(`+${delta.toLocaleString()} · Agentic fairness`);
+    const deltaDisplay = isGoat
+      ? `+${delta.toLocaleString()} sats`
+      : `+${satsToDollars(delta, bsvPrice)}`;
+    setLabel(`${deltaDisplay} · Agentic fairness`);
     setTimeout(() => setFlash(false), 1200);
 
     if (labelTimer.current) clearTimeout(labelTimer.current);
@@ -53,7 +59,11 @@ export function AnimatedBalance({ sats, className = '' }: AnimatedBalanceProps) 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [sats]);
+  }, [sats, isGoat, bsvPrice]);
+
+  const formattedValue = isGoat
+    ? `${displayed.toLocaleString()} sats`
+    : satsToDollars(displayed, bsvPrice);
 
   return (
     <span className="relative inline-flex items-center">
@@ -65,7 +75,7 @@ export function AnimatedBalance({ sats, className = '' }: AnimatedBalanceProps) 
         `}
         style={{ display: 'inline-block', transformOrigin: 'center' }}
       >
-        {displayed.toLocaleString()} sats
+        {formattedValue}
       </span>
 
       {/* Agentic fairness label */}
