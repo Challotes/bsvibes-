@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-27 — Balance Display + Free Boot Policy
+
+- Identity chip now shows spendable balance (WhatsOnChain UTXOs) instead of total earned
+- Identity dropdown shows both: Balance (spendable) + Total earned (all-time)
+- Settled: free boots are one-time only (15 per identity, never reset)
+- System is live: posts on-chain, boots splitting payments, earnings accumulating, balance visible
+
 ## 2026-03-27 — Boot Reliability: UTXO Management + Paid Boot Flow
 
 - Fixed boot splits failing silently: spent-UTXO blacklist prevents double-spend from stale WhatsOnChain data
