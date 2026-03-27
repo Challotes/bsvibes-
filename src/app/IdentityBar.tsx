@@ -5,6 +5,8 @@ import { useIdentityContext } from '@/contexts/IdentityContext';
 import { isIdentityEncrypted, upgradeIdentity } from '@/services/bsv/identity';
 import { migrateIdentity } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
+import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
+import { useCurrencyMode } from '@/hooks/useCurrencyMode';
 
 const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
 
@@ -21,6 +23,8 @@ export function IdentityChip(): React.JSX.Element | null {
   const [isProtected, setIsProtected] = useState(false);
   const [earnedSats, setEarnedSats] = useState<number | null>(null);
   const [balanceSats, setBalanceSats] = useState<number | null>(null);
+  const bsvPrice = useBsvPrice();
+  const { mode, toggle: toggleCurrency, isGoat } = useCurrencyMode();
   const [activity, setActivity] = useState<Array<{ amount: number; direction: 'in' | 'out'; label: string; created_at: string; txid?: string }>>([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
@@ -164,7 +168,9 @@ export function IdentityChip(): React.JSX.Element | null {
         <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
         <span className="text-zinc-300">{identity.name}</span>
         {balanceSats !== null && balanceSats > 0 && (
-          <AnimatedBalance sats={balanceSats} className="text-[10px]" />
+          isGoat
+            ? <AnimatedBalance sats={balanceSats} className="text-[10px]" />
+            : <span className="text-emerald-400 text-[10px] font-medium">{satsToDollars(balanceSats, bsvPrice)}</span>
         )}
 
         {showWarningDot && (
@@ -208,19 +214,37 @@ export function IdentityChip(): React.JSX.Element | null {
 
           {/* Activity feed */}
           <div className="py-2 border-t border-zinc-800">
-            {balanceSats !== null && (
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-zinc-400">Balance</span>
-                <span className="text-xs text-emerald-400 font-medium">{balanceSats.toLocaleString()} sats</span>
+            {/* Balance + mode toggle */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-zinc-400">Balance</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-emerald-400 font-medium">
+                  {balanceSats !== null
+                    ? isGoat
+                      ? `${balanceSats.toLocaleString()} sats`
+                      : satsToDollars(balanceSats, bsvPrice)
+                    : '—'}
+                </span>
+                <button
+                  onClick={toggleCurrency}
+                  className="text-[9px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
+                  title={isGoat ? 'Switch to Noob Mode ($)' : 'Switch to Goat Mode (sats)'}
+                >
+                  {isGoat ? '🐐' : '$'}
+                </button>
               </div>
-            )}
+            </div>
+
             {activity.length > 0 && (
               <div className="max-h-[140px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
                 {activity.map((a, i) => (
                   <div key={i} className="flex items-center justify-between text-[11px]">
                     <span className="text-zinc-500 truncate mr-2">{a.label}</span>
                     <span className={`font-mono shrink-0 ${a.direction === 'in' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {a.direction === 'in' ? '+' : '-'}{a.amount.toLocaleString()}
+                      {a.direction === 'in' ? '+' : '-'}
+                      {isGoat
+                        ? a.amount.toLocaleString()
+                        : satsToDollars(a.amount, bsvPrice)}
                     </span>
                   </div>
                 ))}
@@ -229,7 +253,9 @@ export function IdentityChip(): React.JSX.Element | null {
             {earnedSats !== null && earnedSats > 0 && (
               <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-800/60">
                 <span className="text-[10px] text-zinc-500">Total earned</span>
-                <span className="text-[10px] text-zinc-400">{earnedSats.toLocaleString()} sats</span>
+                <span className="text-[10px] text-zinc-400">
+                  {isGoat ? `${earnedSats.toLocaleString()} sats` : satsToDollars(earnedSats, bsvPrice)}
+                </span>
               </div>
             )}
           </div>

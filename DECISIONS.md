@@ -126,6 +126,7 @@
 - **$50/month operator budget:** Covers subsidised boots, on-chain posting, hosting, API. Sustainable through ~200 users, then user-paid boots and 5% platform cut take over.
 - **Trustless P2P payments:** Paid boots are built client-side — user's browser constructs the multi-output BSV transaction directly to every contributor. Server never touches user funds. Server only provides the contributor list. The transaction itself is the verifiable proof. Free boots use the server wallet (server is the payer, not custodian).
 - **Auto-switch:** Free boots → server pays. User has BSV balance → client builds trustless tx. No balance → show fund address QR. One click, ~800ms, zero custody.
+- **Currency display:** Default is dollars ("Noob Mode"), toggle to sats ("Goat Mode"). Persisted in localStorage. Applies to chip balance, activity feed, and boot prices. BSV price from WhatsOnChain API, cached.
 - **Free boots are one-time only (settled).** 15 free boots per identity, never reset. Once used, user pays from their earnings or funded balance. No monthly reset, no balance-based gating. The 15 boots are an onboarding gift — "try before you buy." After that, the economy takes over.
 
 ## Tech Stack (settled)
