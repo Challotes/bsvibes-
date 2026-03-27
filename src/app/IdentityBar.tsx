@@ -32,29 +32,33 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(isIdentityEncrypted());
   }, []);
 
-  // Fetch earnings and balance when identity is available.
-  // Re-fetch each time the dropdown opens so values stay fresh.
-  // Also poll every 30 seconds so the chip balance updates after boots/earnings.
+  // Live balance: poll WhatsOnChain every 5s (client-side, per-user, no server cost).
+  // Earnings: refresh on dropdown open (less frequent, server call).
   useEffect(() => {
     if (!identity?.address) return;
 
-    function fetchBalance() {
-      fetch(`/api/earnings?address=${encodeURIComponent(identity!.address)}`)
-        .then((res) => res.json())
-        .then((data) => setEarnedSats(data.totalEarned ?? 0))
-        .catch(() => setEarnedSats(0));
+    function fetchLiveBalance() {
       fetch(`https://api.whatsonchain.com/v1/bsv/main/address/${identity!.address}/unspent`)
         .then((res) => res.json())
         .then((utxos) => {
           const total = Array.isArray(utxos) ? utxos.reduce((s: number, u: { value: number }) => s + u.value, 0) : 0;
           setBalanceSats(total);
         })
-        .catch(() => setBalanceSats(0));
+        .catch(() => {});
     }
 
-    fetchBalance();
-    const interval = setInterval(fetchBalance, 30_000);
+    fetchLiveBalance();
+    const interval = setInterval(fetchLiveBalance, 5_000);
     return () => clearInterval(interval);
+  }, [identity?.address]);
+
+  // Earnings: fetch on mount + each time dropdown opens
+  useEffect(() => {
+    if (!identity?.address) return;
+    fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
+      .then((res) => res.json())
+      .then((data) => setEarnedSats(data.totalEarned ?? 0))
+      .catch(() => setEarnedSats(0));
   }, [identity?.address, open]);
 
   useEffect(() => {
