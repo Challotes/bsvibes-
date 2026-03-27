@@ -69,6 +69,9 @@ export function useBsvPrice(): number {
 export function satsToDollars(sats: number, bsvPrice: number): string {
   const btc = sats / 100_000_000;
   const usd = btc * bsvPrice;
-  if (usd < 0.01) return '<$0.01';
-  return `$${usd.toFixed(2)}`;
+  if (usd >= 1) return `$${usd.toFixed(2)}`;
+  if (usd >= 0.01) return `$${usd.toFixed(4)}`;
+  if (usd >= 0.0001) return `$${usd.toFixed(6)}`;
+  if (usd > 0) return `$${usd.toFixed(8)}`;
+  return '$0.00';
 }

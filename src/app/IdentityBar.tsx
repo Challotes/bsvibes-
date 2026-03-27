@@ -226,11 +226,11 @@ export function IdentityChip(): React.JSX.Element | null {
                     : '—'}
                 </span>
                 <button
-                  onClick={toggleCurrency}
-                  className="text-[9px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); toggleCurrency(); }}
+                  className="text-[11px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
                   title={isGoat ? 'Switch to Noob Mode ($)' : 'Switch to Goat Mode (sats)'}
                 >
-                  {isGoat ? '🐐' : '$'}
+                  {isGoat ? '🐐 Goat' : '💵 Noob'}
                 </button>
               </div>
             </div>
