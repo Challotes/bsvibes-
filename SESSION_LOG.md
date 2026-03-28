@@ -2,6 +2,15 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-28 — Tester Audit + Final Critical Fixes
+
+- Full end-to-end tester audit by Jason: 8 bugs found in identity/upgrade flow
+- BUG-1 FIXED: Passphrase unlock UI added (was dead code, users locked out after refresh)
+- BUG-2 FIXED: Migration registered before key stored (atomic ordering, no crash window)
+- needsUnlock state flows through useIdentity → context → IdentityBar
+- commitUpgrade() separates key storage from key generation
+- All previous critical fixes verified as working by tester
+
 ## 2026-03-28 — Security Audit: 9 Criticals + 3 Highs Fixed
 
 - Full deep audit by code auditor (Jerry) + security ops (Paul): 53 findings total
