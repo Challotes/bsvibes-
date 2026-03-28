@@ -61,23 +61,40 @@ export function useFeedPolling({
 
       setBootboard(data.bootboard)
 
-      // Merge updated posts (ones that now have tx_id) into existing state
-      if (data.updated && data.updated.length > 0) {
-        const updatedMap = new Map(data.updated.map(p => [p.id, p]))
-        setPosts(prev => prev.map(p => updatedMap.get(p.id) ?? p))
-      }
+      // Build the tx_id update map (posts that now have chain confirmation)
+      const updatedMap = data.updated && data.updated.length > 0
+        ? new Map(data.updated.map((p: Post) => [p.id, p.tx_id]))
+        : null
 
-      if (data.posts.length === 0) {
-        // No new posts — nothing else to merge
+      if (data.posts.length === 0 && !updatedMap) {
+        // Nothing new, nothing updated — skip
         return
       }
 
+      if (data.posts.length === 0 && updatedMap) {
+        // Only tx_id updates, no new posts — single atomic setPosts
+        setPosts(prev => prev.map(p => {
+          const newTxId = updatedMap.get(p.id)
+          return newTxId ? { ...p, tx_id: newTxId } : p
+        }))
+        return
+      }
+
+      // New posts (and possibly tx_id updates) — combine into one setPosts
       if (latestId === null) {
-        // First incremental poll — replace the full set
         setPosts(data.posts)
       } else {
-        // Prepend new posts (they arrive newest-first from the API)
-        setPosts(prev => [...data.posts, ...prev])
+        setPosts(prev => {
+          // First apply tx_id updates to existing posts
+          const updated = updatedMap
+            ? prev.map(p => {
+                const newTxId = updatedMap.get(p.id)
+                return newTxId ? { ...p, tx_id: newTxId } : p
+              })
+            : prev
+          // Then prepend new posts
+          return [...data.posts, ...updated]
+        })
       }
 
       // data.posts is ordered DESC, so index 0 is the newest
