@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { isIdentityEncrypted, upgradeIdentity, importIdentity } from '@/services/bsv/identity';
-import { migrateIdentity } from './actions';
+import { migrateIdentity, cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
 import { useCurrencyMode } from '@/hooks/useCurrencyMode';
@@ -226,6 +226,15 @@ export function IdentityChip(): React.JSX.Element | null {
     try {
       const imported = await importIdentity(wif, name);
       updateIdentity(imported);
+
+      // Clean up any stale migration pointing away from this key.
+      // If the user previously upgraded (creating a migration A → B) and is now
+      // re-importing key A, we must remove that migration so payouts go to A, not B.
+      // Fire-and-forget: non-critical, failure should not block the import flow.
+      cleanupMigrations(imported.pubkey).catch((err) => {
+        console.warn('[BSVibes] doImport: cleanupMigrations failed (non-critical)', err);
+      });
+
       setImportSuccess(true);
       setTimeout(() => {
         resetImport();

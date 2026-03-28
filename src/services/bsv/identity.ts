@@ -425,7 +425,7 @@ export function preWarmBsvSdk(): void {
  * @param wif    - A Base58-encoded WIF private key string.
  * @param name   - Optional display name. Falls back to generating a new anon name.
  */
-export async function importIdentity(wif: string, name?: string): Promise<Identity> {
+export async function importIdentity(wif: string, name?: string): Promise<Identity & { pubkey: string }> {
   if (typeof window === 'undefined') {
     throw new Error('importIdentity can only run in the browser');
   }
@@ -442,6 +442,7 @@ export async function importIdentity(wif: string, name?: string): Promise<Identi
     throw new Error('Invalid key — please check and try again');
   }
 
+  const pubkey = key.toPublicKey().toString();
   const address = key.toPublicKey().toAddress().toString();
   const identityName = (name ?? '').trim() || generateAnonName();
 
@@ -459,5 +460,5 @@ export async function importIdentity(wif: string, name?: string): Promise<Identi
   _cachedWif = trimmed;
   _cachedPrivateKey = key;
 
-  return { name: identityName, address, wif: trimmed };
+  return { name: identityName, address, wif: trimmed, pubkey };
 }

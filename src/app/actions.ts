@@ -215,6 +215,34 @@ export async function bootPost(postId: number, boostedBy: string, boostedByName:
   };
 }
 
+/**
+ * Clean up any migration records where `from_pubkey` matches the given pubkey.
+ *
+ * Called when a user imports a key back into their browser. If key A was
+ * previously upgraded (creating a migration A → B), but the user is now
+ * actively using A again, the migration is stale and would silently redirect
+ * all payouts to B — an address the user may no longer control.
+ *
+ * Deleting the migration row restores direct payouts to A.
+ * This is safe: the user holding the key proves ownership.
+ */
+export async function cleanupMigrations(pubkey: string): Promise<{ deleted: number }> {
+  if (typeof pubkey !== 'string' || pubkey.trim().length === 0) {
+    return { deleted: 0 };
+  }
+
+  const result = db.prepare(
+    'DELETE FROM migrations WHERE from_pubkey = ?'
+  ).run(pubkey.trim());
+
+  const deleted = result.changes;
+  if (deleted > 0) {
+    console.log(`[BSVibes] cleanupMigrations: removed ${deleted} stale migration(s) for pubkey ${pubkey.slice(0, 16)}…`);
+  }
+
+  return { deleted };
+}
+
 export async function migrateIdentity(
   oldPubkey: string,
   newPubkey: string,
