@@ -5,10 +5,10 @@
 
 ## CRITICAL (9 findings — must fix before real users)
 
-### C1: CSP allows unsafe-inline + unsafe-eval
+### C1: CSP allows unsafe-inline + unsafe-eval — PARTIALLY FIXED
 **File:** next.config.ts line 37
 **Risk:** XSS = instant key theft. Any injected script reads localStorage WIF.
-**Fix:** Nonce-based CSP. Remove unsafe-eval and unsafe-inline.
+**Fix:** Removed unsafe-eval. unsafe-inline remains (needed for Next.js). Nonce-based CSP is the full fix (future).
 
 ### C2: WIF cached in JS module-scope variables
 **File:** src/services/bsv/identity.ts lines 39-45
@@ -76,9 +76,17 @@
 **File:** src/app/api/tx-hex/route.ts
 **Fix:** Add IP-keyed rate limiting (60 req/min).
 
-### H7: Migration registration after local key storage — crash breaks attribution
-**File:** src/services/bsv/identity.ts
-**Fix:** Register migration before storing new key locally.
+### H7: Migration registration after local key storage — FIXED
+**File:** src/services/bsv/identity.ts + src/app/IdentityBar.tsx
+**Fix:** upgradeIdentity() no longer stores key. Returns encStore. IdentityBar calls migrateIdentity() first, then commitUpgrade() only on success. Atomic ordering.
+
+### Additional findings from tester audit (2026-03-28):
+
+**BUG-1 (High) — FIXED:** `unlockIdentity` was dead code. No passphrase prompt existed. Added unlock UI panel to IdentityBar. needsUnlock state flows through useIdentity → context.
+
+**BUG-2 (High) — FIXED:** Same as H7 above. Migration now registered before key storage.
+
+**BUG-6 (Medium) — OPEN:** boot-confirm stores booterPubkey as boosted_by but field expects BSV address. Mismatch for paid boots.
 
 ## MEDIUM (8 findings — before public launch)
 

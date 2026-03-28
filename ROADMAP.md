@@ -134,6 +134,10 @@
 - [x] Identity import with automatic migration cleanup
 - [x] Earnings sparkline chart, Noob/Goat currency toggle, live balance polling
 - [x] Forced backup download on security upgrade, interrupted upgrade recovery
+- [x] Passphrase unlock UI (users no longer locked out after refresh with encrypted identity)
+- [x] Atomic migration ordering (server confirms before key stored locally)
+- [x] Identity import with automatic migration cleanup (signed challenge required)
+- [x] Full tester audit: all identity/upgrade paths verified
 
 ## Phase 7: The Recursive Model — PLANNED
 
