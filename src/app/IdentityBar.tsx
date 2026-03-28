@@ -304,6 +304,26 @@ export function IdentityChip(): React.JSX.Element | null {
     setImporting(true);
     setImportError('');
     try {
+      // Auto-backup the CURRENT identity before replacing it.
+      // This is a silent safety net — the file lands in Downloads with no extra clicks.
+      if (identity) {
+        const preImportBackup = JSON.stringify({
+          name: identity.name,
+          address: identity.address,
+          wif: identity.wif,
+          createdAt: new Date().toISOString(),
+          app: 'BSVibes',
+          note: 'Automatic backup saved before importing a different identity.',
+        }, null, 2);
+        const backupBlob = new Blob([preImportBackup], { type: 'application/json' });
+        const backupUrl = URL.createObjectURL(backupBlob);
+        const backupAnchor = document.createElement('a');
+        backupAnchor.href = backupUrl;
+        backupAnchor.download = `bsvibes-identity-${identity.name}-before-import.json`;
+        backupAnchor.click();
+        URL.revokeObjectURL(backupUrl);
+      }
+
       const imported = await importIdentity(wif, name);
       updateIdentity(imported);
 
