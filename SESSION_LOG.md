@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-28 — Post-Audit Fixes: Ghost Posts, UTXO Contention, Migration Bridges
+
+- Fixed ghost posts: createPost returns { ok, reason } — rejected posts removed from optimistic UI
+- Fixed client-side double-spend on rapid boots: mutex + spent tracking + 0-conf chaining
+- Fixed chain link overwrite: single atomic setPosts for tx_id updates + new posts
+- Fixed boot-confirm 400: retry WoC verification after 2s for fresh txs
+- Fixed WoC rate limit: balance polling slowed to 15s
+- Fixed cleanupMigrations: now bridges orphaned intermediate keys before deleting
+- Fixed test user migration data: manual 1EJk → 1H2p insertion
+- Auto-download current identity backup before import (safety net)
+
 ## 2026-03-28 — isIdentityEncrypted Root Cause Fix
 
 - Root cause found: isIdentityEncrypted() always returned false — checked raw JSON string for "enc:" prefix but the stored value is a JSON wrapper starting with "{"
