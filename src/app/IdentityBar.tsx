@@ -76,7 +76,7 @@ export function IdentityChip(): React.JSX.Element | null {
     }
 
     fetchLiveBalance();
-    const interval = setInterval(fetchLiveBalance, 30_000);
+    const interval = setInterval(fetchLiveBalance, 15_000);
     return () => clearInterval(interval);
   }, [identity?.address]);
 
