@@ -88,6 +88,8 @@
 
 **BUG-6 (Medium) — OPEN:** boot-confirm stores booterPubkey as boosted_by but field expects BSV address. Mismatch for paid boots.
 
+**BUG-9 (Critical) — FIXED:** `isIdentityEncrypted()` always returned false. Checked raw JSON string for "enc:" prefix but stored value is JSON wrapper. Every encrypted identity guard was broken — unlock prompt never appeared, stale key generated after upgrade. Fixed by JSON-parsing and checking .encrypted field.
+
 ## MEDIUM (8 findings — before public launch)
 
 - M1: PBKDF2 at 100k iterations (increase to 600k)

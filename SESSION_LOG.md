@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-28 — isIdentityEncrypted Root Cause Fix
+
+- Root cause found: isIdentityEncrypted() always returned false — checked raw JSON string for "enc:" prefix but the stored value is a JSON wrapper starting with "{"
+- Every encrypted identity guard was broken: unlock prompt never appeared, stale plaintext key generated after upgrade, "Not protected" shown despite valid encrypted key
+- Fixed: now JSON-parses stored value and checks .encrypted field (matches unlockIdentity pattern)
+- Added secondary guard before key generation (after async gap)
+- Upgrade → refresh → passphrase unlock → identity restored: fully working end-to-end
+
 ## 2026-03-28 — Tester Audit + Final Critical Fixes
 
 - Full end-to-end tester audit by Jason: 8 bugs found in identity/upgrade flow
