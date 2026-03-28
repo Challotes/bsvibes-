@@ -93,6 +93,9 @@
 - [ ] Passkey wrapping (WebAuthn PRF, biometric unlock) — future
 - [ ] Firefox passphrase fallback — future
 - [ ] Deferred activation prompt (nudge at earnings threshold) — future
+- [ ] Session timeout for encrypted identities (auto-lock after inactivity) — future
+- [ ] Device sync via QR code (faster identity import between devices) — future
+- [ ] PBKDF2 increase to 600k iterations — future (when real funds flow)
 
 ## Phase 5: Self-Funded Posting — PLANNED
 
