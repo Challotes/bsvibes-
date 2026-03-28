@@ -165,7 +165,93 @@ export async function unlockIdentity(passphrase: string): Promise<Identity | nul
 }
 
 /**
+ * Auto-transfer all funds from old address to new address during upgrade.
+ * Builds a simple P2PKH transaction spending all UTXOs from old → new.
+ * Returns the txid on success, null if no funds or transfer fails.
+ */
+async function autoTransferFunds(
+  oldWif: string,
+  oldAddress: string,
+  newAddress: string,
+): Promise<{ txid: string | null; transferredSats: number; error?: string }> {
+  const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
+
+  try {
+    // Fetch UTXOs from old address
+    const utxoRes = await fetch(`${WOC_BASE}/address/${oldAddress}/unspent`);
+    if (!utxoRes.ok) {
+      return { txid: null, transferredSats: 0, error: `UTXO fetch failed: ${utxoRes.status}` };
+    }
+
+    const utxoData = await utxoRes.json();
+    if (!Array.isArray(utxoData) || utxoData.length === 0) {
+      return { txid: null, transferredSats: 0 }; // No funds — not an error
+    }
+
+    const totalSats = utxoData.reduce((sum: number, u: { value: number }) => sum + u.value, 0);
+    if (totalSats === 0) {
+      return { txid: null, transferredSats: 0 };
+    }
+
+    const { Transaction, PrivateKey, P2PKH } = await getBsvSdk();
+    const oldKey = PrivateKey.fromWif(oldWif);
+
+    // Fetch source transaction hex for each UTXO (parallel)
+    const sourceTxs = await Promise.all(
+      utxoData.map(async (utxo: { tx_hash: string; tx_pos: number; value: number }) => {
+        const hexRes = await fetch(`${WOC_BASE}/tx/${utxo.tx_hash}/hex`);
+        if (!hexRes.ok) throw new Error(`Source tx fetch failed: ${utxo.tx_hash}`);
+        const hex = await hexRes.text();
+        return { utxo, sourceTx: Transaction.fromHex(hex) };
+      }),
+    );
+
+    // Build transaction: all old UTXOs → new address
+    const tx = new Transaction();
+
+    for (const { utxo, sourceTx } of sourceTxs) {
+      tx.addInput({
+        sourceTransaction: sourceTx,
+        sourceOutputIndex: utxo.tx_pos,
+        unlockingScriptTemplate: new P2PKH().unlock(oldKey),
+      });
+    }
+
+    // Single output to new address (with change flag so fee is deducted)
+    tx.addOutput({
+      lockingScript: new P2PKH().lock(newAddress),
+      change: true,
+    });
+
+    await tx.fee();
+    await tx.sign();
+
+    const broadcastResult = await tx.broadcast();
+
+    if (broadcastResult.status === 'success') {
+      const txid = tx.id('hex') as string;
+      console.log(`[BSVibes] Auto-transferred ${totalSats} sats from old address to new address. txid: ${txid}`);
+      return { txid, transferredSats: totalSats };
+    }
+
+    return {
+      txid: null,
+      transferredSats: 0,
+      error: `Broadcast failed: ${typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult)}`,
+    };
+  } catch (e) {
+    console.warn('[BSVibes] Auto-transfer failed:', e);
+    return {
+      txid: null,
+      transferredSats: 0,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
  * Upgrade identity: generate new key, encrypt it, sign migration.
+ * Auto-transfers any funds from old address to new address.
  * Returns the new identity + migration data for on-chain posting.
  */
 export async function upgradeIdentity(
@@ -180,6 +266,11 @@ export async function upgradeIdentity(
     migrationMessage: string;
     migrationSignature: string;
   };
+  fundTransfer: {
+    txid: string | null;
+    transferredSats: number;
+    error?: string;
+  };
 }> {
   const { PrivateKey } = await getBsvSdk();
 
@@ -192,6 +283,7 @@ export async function upgradeIdentity(
   // Old key signs migration message
   const oldKey = PrivateKey.fromWif(oldWif);
   const oldPubkey = oldKey.toPublicKey().toString();
+  const oldAddress = oldKey.toPublicKey().toAddress().toString();
 
   const migrationMessage = JSON.stringify({
     app: 'bsvibes',
@@ -204,6 +296,9 @@ export async function upgradeIdentity(
   const msgBytes = Array.from(new TextEncoder().encode(migrationMessage));
   const sig = oldKey.sign(msgBytes);
   const migrationSignature = sig.toDER('hex') as string;
+
+  // Auto-transfer funds from old address to new address BEFORE storing new key
+  const fundTransfer = await autoTransferFunds(oldWif, oldAddress, newAddress);
 
   // Encrypt new WIF
   const encrypted = await encryptWif(newWif, passphrase);
@@ -237,6 +332,7 @@ export async function upgradeIdentity(
       migrationMessage,
       migrationSignature,
     },
+    fundTransfer,
   };
 }
 

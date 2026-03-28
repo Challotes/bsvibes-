@@ -8,6 +8,7 @@ interface IdentityContextValue {
   identity: Identity | null;
   isLoading: boolean;
   sign: (content: string) => Promise<{ signature: string; pubkey: string } | null>;
+  updateIdentity: (newIdentity: Identity) => void;
 }
 
 const IdentityContext = createContext<IdentityContextValue | null>(null);

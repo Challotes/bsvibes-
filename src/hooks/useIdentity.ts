@@ -7,6 +7,7 @@ interface UseIdentityReturn {
   identity: Identity | null;
   isLoading: boolean;
   sign: (content: string) => Promise<{ signature: string; pubkey: string } | null>;
+  updateIdentity: (newIdentity: Identity) => void;
 }
 
 export function useIdentity(): UseIdentityReturn {
@@ -29,5 +30,9 @@ export function useIdentity(): UseIdentityReturn {
     return signPost(content);
   }, []);
 
-  return { identity, isLoading, sign };
+  const updateIdentity = useCallback((newIdentity: Identity) => {
+    setIdentity(newIdentity);
+  }, []);
+
+  return { identity, isLoading, sign, updateIdentity };
 }

@@ -16,7 +16,7 @@ function maskWif(wif: string): string {
 }
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading } = useIdentityContext();
+  const { identity, isLoading, updateIdentity } = useIdentityContext();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -146,6 +146,16 @@ export function IdentityChip(): React.JSX.Element | null {
         result.migration.migrationSignature,
         result.migration.migrationMessage
       );
+
+      // Update context so UI reflects the new identity (same name, new address)
+      updateIdentity(result.identity);
+
+      // Log fund transfer result
+      if (result.fundTransfer.txid) {
+        console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats, txid: ${result.fundTransfer.txid}`);
+      } else if (result.fundTransfer.error) {
+        console.warn('[BSVibes] Fund transfer issue:', result.fundTransfer.error);
+      }
 
       setIsProtected(true);
       setShowUpgrade(false);
