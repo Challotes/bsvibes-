@@ -28,6 +28,34 @@ export async function POST(req: NextRequest) {
   if (typeof txid !== 'string' || txid.trim().length === 0) {
     return NextResponse.json({ error: 'Missing txid' }, { status: 400 })
   }
+
+  // Validate txid format: must be exactly 64 hex characters
+  if (!/^[a-fA-F0-9]{64}$/.test(txid.trim())) {
+    return NextResponse.json({ error: 'Invalid txid format' }, { status: 400 })
+  }
+
+  // Verify the transaction exists on-chain via WhatsOnChain
+  try {
+    const wocRes = await fetch(
+      `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
+      { headers: { 'Accept': 'application/json' } }
+    )
+    if (!wocRes.ok) {
+      console.warn(`[BSVibes] boot-confirm: txid ${txid.slice(0, 16)}… not found on-chain (HTTP ${wocRes.status})`)
+      return NextResponse.json(
+        { error: 'Transaction not found on-chain — please wait for confirmation and retry' },
+        { status: 400 }
+      )
+    }
+    // Transaction exists — we could optionally verify outputs contain expected addresses here
+  } catch (err) {
+    console.error('[BSVibes] boot-confirm: WhatsOnChain verification failed', err)
+    return NextResponse.json(
+      { error: 'Could not verify transaction — please try again' },
+      { status: 502 }
+    )
+  }
+
   if (typeof booterPubkey !== 'string' || booterPubkey.trim().length === 0) {
     return NextResponse.json({ error: 'Missing booterPubkey' }, { status: 400 })
   }

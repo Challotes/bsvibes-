@@ -91,8 +91,20 @@ export async function getIdentity(): Promise<Identity | null> {
   // If session has a decrypted identity, use it
   if (_sessionIdentity) return _sessionIdentity;
 
-  // If encrypted, can't return identity without passphrase
-  if (isIdentityEncrypted()) return null;
+  // If encrypted, check whether a plaintext identity also exists (interrupted upgrade).
+  // If so, prefer the plaintext one so the user isn't locked out.
+  if (isIdentityEncrypted()) {
+    const plaintext = getStoredIdentity();
+    if (plaintext) {
+      console.warn(
+        '[BSVibes] getIdentity: encrypted key exists but plaintext key also present — ' +
+        'likely an interrupted upgrade. Using plaintext identity.'
+      );
+      getBsvSdk();
+      return { name: plaintext.name, address: plaintext.address, wif: plaintext.wif };
+    }
+    return null;
+  }
 
   const stored = getStoredIdentity();
   if (stored) {

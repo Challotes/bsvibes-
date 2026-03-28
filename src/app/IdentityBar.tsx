@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
-import { isIdentityEncrypted, upgradeIdentity, importIdentity } from '@/services/bsv/identity';
+import { isIdentityEncrypted, upgradeIdentity, importIdentity, signPost } from '@/services/bsv/identity';
 import { migrateIdentity, cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
@@ -108,10 +108,6 @@ export function IdentityChip(): React.JSX.Element | null {
     const nextOpen = !open;
     setOpen(nextOpen);
     if (!nextOpen) setShowUpgrade(false);
-    if (nextOpen && !backedUp) {
-      localStorage.setItem(BACKED_UP_KEY, '1');
-      setBackedUp(true);
-    }
   }
 
   function handleCopy(): void {
@@ -119,6 +115,10 @@ export function IdentityChip(): React.JSX.Element | null {
     navigator.clipboard.writeText(identity.wif);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    if (!backedUp) {
+      localStorage.setItem(BACKED_UP_KEY, '1');
+      setBackedUp(true);
+    }
   }
 
   function handleDownload(): void {
@@ -137,6 +137,10 @@ export function IdentityChip(): React.JSX.Element | null {
     a.download = `bsvibes-identity-${identity.name}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    if (!backedUp) {
+      localStorage.setItem(BACKED_UP_KEY, '1');
+      setBackedUp(true);
+    }
   }
 
   async function handleUpgrade(): Promise<void> {
@@ -167,15 +171,25 @@ export function IdentityChip(): React.JSX.Element | null {
 
       // FORCE auto-download backup of the NEW identity before marking upgrade complete.
       // This is the critical safety gate — the user must have the file before we proceed.
+      // If the fund transfer failed, also include the OLD key so stranded funds can be recovered.
       const newIdentity = result.identity;
-      const backupData = JSON.stringify({
+      const backupPayload: Record<string, string> = {
         name: newIdentity.name,
         address: newIdentity.address,
         wif: newIdentity.wif,
         createdAt: new Date().toISOString(),
         app: 'BSVibes',
         note: 'New identity created during security upgrade. Keep this file safe.',
-      }, null, 2);
+      };
+      if (result.fundTransfer.error) {
+        // Transfer failed — old key may still hold funds. Include it so the user
+        // can recover from the old address using any standard BSV wallet.
+        backupPayload.oldWif = identity.wif;
+        backupPayload.oldAddress = identity.address;
+        backupPayload.oldKeyNote =
+          'Fund transfer failed. Import oldWif into a BSV wallet to recover any balance from oldAddress.';
+      }
+      const backupData = JSON.stringify(backupPayload, null, 2);
       const blob = new Blob([backupData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -231,7 +245,13 @@ export function IdentityChip(): React.JSX.Element | null {
       // If the user previously upgraded (creating a migration A → B) and is now
       // re-importing key A, we must remove that migration so payouts go to A, not B.
       // Fire-and-forget: non-critical, failure should not block the import flow.
-      cleanupMigrations(imported.pubkey).catch((err) => {
+      const cleanupTs = Date.now();
+      const cleanupMsg = `cleanup:${imported.pubkey}:${cleanupTs}`;
+      signPost(cleanupMsg).then((sig) => {
+        if (sig) {
+          return cleanupMigrations(imported.pubkey, sig.signature, cleanupTs);
+        }
+      }).catch((err) => {
         console.warn('[BSVibes] doImport: cleanupMigrations failed (non-critical)', err);
       });
 

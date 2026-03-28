@@ -80,16 +80,19 @@ export async function executeBoot(
     if (result.status === 'success') {
       txid = result.txid;
     } else {
-      // Log the failure — graceful degradation continues with SQLite only,
-      // but we need visibility into WHY on-chain splits are failing.
+      // Log the failure — broadcast did not succeed, do not consume the grant.
       const errorDetail = result.status === 'broadcast_failed' ? result.error : result.status;
       console.error(
         `BSVibes: boot split broadcast FAILED for post ${postId}: ${errorDetail}`,
       );
+      // C5 fix: grant must NOT be consumed when broadcast fails.
+      return { success: false, price: actualPrice, recipients: 0, error: `Broadcast failed: ${errorDetail}`, isFree };
     }
   }
 
-  // 8. Update SQLite (bootboard + grants + payouts)
+  // 8. Update SQLite (bootboard + grants + payouts).
+  // For free boots this block is only reached when platformAddress is set AND broadcast succeeded (txid defined).
+  // For unconfigured-wallet boots (no platformAddress) we still record the bootboard entry — no grant to consume.
   db.transaction(() => {
     // Close current bootboard holder
     db.prepare(`

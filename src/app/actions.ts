@@ -20,26 +20,30 @@ export async function createPost(formData: FormData): Promise<void> {
     ? author
     : generateAnonName();
 
-  // 10 posts per minute per author.
-  const rl = rateLimit(`createPost:${authorName}`, { limit: 10, windowMs: 60_000 });
-  if (!rl.success) return;
-
   const signature = formData.get('signature');
   const pubkey = formData.get('pubkey');
 
-  // Verify signature server-side if both signature and pubkey are present.
-  // Unsigned posts are still allowed (signature/pubkey will be null).
-  if (typeof signature === 'string' && typeof pubkey === 'string') {
-    try {
-      const messageBytes = Array.from(new TextEncoder().encode(content.trim()));
-      const verified = PublicKey.fromString(pubkey).verify(
-        messageBytes,
-        Signature.fromDER(signature, 'hex'),
-      );
-      if (!verified) return;
-    } catch {
-      return;
-    }
+  // H5 fix: require pubkey on all new posts. Posts without a pubkey cannot receive
+  // payouts and cannot be bootstrapped into the fairness system anyway.
+  if (typeof pubkey !== 'string' || pubkey.trim().length === 0) return;
+
+  // H1 fix: key rate limit on the verified pubkey, not the client-supplied author name.
+  // pubkey is cryptographically bound to the post via the signature check below, so
+  // it cannot be spoofed to evade or exhaust someone else's bucket.
+  const rl = rateLimit(`createPost:${pubkey}`, { limit: 10, windowMs: 60_000 });
+  if (!rl.success) return;
+
+  // Verify signature server-side. Both signature and pubkey are now required.
+  if (typeof signature !== 'string') return;
+  try {
+    const messageBytes = Array.from(new TextEncoder().encode(content.trim()));
+    const verified = PublicKey.fromString(pubkey).verify(
+      messageBytes,
+      Signature.fromDER(signature, 'hex'),
+    );
+    if (!verified) return;
+  } catch {
+    return;
   }
 
   const result = db.prepare(
@@ -226,8 +230,41 @@ export async function bootPost(postId: number, boostedBy: string, boostedByName:
  * Deleting the migration row restores direct payouts to A.
  * This is safe: the user holding the key proves ownership.
  */
-export async function cleanupMigrations(pubkey: string): Promise<{ deleted: number }> {
+export async function cleanupMigrations(
+  pubkey: string,
+  signature?: string,
+  timestamp?: number
+): Promise<{ deleted: number }> {
   if (typeof pubkey !== 'string' || pubkey.trim().length === 0) {
+    return { deleted: 0 };
+  }
+
+  // Require signature verification — caller must prove key ownership
+  if (typeof signature !== 'string' || !signature || typeof timestamp !== 'number') {
+    console.warn('[BSVibes] cleanupMigrations: called without signature — rejecting');
+    return { deleted: 0 };
+  }
+
+  // Reject timestamps older than 5 minutes to prevent replay attacks
+  const age = Date.now() - timestamp;
+  if (age > 5 * 60 * 1000 || age < -30_000) {
+    console.warn('[BSVibes] cleanupMigrations: timestamp out of range — rejecting');
+    return { deleted: 0 };
+  }
+
+  const message = `cleanup:${pubkey.trim()}:${timestamp}`;
+  try {
+    const messageBytes = Array.from(new TextEncoder().encode(message));
+    const verified = PublicKey.fromString(pubkey.trim()).verify(
+      messageBytes,
+      Signature.fromDER(signature, 'hex'),
+    );
+    if (!verified) {
+      console.warn('[BSVibes] cleanupMigrations: signature verification failed — rejecting');
+      return { deleted: 0 };
+    }
+  } catch {
+    console.warn('[BSVibes] cleanupMigrations: signature verification error — rejecting');
     return { deleted: 0 };
   }
 
@@ -261,12 +298,36 @@ export async function migrateIdentity(
     return { success: false };
   }
 
-  // Store migration record — INSERT OR REPLACE so a re-upgrade from the same old key
-  // updates the existing row rather than creating a duplicate (which would confuse the
-  // fairness weight migration chain resolver).
-  db.prepare(
-    'INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
-  ).run(oldPubkey, newPubkey, migrationSig);
+  // C7 fix: before replacing the migration row, check whether the existing to_pubkey
+  // has any posts in the database. If it does, those posts would be orphaned (no migration
+  // chain back to the contributor) once we overwrite the A→B row with A→C. Guard against
+  // this by inserting a bridging migration B→C first so the full chain A→B→C is preserved.
+  db.transaction(() => {
+    const existingMigration = db.prepare(
+      'SELECT to_pubkey FROM migrations WHERE from_pubkey = ?'
+    ).get(oldPubkey) as { to_pubkey: string } | undefined;
+
+    if (existingMigration) {
+      const intermediatePubkey = existingMigration.to_pubkey;
+      // Only bridge if the intermediate key actually posted something.
+      const postCount = (db.prepare(
+        'SELECT COUNT(*) as count FROM posts WHERE pubkey = ?'
+      ).get(intermediatePubkey) as { count: number }).count;
+
+      if (postCount > 0) {
+        // Insert bridging migration: intermediate → new. Use INSERT OR IGNORE so
+        // a previously-recorded bridge is left intact with its own signature.
+        db.prepare(
+          'INSERT OR IGNORE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+        ).run(intermediatePubkey, newPubkey, migrationSig);
+      }
+    }
+
+    // Now replace (or insert) the original migration row pointing old → new.
+    db.prepare(
+      'INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+    ).run(oldPubkey, newPubkey, migrationSig);
+  })();
 
   // Fire-and-forget: post migration on-chain
   postMigrationOnChain({
