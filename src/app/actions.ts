@@ -269,13 +269,35 @@ export async function cleanupMigrations(
     return { deleted: 0 };
   }
 
-  const result = db.prepare(
-    'DELETE FROM migrations WHERE from_pubkey = ?'
-  ).run(pubkey.trim());
+  const trimmedPubkey = pubkey.trim();
 
-  const deleted = result.changes;
+  // Before deleting, check if the target key has posts that would be orphaned.
+  // If so, insert a bridge migration (target → imported key) to preserve attribution.
+  const existingMigrations = db.prepare(
+    'SELECT to_pubkey FROM migrations WHERE from_pubkey = ?'
+  ).all(trimmedPubkey) as Array<{ to_pubkey: string }>;
+
+  db.transaction(() => {
+    for (const { to_pubkey } of existingMigrations) {
+      const postCount = db.prepare(
+        'SELECT COUNT(*) as c FROM posts WHERE pubkey = ?'
+      ).get(to_pubkey) as { c: number };
+
+      if (postCount.c > 0) {
+        // The intermediate key has posts — bridge it to the imported key
+        db.prepare(
+          'INSERT OR IGNORE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+        ).run(to_pubkey, trimmedPubkey, 'auto-bridge-on-import');
+        console.log(`[BSVibes] cleanupMigrations: bridged orphaned key ${to_pubkey.slice(0, 16)}… → ${trimmedPubkey.slice(0, 16)}…`);
+      }
+    }
+
+    db.prepare('DELETE FROM migrations WHERE from_pubkey = ?').run(trimmedPubkey);
+  })();
+
+  const deleted = existingMigrations.length;
   if (deleted > 0) {
-    console.log(`[BSVibes] cleanupMigrations: removed ${deleted} stale migration(s) for pubkey ${pubkey.slice(0, 16)}…`);
+    console.log(`[BSVibes] cleanupMigrations: removed ${deleted} stale migration(s) for pubkey ${trimmedPubkey.slice(0, 16)}…`);
   }
 
   return { deleted };
