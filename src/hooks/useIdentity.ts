@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { getIdentity, signPost, type Identity } from '@/services/bsv/identity';
+import { getIdentity, isIdentityEncrypted, signPost, type Identity } from '@/services/bsv/identity';
 
 interface UseIdentityReturn {
   identity: Identity | null;
   isLoading: boolean;
+  needsUnlock: boolean;
   sign: (content: string) => Promise<{ signature: string; pubkey: string } | null>;
   updateIdentity: (newIdentity: Identity) => void;
 }
@@ -13,10 +14,14 @@ interface UseIdentityReturn {
 export function useIdentity(): UseIdentityReturn {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
 
   useEffect(() => {
     getIdentity()
       .then((id) => {
+        if (id === null && isIdentityEncrypted()) {
+          setNeedsUnlock(true);
+        }
         setIdentity(id);
         setIsLoading(false);
       })
@@ -32,7 +37,8 @@ export function useIdentity(): UseIdentityReturn {
 
   const updateIdentity = useCallback((newIdentity: Identity) => {
     setIdentity(newIdentity);
+    setNeedsUnlock(false);
   }, []);
 
-  return { identity, isLoading, sign, updateIdentity };
+  return { identity, isLoading, needsUnlock, sign, updateIdentity };
 }

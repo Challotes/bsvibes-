@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
-import { isIdentityEncrypted, upgradeIdentity, importIdentity, signPost } from '@/services/bsv/identity';
+import { isIdentityEncrypted, upgradeIdentity, commitUpgrade, unlockIdentity, importIdentity, signPost } from '@/services/bsv/identity';
 import { migrateIdentity, cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
@@ -16,7 +16,7 @@ function maskWif(wif: string): string {
 }
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading, updateIdentity } = useIdentityContext();
+  const { identity, isLoading, needsUnlock, updateIdentity } = useIdentityContext();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -44,6 +44,10 @@ export function IdentityChip(): React.JSX.Element | null {
   const [importSuccess, setImportSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Unlock state (shown when needsUnlock === true)
+  const [unlockPassphrase, setUnlockPassphrase] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
 
   useEffect(() => {
     setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
@@ -102,7 +106,64 @@ export function IdentityChip(): React.JSX.Element | null {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  if (isLoading || !identity) return null;
+  if (isLoading) return null;
+
+  // Encrypted identity needs passphrase to unlock — show unlock prompt instead of null
+  if (needsUnlock && !identity) {
+    async function handleUnlock(): Promise<void> {
+      if (!unlockPassphrase) return;
+      setUnlocking(true);
+      setUnlockError('');
+      try {
+        const unlocked = await unlockIdentity(unlockPassphrase);
+        if (!unlocked) {
+          setUnlockError('Wrong passphrase — try again');
+        } else {
+          updateIdentity(unlocked);
+          setUnlockPassphrase('');
+        }
+      } catch {
+        setUnlockError('Unlock failed — try again');
+      } finally {
+        setUnlocking(false);
+      }
+    }
+
+    return (
+      <div className="relative">
+        <div className="w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden" style={{ backgroundColor: '#18181b' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800 bg-zinc-900/60">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 shrink-0">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span className="text-xs text-zinc-300 font-medium">Enter your passphrase to unlock</span>
+          </div>
+          <div className="px-3 py-3 space-y-2">
+            <input
+              type="password"
+              placeholder="Passphrase"
+              value={unlockPassphrase}
+              autoFocus
+              onChange={(e) => { setUnlockPassphrase(e.target.value); setUnlockError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock(); }}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+            />
+            {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
+            <button
+              onClick={handleUnlock}
+              disabled={!unlockPassphrase || unlocking}
+              className="w-full bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {unlocking ? 'Unlocking...' : 'Unlock'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!identity) return null;
 
   function handleOpen(): void {
     const nextOpen = !open;
@@ -159,15 +220,20 @@ export function IdentityChip(): React.JSX.Element | null {
     setTransferStatus(null);
 
     try {
+      // Phase 1: generate keys, sign migration, transfer funds — but do NOT write to localStorage yet
       const result = await upgradeIdentity(passphrase, identity.wif, identity.name);
 
-      // Register migration on the server
+      // Phase 2: register migration on the server BEFORE committing locally
+      // If this fails, we have not overwritten localStorage — user is still on old key
       await migrateIdentity(
         result.migration.oldPubkey,
         result.migration.newPubkey,
         result.migration.migrationSignature,
         result.migration.migrationMessage
       );
+
+      // Phase 3: server confirmed — now safe to commit encrypted key to localStorage
+      commitUpgrade(result.encStore);
 
       // FORCE auto-download backup of the NEW identity before marking upgrade complete.
       // This is the critical safety gate — the user must have the file before we proceed.

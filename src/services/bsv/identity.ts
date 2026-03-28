@@ -319,12 +319,27 @@ async function autoTransferFunds(
  * Auto-transfers any funds from old address to new address.
  * Returns the new identity + migration data for on-chain posting.
  */
+/**
+ * Commit an upgrade that was prepared by upgradeIdentity().
+ * Writes the encrypted store to localStorage and removes the old plaintext key.
+ * Call this ONLY after the server migration has been confirmed.
+ */
+export function commitUpgrade(encStore: string): void {
+  try {
+    localStorage.setItem(ENCRYPTED_KEY, encStore);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn('BSVibes: could not commit upgrade to localStorage', err);
+  }
+}
+
 export async function upgradeIdentity(
   passphrase: string,
   oldWif: string,
   currentName: string
 ): Promise<{
   identity: Identity;
+  encStore: string;
   migration: {
     oldPubkey: string;
     newPubkey: string;
@@ -368,22 +383,14 @@ export async function upgradeIdentity(
   // Encrypt new WIF
   const encrypted = await encryptWif(newWif, passphrase);
 
-  // Store encrypted identity
+  // Build encrypted store string — caller must commit this after server confirms migration
   const encStore = JSON.stringify({
     encrypted,
     name: currentName,
     address: newAddress,
   });
 
-  try {
-    localStorage.setItem(ENCRYPTED_KEY, encStore);
-    // Remove plaintext key
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (err) {
-    console.warn('BSVibes: could not store encrypted identity', err);
-  }
-
-  // Cache for session
+  // Cache for session so the new identity is usable immediately after commit
   const identity = { name: currentName, address: newAddress, wif: newWif };
   _sessionIdentity = identity;
   _cachedWif = newWif;
@@ -391,6 +398,7 @@ export async function upgradeIdentity(
 
   return {
     identity,
+    encStore,
     migration: {
       oldPubkey,
       newPubkey,
