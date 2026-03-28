@@ -35,11 +35,20 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify the transaction exists on-chain via WhatsOnChain
+  // Note: recently broadcast txs may not be indexed yet — retry once after 2s
   try {
-    const wocRes = await fetch(
+    let wocRes = await fetch(
       `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
       { headers: { 'Accept': 'application/json' } }
     )
+    // If not found, wait 2s and retry (tx may still be propagating)
+    if (!wocRes.ok) {
+      await new Promise(r => setTimeout(r, 2000))
+      wocRes = await fetch(
+        `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
+        { headers: { 'Accept': 'application/json' } }
+      )
+    }
     if (!wocRes.ok) {
       console.warn(`[BSVibes] boot-confirm: txid ${txid.slice(0, 16)}… not found on-chain (HTTP ${wocRes.status})`)
       return NextResponse.json(
