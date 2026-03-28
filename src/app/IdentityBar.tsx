@@ -34,6 +34,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [upgradeError, setUpgradeError] = useState('');
   const [upgrading, setUpgrading] = useState(false);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
+  const [backupConfirmed, setBackupConfirmed] = useState(false);
   // Import state
   const [showImport, setShowImport] = useState(false);
   const [importMode, setImportMode] = useState<'file' | 'wif'>('file');
@@ -164,14 +165,33 @@ export function IdentityChip(): React.JSX.Element | null {
         result.migration.migrationMessage
       );
 
-      // Update context so UI reflects the new identity (same name, new address)
-      updateIdentity(result.identity);
+      // FORCE auto-download backup of the NEW identity before marking upgrade complete.
+      // This is the critical safety gate — the user must have the file before we proceed.
+      const newIdentity = result.identity;
+      const backupData = JSON.stringify({
+        name: newIdentity.name,
+        address: newIdentity.address,
+        wif: newIdentity.wif,
+        createdAt: new Date().toISOString(),
+        app: 'BSVibes',
+        note: 'New identity created during security upgrade. Keep this file safe.',
+      }, null, 2);
+      const blob = new Blob([backupData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bsvibes-identity-${newIdentity.name}-secured.json`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-      // Surface fund transfer result to the user
+      // Update context so UI reflects the new identity (same name, new address)
+      updateIdentity(newIdentity);
+
+      // Surface fund transfer result to the user — include new address so they know where funds went
       if (result.fundTransfer.txid) {
         const sats = result.fundTransfer.transferredSats.toLocaleString();
-        setTransferStatus(`Transferred ${sats} sats to your new address.`);
-        console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats, txid: ${result.fundTransfer.txid}`);
+        setTransferStatus(`Transferred ${sats} sats to your new address (${newIdentity.address.slice(0, 8)}…${newIdentity.address.slice(-6)}).`);
+        console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats to ${newIdentity.address}, txid: ${result.fundTransfer.txid}`);
       } else if (result.fundTransfer.error) {
         // Non-fatal: identity is upgraded, but funds need manual recovery
         setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your old key is still in your backup file.`);
@@ -179,6 +199,7 @@ export function IdentityChip(): React.JSX.Element | null {
       }
       // If no error and no txid, there were simply no funds — no message needed
 
+      setBackupConfirmed(true);
       setIsProtected(true);
       setShowUpgrade(false);
       setPassphrase('');
@@ -332,6 +353,32 @@ export function IdentityChip(): React.JSX.Element | null {
                   className="flex-1 bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {upgrading ? 'Securing...' : 'Secure identity'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Backup confirmation banner (shown immediately after upgrade) */}
+          {backupConfirmed && (
+            <div className="px-3 py-2.5 border-b border-emerald-800/60 bg-emerald-950/40">
+              <div className="flex items-start gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 shrink-0 mt-0.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] text-emerald-300 font-semibold leading-snug">Backup saved to your device</p>
+                  <p className="text-[11px] text-emerald-500/90 leading-relaxed mt-0.5">
+                    Your new identity has been downloaded as a <span className="font-mono">-secured.json</span> file. Keep it safe — it is the only copy.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setBackupConfirmed(false)}
+                  className="shrink-0 text-emerald-700 hover:text-emerald-400 transition-colors text-[11px] leading-none pt-0.5"
+                  aria-label="Dismiss"
+                >
+                  ✕
                 </button>
               </div>
             </div>
