@@ -7,6 +7,7 @@ import { migrateIdentity } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
 import { useCurrencyMode } from '@/hooks/useCurrencyMode';
+import { EarningsSparkline } from '@/components/EarningsSparkline';
 
 const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
 
@@ -26,6 +27,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const bsvPrice = useBsvPrice();
   const { mode, toggle: toggleCurrency, isGoat } = useCurrencyMode();
   const [activity, setActivity] = useState<Array<{ amount: number; direction: 'in' | 'out'; label: string; created_at: string; txid?: string }>>([]);
+  const [earningsHistory, setEarningsHistory] = useState<Array<{ t: string; cumulative: number }>>([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -66,6 +68,7 @@ export function IdentityChip(): React.JSX.Element | null {
       .then((data) => {
         setEarnedSats(data.totalEarned ?? 0);
         setActivity(data.recentActivity ?? []);
+        setEarningsHistory(data.earningsHistory ?? []);
       })
       .catch(() => setEarnedSats(0));
   }, [identity?.address, open]);
@@ -279,8 +282,14 @@ export function IdentityChip(): React.JSX.Element | null {
             </button>
           </div>
 
-          {/* ── Section 3: Activity ── */}
+          {/* ── Section 3: Earnings Chart + Activity ── */}
           <div className="px-3 py-2.5 border-b border-zinc-800">
+            <EarningsSparkline
+              history={earningsHistory}
+              totalSats={earnedSats ?? 0}
+              isGoat={isGoat}
+              bsvPrice={bsvPrice}
+            />
             <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Activity</span>
             {activity.length === 0 ? (
               <p className="text-[11px] text-zinc-600 py-1">No activity yet</p>

@@ -72,8 +72,28 @@ export async function GET(request: Request) {
   // Sort by time descending, take last 10
   activity.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  // Cumulative earnings history for the sparkline chart (last 30 data points)
+  const earningsHistory = db.prepare(`
+    SELECT created_at as t, amount_sats
+    FROM payouts
+    WHERE recipient_address = ?
+    ORDER BY created_at ASC
+  `).all(address) as Array<{ t: string; amount_sats: number }>;
+
+  let cumulative = 0;
+  const history = earningsHistory.map((row) => {
+    cumulative += row.amount_sats;
+    return { t: row.t, cumulative };
+  });
+
+  // Keep last 30 points for chart (reduce noise on large datasets)
+  const chartHistory = history.length > 30
+    ? history.filter((_, i, arr) => i === arr.length - 1 || i % Math.ceil(arr.length / 30) === 0)
+    : history;
+
   return Response.json({
     totalEarned: total.total,
     recentActivity: activity.slice(0, 10),
+    earningsHistory: chartHistory,
   });
 }
