@@ -6,11 +6,12 @@ import { createPost } from './actions';
 import { AgentChat } from './AgentChat';
 
 interface PostFormProps {
-  onPostCreated?: (content: string, author: string) => void;
+  onPostCreated?: (content: string, author: string, tempId: number) => void;
+  onPostRejected?: (tempId: number, reason?: string) => void;
   agentHighlight?: boolean;
 }
 
-export function PostForm({ onPostCreated, agentHighlight }: PostFormProps): React.JSX.Element {
+export function PostForm({ onPostCreated, onPostRejected, agentHighlight }: PostFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -46,7 +47,8 @@ export function PostForm({ onPostCreated, agentHighlight }: PostFormProps): Reac
 
     // Show optimistic post and clear form IMMEDIATELY — don't wait for signing or server
     const trimmed = content.trim();
-    onPostCreated?.(trimmed, identity.name);
+    const tempId = Date.now();
+    onPostCreated?.(trimmed, identity.name, tempId);
     formRef.current?.reset();
     setHasContent(false);
     setJustPosted(true);
@@ -62,7 +64,10 @@ export function PostForm({ onPostCreated, agentHighlight }: PostFormProps): Reac
         formData.set('signature', sig.signature);
         formData.set('pubkey', sig.pubkey);
       }
-      await createPost(formData);
+      const result = await createPost(formData);
+      if (!result.ok) {
+        onPostRejected?.(tempId, result.reason);
+      }
     });
   }
 

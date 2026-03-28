@@ -19,6 +19,8 @@ interface OptimisticPost {
   content: string;
   author_name: string;
   created_at: string;
+  failed?: boolean;
+  failReason?: string;
 }
 
 // Remove an optimistic post if a confirmed server post with matching content +
@@ -86,10 +88,22 @@ function FeedContent({
     [optimisticPosts, serverPosts]
   );
 
-  const handlePostCreated = useCallback((content: string, author: string) => {
+  const handlePostRejected = useCallback((tempId: number, reason?: string) => {
+    // Mark as failed, then auto-remove after 3 seconds
+    setOptimisticPosts((prev) =>
+      prev.map((op) =>
+        op.id === tempId ? { ...op, failed: true, failReason: reason } : op
+      )
+    );
+    setTimeout(() => {
+      setOptimisticPosts((prev) => prev.filter((op) => op.id !== tempId));
+    }, 3000);
+  }, []);
+
+  const handlePostCreated = useCallback((content: string, author: string, tempId: number) => {
     setOptimisticPosts((prev) => [
       {
-        id: Date.now(),
+        id: tempId,
         content,
         author_name: author,
         created_at: new Date().toISOString(),
@@ -189,13 +203,18 @@ function FeedContent({
         {pendingOptimistic.length > 0 && (
           <div className="mx-auto max-w-2xl px-4 pb-2 divide-y divide-zinc-800/60">
             {pendingOptimistic.map((op) => (
-              <article key={op.id} className="py-3.5">
+              <article key={op.id} className={`py-3.5 ${op.failed ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-xs text-zinc-500">
                       <span className="font-medium text-zinc-300">{op.author_name}</span>
                       <span>·</span>
                       <time>{timeAgo(op.created_at)}</time>
+                      {op.failed && (
+                        <span className="text-red-400 text-[10px]">
+                          {op.failReason === 'rate_limited' ? 'Too fast — try again' : 'Failed to post'}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">
                       {op.content}
@@ -230,7 +249,7 @@ function FeedContent({
       {/* Pinned bottom — compose area */}
       <div className="shrink-0">
         <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
-          <PostForm onPostCreated={handlePostCreated} agentHighlight={agentHighlight} />
+          <PostForm onPostCreated={handlePostCreated} onPostRejected={handlePostRejected} agentHighlight={agentHighlight} />
           <div className="flex justify-center mt-1">
             <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
               created with bopen.ai

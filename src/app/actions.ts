@@ -10,10 +10,15 @@ import { executeBoot } from '@/services/fairness/boot-orchestrator';
 import { getBootPriceForUser } from '@/services/fairness/pricing';
 import type { Post, BootboardRow, BootboardHistoryRow, BootboardData } from '@/types';
 
-export async function createPost(formData: FormData): Promise<void> {
+export interface CreatePostResult {
+  ok: boolean;
+  reason?: 'bad_input' | 'missing_pubkey' | 'rate_limited' | 'invalid_signature';
+}
+
+export async function createPost(formData: FormData): Promise<CreatePostResult> {
   const content = formData.get('content');
-  if (typeof content !== 'string' || content.trim().length === 0) return;
-  if (content.length > 1000) return;
+  if (typeof content !== 'string' || content.trim().length === 0) return { ok: false, reason: 'bad_input' };
+  if (content.length > 1000) return { ok: false, reason: 'bad_input' };
 
   const author = formData.get('author');
   const authorName = typeof author === 'string' && /^anon_[a-z0-9]{4}$/.test(author)
@@ -23,27 +28,21 @@ export async function createPost(formData: FormData): Promise<void> {
   const signature = formData.get('signature');
   const pubkey = formData.get('pubkey');
 
-  // H5 fix: require pubkey on all new posts. Posts without a pubkey cannot receive
-  // payouts and cannot be bootstrapped into the fairness system anyway.
-  if (typeof pubkey !== 'string' || pubkey.trim().length === 0) return;
+  if (typeof pubkey !== 'string' || pubkey.trim().length === 0) return { ok: false, reason: 'missing_pubkey' };
 
-  // H1 fix: key rate limit on the verified pubkey, not the client-supplied author name.
-  // pubkey is cryptographically bound to the post via the signature check below, so
-  // it cannot be spoofed to evade or exhaust someone else's bucket.
   const rl = rateLimit(`createPost:${pubkey}`, { limit: 10, windowMs: 60_000 });
-  if (!rl.success) return;
+  if (!rl.success) return { ok: false, reason: 'rate_limited' };
 
-  // Verify signature server-side. Both signature and pubkey are now required.
-  if (typeof signature !== 'string') return;
+  if (typeof signature !== 'string') return { ok: false, reason: 'invalid_signature' };
   try {
     const messageBytes = Array.from(new TextEncoder().encode(content.trim()));
     const verified = PublicKey.fromString(pubkey).verify(
       messageBytes,
       Signature.fromDER(signature, 'hex'),
     );
-    if (!verified) return;
+    if (!verified) return { ok: false, reason: 'invalid_signature' };
   } catch {
-    return;
+    return { ok: false, reason: 'invalid_signature' };
   }
 
   const result = db.prepare(
@@ -70,6 +69,8 @@ export async function createPost(formData: FormData): Promise<void> {
     .catch(() => {
       // On-chain logging is best-effort — post still exists in SQLite
     });
+
+  return { ok: true };
 }
 
 export async function getPosts(beforeId?: number): Promise<Post[]> {
