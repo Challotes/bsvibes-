@@ -364,3 +364,44 @@ export async function signPost(content: string): Promise<{ signature: string; pu
 export function preWarmBsvSdk(): void {
   getBsvSdk();
 }
+
+/**
+ * Import an identity from a raw WIF string (or a backup JSON file's WIF field).
+ * Validates the WIF, derives the address, stores in localStorage (plaintext).
+ * Replaces any existing identity — caller is responsible for confirming with the user.
+ * @param wif    - A Base58-encoded WIF private key string.
+ * @param name   - Optional display name. Falls back to generating a new anon name.
+ */
+export async function importIdentity(wif: string, name?: string): Promise<Identity> {
+  if (typeof window === 'undefined') {
+    throw new Error('importIdentity can only run in the browser');
+  }
+
+  const trimmed = wif.trim();
+  if (!trimmed) throw new Error('WIF is required');
+
+  const { PrivateKey } = await getBsvSdk();
+
+  let key: import('@bsv/sdk').PrivateKey;
+  try {
+    key = PrivateKey.fromWif(trimmed);
+  } catch {
+    throw new Error('Invalid key — please check and try again');
+  }
+
+  const address = key.toPublicKey().toAddress().toString();
+  const identityName = (name ?? '').trim() || generateAnonName();
+
+  const store: StoredIdentity = { wif: trimmed, name: identityName, address };
+
+  // Clear any existing encrypted identity so the app uses the new plaintext one
+  localStorage.removeItem(ENCRYPTED_KEY);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+
+  // Update session caches so signPost works immediately without reload
+  _sessionIdentity = null; // plaintext path; no session identity needed
+  _cachedWif = trimmed;
+  _cachedPrivateKey = key;
+
+  return { name: identityName, address, wif: trimmed };
+}

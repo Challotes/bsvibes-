@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
-import { isIdentityEncrypted, upgradeIdentity } from '@/services/bsv/identity';
+import { isIdentityEncrypted, upgradeIdentity, importIdentity } from '@/services/bsv/identity';
 import { migrateIdentity } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
@@ -33,6 +33,14 @@ export function IdentityChip(): React.JSX.Element | null {
   const [confirmPass, setConfirmPass] = useState('');
   const [upgradeError, setUpgradeError] = useState('');
   const [upgrading, setUpgrading] = useState(false);
+  // Import state
+  const [showImport, setShowImport] = useState(false);
+  const [importMode, setImportMode] = useState<'file' | 'wif'>('file');
+  const [importWif, setImportWif] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importSuccess, setImportSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,6 +87,7 @@ export function IdentityChip(): React.JSX.Element | null {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
         setShowUpgrade(false);
+        resetImport();
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -167,6 +176,60 @@ export function IdentityChip(): React.JSX.Element | null {
     } finally {
       setUpgrading(false);
     }
+  }
+
+  function resetImport(): void {
+    setShowImport(false);
+    setImportWif('');
+    setImportError('');
+    setImportSuccess(false);
+    setImportMode('file');
+  }
+
+  async function doImport(wif: string, name?: string): Promise<void> {
+    setImporting(true);
+    setImportError('');
+    try {
+      const imported = await importIdentity(wif, name);
+      updateIdentity(imported);
+      setImportSuccess(true);
+      setTimeout(() => {
+        resetImport();
+        setOpen(false);
+      }, 1200);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Import failed — try again');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>): void {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = ev.target?.result as string;
+      let parsed: { wif?: string; name?: string };
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        setImportError('Could not read file — make sure it is a BSVibes backup (.json)');
+        return;
+      }
+      if (!parsed?.wif) {
+        setImportError('File does not contain a valid key');
+        return;
+      }
+      await doImport(parsed.wif, parsed.name);
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }
+
+  async function handleImportWif(): Promise<void> {
+    await doImport(importWif);
   }
 
   const showWarningDot = backedUp === false;
@@ -348,7 +411,7 @@ export function IdentityChip(): React.JSX.Element | null {
           </div>
 
           {/* ── Section 4: Identity backup ── */}
-          <div className="px-3 py-2.5">
+          <div className="px-3 py-2.5 border-b border-zinc-800">
             <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Keep your name</span>
             <div className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400 mb-2">
               <span className="flex-1 break-all leading-relaxed">
@@ -378,6 +441,101 @@ export function IdentityChip(): React.JSX.Element | null {
             <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">
               Save this to keep your name if you clear your browser data.
             </p>
+          </div>
+
+          {/* ── Section 5: Import identity ── */}
+          <div className="px-3 py-2.5">
+            {!showImport ? (
+              <button
+                onClick={() => setShowImport(true)}
+                className="w-full flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors py-0.5"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import identity from another device
+              </button>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Import identity</span>
+                  <button
+                    onClick={resetImport}
+                    className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-amber-400/80 leading-relaxed">
+                  This will replace your current identity. Make sure you have your current key backed up first.
+                </p>
+
+                {/* Mode toggle */}
+                <div className="flex rounded-lg overflow-hidden border border-zinc-700 text-[11px]">
+                  <button
+                    onClick={() => { setImportMode('file'); setImportError(''); }}
+                    className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'file' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Backup file
+                  </button>
+                  <button
+                    onClick={() => { setImportMode('wif'); setImportError(''); }}
+                    className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'wif' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Paste key
+                  </button>
+                </div>
+
+                {importMode === 'file' ? (
+                  <>
+                    <p className="text-[11px] text-zinc-500 leading-relaxed">
+                      Select the <span className="font-mono text-zinc-400">.json</span> file you downloaded when you backed up your identity.
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImportFile}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={importing}
+                      className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {importing ? 'Importing...' : 'Choose backup file'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <textarea
+                      placeholder="Paste your key here..."
+                      value={importWif}
+                      onChange={(e) => { setImportWif(e.target.value); setImportError(''); }}
+                      rows={3}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none leading-relaxed"
+                    />
+                    <button
+                      onClick={handleImportWif}
+                      disabled={!importWif.trim() || importing}
+                      className="w-full bg-zinc-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {importing ? 'Importing...' : 'Import key'}
+                    </button>
+                  </>
+                )}
+
+                {importError && (
+                  <p className="text-[11px] text-red-400 leading-relaxed">{importError}</p>
+                )}
+                {importSuccess && (
+                  <p className="text-[11px] text-emerald-400 font-medium">Identity restored.</p>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
