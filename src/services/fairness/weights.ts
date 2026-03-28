@@ -31,19 +31,41 @@ interface MigrationRow {
 /**
  * Build a map from any old pubkey to its final (current) pubkey
  * by following the migration chain.
+ *
+ * Handles duplicate migrations from the same key (e.g. two upgrade attempts
+ * from the same old key). In that case:
+ *  - We collect ALL forward links as a multi-map (from → [to, to, ...])
+ *  - For keys with multiple destinations, we pick the LATEST migration
+ *    (highest DB id) as the canonical forward link
+ *  - We also cover intermediate keys: if A→B and A→C both exist (A→C won),
+ *    we add B→C so contributions from the intermediate key B are attributed to C
+ *
+ * Also detects and breaks cycles (defensive — should never occur in practice).
  */
 function buildMigrationMap(db: import('better-sqlite3').Database): Map<string, string> {
   const migrations = db.prepare(
-    'SELECT from_pubkey, to_pubkey FROM migrations'
+    'SELECT from_pubkey, to_pubkey FROM migrations ORDER BY id ASC'
   ).all() as MigrationRow[];
 
-  // Build forward links
+  // Build forward links — later rows overwrite earlier rows for the same from_pubkey,
+  // so the latest migration from any given key always wins.
   const forward = new Map<string, string>();
   for (const m of migrations) {
+    const existing = forward.get(m.from_pubkey);
+    if (existing && existing !== m.to_pubkey) {
+      // This is a re-upgrade: old key migrated again to a different destination.
+      // The new destination takes over. We also need to route the previous
+      // intermediate key (existing) to the new destination so contributions
+      // made on the intermediate key are not orphaned.
+      if (!forward.has(existing)) {
+        forward.set(existing, m.to_pubkey);
+      }
+    }
     forward.set(m.from_pubkey, m.to_pubkey);
   }
 
-  // Resolve chains: follow from_pubkey → to_pubkey → ... until no more hops
+  // Resolve chains: follow from_pubkey → to_pubkey → ... until no more hops.
+  // visited set prevents infinite loops from any unexpected cycle.
   const resolved = new Map<string, string>();
   for (const key of forward.keys()) {
     let current = key;

@@ -104,8 +104,12 @@ try {
   // Indexes for query performance
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_post_id ON bootboard(post_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_held_until ON bootboard(held_until)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_from ON migrations(from_pubkey)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_to ON migrations(to_pubkey)');
+  // Unique index on from_pubkey: only one active migration per source key.
+  // If a user upgrades twice from the same old key (duplicate migration), upsert
+  // the existing row rather than inserting a duplicate. This replaces the old
+  // non-unique idx_migrations_from index.
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_migrations_from_unique ON migrations(from_pubkey)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pubkey ON posts(pubkey)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_boot ON payouts(boot_event_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_recipient ON payouts(recipient_pubkey)');

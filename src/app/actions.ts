@@ -233,9 +233,11 @@ export async function migrateIdentity(
     return { success: false };
   }
 
-  // Store migration record
+  // Store migration record — INSERT OR REPLACE so a re-upgrade from the same old key
+  // updates the existing row rather than creating a duplicate (which would confuse the
+  // fairness weight migration chain resolver).
   db.prepare(
-    'INSERT INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+    'INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
   ).run(oldPubkey, newPubkey, migrationSig);
 
   // Fire-and-forget: post migration on-chain

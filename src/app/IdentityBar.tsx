@@ -33,6 +33,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [confirmPass, setConfirmPass] = useState('');
   const [upgradeError, setUpgradeError] = useState('');
   const [upgrading, setUpgrading] = useState(false);
+  const [transferStatus, setTransferStatus] = useState<string | null>(null);
   // Import state
   const [showImport, setShowImport] = useState(false);
   const [importMode, setImportMode] = useState<'file' | 'wif'>('file');
@@ -47,6 +48,12 @@ export function IdentityChip(): React.JSX.Element | null {
     setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
     setIsProtected(isIdentityEncrypted());
   }, []);
+
+  // Re-check encryption status whenever the identity changes (import/upgrade/unlock)
+  useEffect(() => {
+    if (!identity) return;
+    setIsProtected(isIdentityEncrypted());
+  }, [identity?.address, identity?.wif]);
 
   // Live balance: poll WhatsOnChain every 5s (client-side, per-user, no server cost).
   // Earnings: refresh on dropdown open (less frequent, server call).
@@ -144,6 +151,7 @@ export function IdentityChip(): React.JSX.Element | null {
 
     setUpgrading(true);
     setUpgradeError('');
+    setTransferStatus(null);
 
     try {
       const result = await upgradeIdentity(passphrase, identity.wif, identity.name);
@@ -159,12 +167,17 @@ export function IdentityChip(): React.JSX.Element | null {
       // Update context so UI reflects the new identity (same name, new address)
       updateIdentity(result.identity);
 
-      // Log fund transfer result
+      // Surface fund transfer result to the user
       if (result.fundTransfer.txid) {
+        const sats = result.fundTransfer.transferredSats.toLocaleString();
+        setTransferStatus(`Transferred ${sats} sats to your new address.`);
         console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats, txid: ${result.fundTransfer.txid}`);
       } else if (result.fundTransfer.error) {
-        console.warn('[BSVibes] Fund transfer issue:', result.fundTransfer.error);
+        // Non-fatal: identity is upgraded, but funds need manual recovery
+        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your old key is still in your backup file.`);
+        console.error('[BSVibes] Fund transfer failed:', result.fundTransfer.error);
       }
+      // If no error and no txid, there were simply no funds — no message needed
 
       setIsProtected(true);
       setShowUpgrade(false);
@@ -321,6 +334,23 @@ export function IdentityChip(): React.JSX.Element | null {
                   {upgrading ? 'Securing...' : 'Secure identity'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Fund transfer status message (shown after upgrade if relevant) */}
+          {transferStatus && (
+            <div className={`px-3 py-2 border-b text-[11px] leading-relaxed ${
+              transferStatus.startsWith('Note:')
+                ? 'border-amber-900/40 bg-amber-950/20 text-amber-400'
+                : 'border-emerald-900/30 bg-emerald-950/20 text-emerald-400'
+            }`}>
+              {transferStatus}
+              <button
+                onClick={() => setTransferStatus(null)}
+                className="ml-2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Dismiss
+              </button>
             </div>
           )}
 

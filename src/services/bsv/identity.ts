@@ -165,10 +165,53 @@ export async function unlockIdentity(passphrase: string): Promise<Identity | nul
 }
 
 /**
+ * Fetch source tx hexes in small batches to respect WhatsOnChain rate limit
+ * (free tier: ~3 req/sec). Waits `delayMs` between each batch.
+ */
+async function fetchSourceTxsBatched(
+  txHashes: string[],
+  WOC_BASE: string,
+  batchSize = 3,
+  delayMs = 400,
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  // Deduplicate: multiple UTXOs can share the same parent tx
+  const unique = [...new Set(txHashes)];
+
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (txHash) => {
+        const hexRes = await fetch(`${WOC_BASE}/tx/${txHash}/hex`);
+        if (!hexRes.ok) {
+          throw new Error(`Source tx fetch failed for ${txHash}: HTTP ${hexRes.status}`);
+        }
+        const hex = await hexRes.text();
+        result.set(txHash, hex);
+      }),
+    );
+    // Throttle between batches (skip delay after last batch)
+    if (i + batchSize < unique.length) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  return result;
+}
+
+/**
  * Auto-transfer all funds from old address to new address during upgrade.
  * Builds a simple P2PKH transaction spending all UTXOs from old → new.
+ *
+ * Handles large UTXO sets (e.g. 92 boot split outputs) by:
+ *  - Capping inputs at MAX_INPUTS to keep tx size reasonable.
+ *  - Fetching source txs in batches of 3 with 400 ms gaps to stay within
+ *    WhatsOnChain free-tier rate limits (3 req/sec).
+ *
  * Returns the txid on success, null if no funds or transfer fails.
  */
+const MAX_INPUTS = 50; // Hard cap — keeps tx under ~25 KB and avoids WoC rate-limit pain
+
 async function autoTransferFunds(
   oldWif: string,
   oldAddress: string,
@@ -177,39 +220,58 @@ async function autoTransferFunds(
   const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
 
   try {
+    console.log(`[BSVibes] autoTransferFunds: fetching UTXOs for ${oldAddress}`);
+
     // Fetch UTXOs from old address
     const utxoRes = await fetch(`${WOC_BASE}/address/${oldAddress}/unspent`);
     if (!utxoRes.ok) {
-      return { txid: null, transferredSats: 0, error: `UTXO fetch failed: ${utxoRes.status}` };
+      const msg = `UTXO fetch failed: HTTP ${utxoRes.status} for ${oldAddress}`;
+      console.error(`[BSVibes] autoTransferFunds: ${msg}`);
+      return { txid: null, transferredSats: 0, error: msg };
     }
 
     const utxoData = await utxoRes.json();
     if (!Array.isArray(utxoData) || utxoData.length === 0) {
+      console.log(`[BSVibes] autoTransferFunds: no UTXOs found at ${oldAddress} — nothing to transfer`);
       return { txid: null, transferredSats: 0 }; // No funds — not an error
     }
 
-    const totalSats = utxoData.reduce((sum: number, u: { value: number }) => sum + u.value, 0);
+    console.log(`[BSVibes] autoTransferFunds: found ${utxoData.length} UTXOs`);
+
+    // Sort by value descending and cap at MAX_INPUTS to avoid oversized txs
+    const allUtxos = (utxoData as Array<{ tx_hash: string; tx_pos: number; value: number }>)
+      .sort((a, b) => b.value - a.value);
+    const utxos = allUtxos.slice(0, MAX_INPUTS);
+
+    if (utxos.length < allUtxos.length) {
+      console.warn(
+        `[BSVibes] autoTransferFunds: capping inputs at ${MAX_INPUTS} of ${allUtxos.length} total UTXOs. ` +
+        `Remaining UTXOs will be swept in a future upgrade.`,
+      );
+    }
+
+    const totalSats = utxos.reduce((sum, u) => sum + u.value, 0);
     if (totalSats === 0) {
       return { txid: null, transferredSats: 0 };
     }
 
+    console.log(`[BSVibes] autoTransferFunds: spending ${utxos.length} inputs, total ${totalSats} sats`);
+
     const { Transaction, PrivateKey, P2PKH } = await getBsvSdk();
     const oldKey = PrivateKey.fromWif(oldWif);
 
-    // Fetch source transaction hex for each UTXO (parallel)
-    const sourceTxs = await Promise.all(
-      utxoData.map(async (utxo: { tx_hash: string; tx_pos: number; value: number }) => {
-        const hexRes = await fetch(`${WOC_BASE}/tx/${utxo.tx_hash}/hex`);
-        if (!hexRes.ok) throw new Error(`Source tx fetch failed: ${utxo.tx_hash}`);
-        const hex = await hexRes.text();
-        return { utxo, sourceTx: Transaction.fromHex(hex) };
-      }),
-    );
+    // Fetch source tx hexes in batches to respect WoC rate limit
+    const txHashes = utxos.map((u) => u.tx_hash);
+    console.log(`[BSVibes] autoTransferFunds: fetching ${new Set(txHashes).size} unique source txs in batches of 3`);
+    const sourceTxHexMap = await fetchSourceTxsBatched(txHashes, WOC_BASE);
 
-    // Build transaction: all old UTXOs → new address
+    // Build transaction: selected UTXOs → new address
     const tx = new Transaction();
 
-    for (const { utxo, sourceTx } of sourceTxs) {
+    for (const utxo of utxos) {
+      const hex = sourceTxHexMap.get(utxo.tx_hash);
+      if (!hex) throw new Error(`Missing source tx hex for ${utxo.tx_hash}`);
+      const sourceTx = Transaction.fromHex(hex);
       tx.addInput({
         sourceTransaction: sourceTx,
         sourceOutputIndex: utxo.tx_pos,
@@ -217,7 +279,7 @@ async function autoTransferFunds(
       });
     }
 
-    // Single output to new address (with change flag so fee is deducted)
+    // Single output to new address (change flag so fee is auto-deducted)
     tx.addOutput({
       lockingScript: new P2PKH().lock(newAddress),
       change: true,
@@ -226,26 +288,25 @@ async function autoTransferFunds(
     await tx.fee();
     await tx.sign();
 
+    console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);
     const broadcastResult = await tx.broadcast();
 
     if (broadcastResult.status === 'success') {
       const txid = tx.id('hex') as string;
-      console.log(`[BSVibes] Auto-transferred ${totalSats} sats from old address to new address. txid: ${txid}`);
+      console.log(`[BSVibes] autoTransferFunds: SUCCESS — transferred ${totalSats} sats. txid: ${txid}`);
       return { txid, transferredSats: totalSats };
     }
 
-    return {
-      txid: null,
-      transferredSats: 0,
-      error: `Broadcast failed: ${typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult)}`,
-    };
+    const broadcastError = `Broadcast failed: ${
+      typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult)
+    }`;
+    console.error(`[BSVibes] autoTransferFunds: ${broadcastError}`);
+    return { txid: null, transferredSats: 0, error: broadcastError };
+
   } catch (e) {
-    console.warn('[BSVibes] Auto-transfer failed:', e);
-    return {
-      txid: null,
-      transferredSats: 0,
-      error: e instanceof Error ? e.message : String(e),
-    };
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[BSVibes] autoTransferFunds: exception —', msg, e);
+    return { txid: null, transferredSats: 0, error: msg };
   }
 }
 
@@ -394,12 +455,15 @@ export async function importIdentity(wif: string, name?: string): Promise<Identi
 
   const store: StoredIdentity = { wif: trimmed, name: identityName, address };
 
-  // Clear any existing encrypted identity so the app uses the new plaintext one
+  // Clear any existing encrypted identity so the app uses the new plaintext one.
+  // This is critical: a previous failed upgrade may have written bfn_keypair_enc
+  // while leaving the user on a new key. Clearing it here ensures isIdentityEncrypted()
+  // returns false after import, so the UI shows "Not protected" rather than "Identity protected".
   localStorage.removeItem(ENCRYPTED_KEY);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 
-  // Update session caches so signPost works immediately without reload
-  _sessionIdentity = null; // plaintext path; no session identity needed
+  // Reset ALL session caches — the identity has fully changed
+  _sessionIdentity = null;
   _cachedWif = trimmed;
   _cachedPrivateKey = key;
 
