@@ -165,14 +165,17 @@ export async function unlockIdentity(passphrase: string): Promise<Identity | nul
 }
 
 /**
- * Fetch source tx hexes in small batches to respect WhatsOnChain rate limit
- * (free tier: ~3 req/sec). Waits `delayMs` between each batch.
+ * Fetch source tx hexes in batches through our server-side proxy (/api/tx-hex).
+ *
+ * Since the proxy runs server-to-server (no CORS, no browser rate limit),
+ * we can use larger batches with shorter delays. Default: 10 concurrent
+ * requests per batch with 100ms gaps — fetches 92 unique txs in ~1 second.
  */
 async function fetchSourceTxsBatched(
   txHashes: string[],
-  WOC_BASE: string,
-  batchSize = 3,
-  delayMs = 400,
+  _wocBase: string,
+  batchSize = 10,
+  delayMs = 100,
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   // Deduplicate: multiple UTXOs can share the same parent tx
@@ -201,18 +204,15 @@ async function fetchSourceTxsBatched(
 }
 
 /**
- * Auto-transfer all funds from old address to new address during upgrade.
- * Builds a simple P2PKH transaction spending all UTXOs from old → new.
+ * Auto-transfer ALL funds from old address to new address during upgrade.
+ * Builds a single P2PKH transaction spending every UTXO from old → new.
  *
- * Handles large UTXO sets (e.g. 92 boot split outputs) by:
- *  - Capping inputs at MAX_INPUTS to keep tx size reasonable.
- *  - Fetching source txs in batches of 3 with 400 ms gaps to stay within
- *    WhatsOnChain free-tier rate limits (3 req/sec).
+ * No input cap — a tx with 200 P2PKH inputs is ~30 KB, well within BSV's
+ * standard limits. Source txs are fetched through our server-side proxy
+ * in batches of 10 with 100ms gaps (~1 second for 100 unique txs).
  *
  * Returns the txid on success, null if no funds or transfer fails.
  */
-const MAX_INPUTS = 50; // Hard cap — keeps tx under ~25 KB and avoids WoC rate-limit pain
-
 async function autoTransferFunds(
   oldWif: string,
   oldAddress: string,
@@ -239,17 +239,8 @@ async function autoTransferFunds(
 
     console.log(`[BSVibes] autoTransferFunds: found ${utxoData.length} UTXOs`);
 
-    // Sort by value descending and cap at MAX_INPUTS to avoid oversized txs
-    const allUtxos = (utxoData as Array<{ tx_hash: string; tx_pos: number; value: number }>)
-      .sort((a, b) => b.value - a.value);
-    const utxos = allUtxos.slice(0, MAX_INPUTS);
-
-    if (utxos.length < allUtxos.length) {
-      console.warn(
-        `[BSVibes] autoTransferFunds: capping inputs at ${MAX_INPUTS} of ${allUtxos.length} total UTXOs. ` +
-        `Remaining UTXOs will be swept in a future upgrade.`,
-      );
-    }
+    // Sweep all UTXOs — no cap
+    const utxos = utxoData as Array<{ tx_hash: string; tx_pos: number; value: number }>;
 
     const totalSats = utxos.reduce((sum, u) => sum + u.value, 0);
     if (totalSats === 0) {
@@ -263,7 +254,7 @@ async function autoTransferFunds(
 
     // Fetch source tx hexes in batches to respect WoC rate limit
     const txHashes = utxos.map((u) => u.tx_hash);
-    console.log(`[BSVibes] autoTransferFunds: fetching ${new Set(txHashes).size} unique source txs in batches of 3`);
+    console.log(`[BSVibes] autoTransferFunds: fetching ${new Set(txHashes).size} unique source txs via proxy`);
     const sourceTxHexMap = await fetchSourceTxsBatched(txHashes, WOC_BASE);
 
     // Build transaction: selected UTXOs → new address
