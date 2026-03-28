@@ -182,7 +182,8 @@ async function fetchSourceTxsBatched(
     const batch = unique.slice(i, i + batchSize);
     await Promise.all(
       batch.map(async (txHash) => {
-        const hexRes = await fetch(`${WOC_BASE}/tx/${txHash}/hex`);
+        // Proxy through our server to avoid CORS on WoC /tx/hex endpoint
+        const hexRes = await fetch(`/api/tx-hex?txid=${txHash}`);
         if (!hexRes.ok) {
           throw new Error(`Source tx fetch failed for ${txHash}: HTTP ${hexRes.status}`);
         }

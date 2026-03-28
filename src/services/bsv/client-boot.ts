@@ -65,7 +65,8 @@ async function fetchUtxos(address: string): Promise<WocUtxo[]> {
 }
 
 async function fetchSourceTxHex(txHash: string): Promise<string> {
-  const res = await fetch(`${WOC_BASE}/tx/${txHash}/hex`);
+  // Proxy through our server to avoid CORS on WoC /tx/hex endpoint
+  const res = await fetch(`/api/tx-hex?txid=${txHash}`);
   if (!res.ok) {
     throw new Error(`Source tx fetch failed for ${txHash}: ${res.status}`);
   }
