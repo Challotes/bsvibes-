@@ -2,6 +2,30 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-28 — Identity Safety, Currency Toggle, Earnings Chart, Activity Feed
+
+Identity safety:
+- Force backup auto-download before security upgrade completes (prevents key loss)
+- Auto-transfer funds from old address to new on upgrade (batched UTXO fetch, no cap)
+- Auto-cleanup stale migration records when importing old identity
+- Fixed CORS: proxy WoC /tx/hex through /api/tx-hex endpoint
+- Fixed migration chain routing contributions to lost addresses
+- Identity import from backup file or WIF paste
+
+Currency & earnings:
+- Noob Mode (dollars) / Goat Mode (sats) toggle in dropdown, persisted
+- BSV price feed from WhatsOnChain (cached 5 min)
+- AnimatedBalance works in both modes (count-up + "Agentic fairness" label)
+- Earnings sparkline chart (step-function area, pure SVG, always rising)
+- Activity feed: shows free/paid boots correctly (is_free column)
+- Live balance polling every 5s from WhatsOnChain
+- Boot event tracking fixed (bootboard.id not post_id for payouts)
+
+UI:
+- Identity dropdown redesigned (security top, Noob/Goat toggle, balance, activity, backup)
+- Pagination order fixed (older posts at top, recent at bottom)
+- FREE badge disappears immediately when free boots exhausted
+
 ## 2026-03-27 — Balance Display + Free Boot Policy
 
 - Identity chip now shows spendable balance (WhatsOnChain UTXOs) instead of total earned

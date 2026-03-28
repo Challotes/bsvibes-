@@ -39,7 +39,9 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
 - `src/app/api/boot-shares/route.ts` — Returns contributor shares + boot price for client-side tx building
 - `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (audit trail + bootboard update)
-- `src/app/api/earnings/route.ts` — Returns total earned sats + recent payouts for an address
+- `src/app/api/earnings/route.ts` — Returns total earned, activity feed (in/out), earnings history for chart
+- `src/app/api/tx-hex/route.ts` — Proxy for WhatsOnChain /tx/hex (avoids CORS for client-side tx building)
+- `src/app/api/boot-status/route.ts` — Returns free boots remaining + boot price for a user address
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts/getNewPosts/getOlderPosts, getBootboard, bootPost with transaction)
 - `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
@@ -66,6 +68,10 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/FundAddress.tsx` — Deposit address panel (QR/copy for users who exhaust free boots)
 - `src/data/genesis.ts` — Genesis conversation data (founding messages)
 - `src/data/agent-knowledge.ts` — Agent knowledge base (Q&A pairs + keyword matching)
+- `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash, Agentic fairness label)
+- `src/components/EarningsSparkline.tsx` — Step-function area chart for cumulative earnings (pure SVG)
+- `src/hooks/useBsvPrice.ts` — BSV/USD price from WhatsOnChain (cached 5 min)
+- `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle (localStorage persist)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon component
 - `src/types/speech.d.ts` — SpeechRecognition API TypeScript types
 
