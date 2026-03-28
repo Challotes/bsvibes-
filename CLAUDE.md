@@ -131,6 +131,7 @@ Read these to understand the full picture:
 - **DIRECTION.md** — Where this project is going and why
 - **DECISIONS.md** — Key decisions already made (don't relitigate these)
 - **FAIRNESS.md** — Revenue distribution model, fairness formula, gaming analysis, phase progression
+- **SECURITY_AUDIT.md** — Full security audit (2026-03-28): 9 criticals fixed, 3 highs fixed, mediums/lows tracked
 - **ROADMAP.md** — What's done, what's next, what's planned
 - **SESSION_LOG.md** — What happened in each working session
 

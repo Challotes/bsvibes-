@@ -129,6 +129,11 @@
 - [x] UTXO reliability: spent-blacklist, retry logic, largest-first selection, error logging
 - [x] Fund modal with balance breakdown (shows actual balance vs boot cost)
 - [x] LIVE AND WORKING: posts on-chain, boots splitting payments, earnings accumulating
+- [x] Security audit: 9 critical + 3 high findings fixed (SECURITY_AUDIT.md)
+- [x] CSP hardened, boot-confirm verifies on-chain, unsigned posts rejected
+- [x] Identity import with automatic migration cleanup
+- [x] Earnings sparkline chart, Noob/Goat currency toggle, live balance polling
+- [x] Forced backup download on security upgrade, interrupted upgrade recovery
 
 ## Phase 7: The Recursive Model — PLANNED
 

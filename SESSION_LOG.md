@@ -2,6 +2,22 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-28 — Security Audit: 9 Criticals + 3 Highs Fixed
+
+- Full deep audit by code auditor (Jerry) + security ops (Paul): 53 findings total
+- Created SECURITY_AUDIT.md tracking all findings with severity and fixes
+- C1: Removed unsafe-eval from CSP
+- C3: boot-confirm now verifies txid on-chain before recording
+- C4: Backup includes old WIF when fund transfer fails
+- C5: Free boot grant preserved when broadcast fails
+- C6: Interrupted upgrade recovery (prefer plaintext key when both exist)
+- C7: Double-upgrade preserves intermediate posts via bridge migration
+- C8: cleanupMigrations requires signed challenge
+- C9: Backup warning dot only clears on actual copy/download
+- H1: Rate limiting keyed on pubkey not client-supplied name
+- H5: Unsigned posts rejected (pubkey + signature required)
+- H6: /api/tx-hex rate limited (60 req/min per IP)
+
 ## 2026-03-28 — Identity Safety, Currency Toggle, Earnings Chart, Activity Feed
 
 Identity safety:
