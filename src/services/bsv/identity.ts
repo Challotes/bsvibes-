@@ -62,8 +62,21 @@ function getStoredIdentity(): StoredIdentity | null {
 /** Check if the identity is stored in encrypted format. */
 export function isIdentityEncrypted(): boolean {
   if (typeof window === 'undefined') return false;
-  const enc = localStorage.getItem(ENCRYPTED_KEY);
-  return enc !== null && isEncrypted(enc);
+  const raw = localStorage.getItem(ENCRYPTED_KEY);
+  if (raw === null) return false;
+  // The encrypted store is a JSON wrapper: { encrypted: "enc:...", name, address }.
+  // isEncrypted() checks for the "enc:" prefix, so we must check the inner field,
+  // not the raw JSON string (which starts with "{").
+  try {
+    const parsed = JSON.parse(raw) as { encrypted?: string };
+    if (typeof parsed.encrypted === 'string') {
+      return isEncrypted(parsed.encrypted);
+    }
+  } catch {
+    // Fallback: maybe it was stored as a bare "enc:..." string (legacy).
+  }
+  // Legacy fallback: bare encrypted string without JSON wrapper.
+  return isEncrypted(raw);
 }
 
 /** Check for old identity format (just a name string, no keypair). */
@@ -108,9 +121,18 @@ export async function getIdentity(): Promise<Identity | null> {
 
   const stored = getStoredIdentity();
   if (stored) {
+    // Double-check: if an encrypted key ALSO exists, this plaintext is stale (from a race).
+    // Remove it and return null so the unlock prompt appears.
+    if (isIdentityEncrypted()) {
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      return null;
+    }
     getBsvSdk();
     return { name: stored.name, address: stored.address, wif: stored.wif };
   }
+
+  // Don't generate a new key if an encrypted identity exists — user needs to unlock
+  if (isIdentityEncrypted()) return null;
 
   const oldName = getOldIdentityName();
 
@@ -120,6 +142,9 @@ export async function getIdentity(): Promise<Identity | null> {
   const name = oldName ?? generateAnonName();
   const wif = key.toWif();
 
+  // Final guard before writing: re-check both keys in case a concurrent call or
+  // a commitUpgrade() wrote something between the async getBsvSdk() await above.
+  if (isIdentityEncrypted()) return null;
   const raceCheck = getStoredIdentity();
   if (raceCheck) {
     return { name: raceCheck.name, address: raceCheck.address, wif: raceCheck.wif };
