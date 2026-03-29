@@ -7,11 +7,13 @@
 - **Project name:** BSVibes (formerly "Build From Nothing" — renamed 2026-03-23)
 - **Subtitle:** Agentic Fairness — fairness enforced by autonomous AI agents, not committees
 - **bOpen.ai** is the toolkit, not the product. "created with bopen.ai" shown in UI
-- **User-facing language:** Never say "key", "wallet", "WIF", "private key" in the UI
-  - "save your key" → "keep your name"
-  - "fund your address" → "deposit slot"
-  - "key rotation" → "stronger lock"
-  - "PIN" → "passphrase" (4-digit PIN is crackable in 1 hour — minimum 8 chars)
+- **User-facing language:** Use crypto terms only when they're the clearest option, always in a friendly context. No jargon for jargon's sake, but don't avoid words users already understand.
+  - "key" and "recovery key" are fine — Google/Apple have normalised these
+  - "WIF", "private key", "ECDSA", "pubkey" — too technical for UI, avoid
+  - "wallet" — avoid (BSVibes isn't a wallet app)
+  - "address" — use sparingly, prefer "deposit" or "add funds" where possible
+  - "passphrase" over "PIN" (minimum 8 chars, not a 4-digit PIN)
+  - When in doubt: would a non-crypto person understand this without Googling? If not, rewrite it
 
 ## Identity & Security
 

@@ -142,6 +142,12 @@
 - [x] Identity import with automatic migration cleanup (signed challenge required)
 - [x] Full tester audit: all identity/upgrade paths verified
 
+## Phase 6.5: UX Polish — PLANNED
+
+- [ ] Notification system (bell icon — "anon_x7f2 featured your post", daily earnings summary)
+- [ ] Content moderation (report mechanism, basic filtering)
+- [ ] Deploy to Railway + custom domain
+
 ## Phase 7: The Recursive Model — PLANNED
 
 - [ ] Post-to-project spawning
