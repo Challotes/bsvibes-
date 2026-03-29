@@ -2,6 +2,19 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-29 — Identity Dropdown UX Overhaul
+
+- Full copy audit by designer + marketer: 44 findings, every string reviewed
+- Relaxed language rule: "key" and "recovery key" now permitted (Google/Apple normalised)
+- 17 string replacements: recovery key, restore, featured, agentic split
+- File names include dates and descriptive suffixes
+- Recovery key section collapsible (collapsed when protected)
+- Protected banner compact single-line
+- Mobile overflow fix (max-h-[85vh])
+- Currency toggle shows destination mode
+- Activity labels: "Agentic split" + "Boot featured"
+- Notification system added to roadmap (Phase 6.5)
+
 ## 2026-03-28 — Post-Audit Fixes: Ghost Posts, UTXO Contention, Migration Bridges
 
 - Fixed ghost posts: createPost returns { ok, reason } — rejected posts removed from optimistic UI
