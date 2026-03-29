@@ -48,16 +48,22 @@ export function IdentityChip(): React.JSX.Element | null {
   const [unlockPassphrase, setUnlockPassphrase] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(!isProtected);
 
   useEffect(() => {
     setBackedUp(localStorage.getItem(BACKED_UP_KEY) === '1');
-    setIsProtected(isIdentityEncrypted());
+    const encrypted = isIdentityEncrypted();
+    setIsProtected(encrypted);
+    setRecoveryOpen(!encrypted);
   }, []);
 
   // Re-check encryption status whenever the identity changes (import/upgrade/unlock)
   useEffect(() => {
     if (!identity) return;
-    setIsProtected(isIdentityEncrypted());
+    const encrypted = isIdentityEncrypted();
+    setIsProtected(encrypted);
+    // Default: expanded when unprotected, collapsed when protected
+    setRecoveryOpen(!encrypted);
   }, [identity?.address, identity?.wif]);
 
   // Live balance: poll WhatsOnChain every 5s (client-side, per-user, no server cost).
@@ -123,7 +129,7 @@ export function IdentityChip(): React.JSX.Element | null {
           setUnlockPassphrase('');
         }
       } catch {
-        setUnlockError('Unlock failed — try again');
+        setUnlockError('Something went wrong — try again');
       } finally {
         setUnlocking(false);
       }
@@ -195,7 +201,7 @@ export function IdentityChip(): React.JSX.Element | null {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bsvibes-identity-${identity.name}.json`;
+    a.download = `bsvibes-${identity.name}-recovery-key.json`;
     a.click();
     URL.revokeObjectURL(url);
     if (!backedUp) {
@@ -260,7 +266,7 @@ export function IdentityChip(): React.JSX.Element | null {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bsvibes-identity-${newIdentity.name}-secured.json`;
+      a.download = `bsvibes-${newIdentity.name}-recovery-key-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -274,7 +280,7 @@ export function IdentityChip(): React.JSX.Element | null {
         console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats to ${newIdentity.address}, txid: ${result.fundTransfer.txid}`);
       } else if (result.fundTransfer.error) {
         // Non-fatal: identity is upgraded, but funds need manual recovery
-        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your old key is still in your backup file.`);
+        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your previous recovery key is saved in the backup file.`);
         console.error('[BSVibes] Fund transfer failed:', result.fundTransfer.error);
       }
       // If no error and no txid, there were simply no funds — no message needed
@@ -285,7 +291,7 @@ export function IdentityChip(): React.JSX.Element | null {
       setPassphrase('');
       setConfirmPass('');
     } catch (e) {
-      setUpgradeError('Upgrade failed — try again');
+      setUpgradeError('Something went wrong — try again');
       console.error('BSVibes: upgrade failed', e);
     } finally {
       setUpgrading(false);
@@ -319,7 +325,7 @@ export function IdentityChip(): React.JSX.Element | null {
         const backupUrl = URL.createObjectURL(backupBlob);
         const backupAnchor = document.createElement('a');
         backupAnchor.href = backupUrl;
-        backupAnchor.download = `bsvibes-identity-${identity.name}-before-import.json`;
+        backupAnchor.download = `bsvibes-${identity.name}-recovery-key-pre-restore.json`;
         backupAnchor.click();
         URL.revokeObjectURL(backupUrl);
       }
@@ -347,7 +353,7 @@ export function IdentityChip(): React.JSX.Element | null {
         setOpen(false);
       }, 1200);
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : 'Import failed — try again');
+      setImportError(e instanceof Error ? e.message : 'Restore failed');
     } finally {
       setImporting(false);
     }
@@ -367,7 +373,7 @@ export function IdentityChip(): React.JSX.Element | null {
         return;
       }
       if (!parsed?.wif) {
-        setImportError('File does not contain a valid key');
+        setImportError('File does not contain a valid recovery key');
         return;
       }
       await doImport(parsed.wif, parsed.name);
@@ -405,16 +411,16 @@ export function IdentityChip(): React.JSX.Element | null {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ backgroundColor: '#18181b' }}>
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[85vh] overflow-y-auto" style={{ backgroundColor: '#18181b' }}>
 
           {/* ── Section 1: Security ── */}
           {isProtected ? (
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-950/40 border-b border-emerald-900/40">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/30 border-b border-emerald-900/30">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 shrink-0">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 <path d="m9 12 2 2 4-4" />
               </svg>
-              <span className="text-xs text-emerald-400 font-medium">Identity protected</span>
+              <span className="text-[11px] text-emerald-500 font-medium">Identity protected</span>
             </div>
           ) : (
             <div className={`flex items-center gap-2 px-3 py-2.5 border-b border-red-900/40 ${showUpgrade ? 'bg-red-950/30' : 'bg-red-950/20'}`}>
@@ -438,7 +444,7 @@ export function IdentityChip(): React.JSX.Element | null {
           {showUpgrade && !isProtected && (
             <div className="px-3 py-3 border-b border-zinc-800 space-y-2 bg-zinc-900/50">
               <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Creates a new passphrase-protected identity. Your name stays the same.
+                Add a passphrase so your name is saved even if you clear your browser.
               </p>
               <input
                 type="password"
@@ -483,9 +489,9 @@ export function IdentityChip(): React.JSX.Element | null {
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] text-emerald-300 font-semibold leading-snug">Backup saved to your device</p>
+                  <p className="text-[12px] text-emerald-300 font-semibold leading-snug">Recovery key saved to your device</p>
                   <p className="text-[11px] text-emerald-500/90 leading-relaxed mt-0.5">
-                    Your new identity has been downloaded as a <span className="font-mono">-secured.json</span> file. Keep it safe — it is the only copy.
+                    Your new identity has been downloaded as a recovery key file. Keep it safe — it is the only copy.
                   </p>
                 </div>
                 <button
@@ -521,28 +527,20 @@ export function IdentityChip(): React.JSX.Element | null {
             <div>
               <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-0.5">Balance</span>
               <span className="text-sm text-emerald-400 font-medium tabular-nums">
-                {balanceSats !== null
-                  ? isGoat
-                    ? `${balanceSats.toLocaleString()} sats`
-                    : satsToDollars(balanceSats, bsvPrice)
-                  : '—'}
+                {isGoat
+                  ? `${(balanceSats ?? 0).toLocaleString()} sats`
+                  : satsToDollars(balanceSats ?? 0, bsvPrice)}
               </span>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); toggleCurrency(); }}
               className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
-              title={isGoat ? 'Switch to Noob Mode ($)' : 'Switch to Goat Mode (sats)'}
+              title={isGoat ? 'Switch to dollar mode' : 'Switch to sats mode'}
             >
               {isGoat ? (
-                <>
-                  <span>🐐</span>
-                  <span>Goat</span>
-                </>
+                <span>Switch to $ 💵</span>
               ) : (
-                <>
-                  <span>💵</span>
-                  <span>Noob</span>
-                </>
+                <span>Switch to sats 🐐</span>
               )}
             </button>
           </div>
@@ -557,7 +555,7 @@ export function IdentityChip(): React.JSX.Element | null {
             />
             <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Activity</span>
             {activity.length === 0 ? (
-              <p className="text-[11px] text-zinc-600 py-1">No activity yet</p>
+              <p className="text-[11px] text-zinc-600 py-1 leading-relaxed">Nothing yet — when your posts get featured, earnings appear here</p>
             ) : (
               <div className="max-h-[120px] overflow-y-auto space-y-1" style={{ scrollbarWidth: 'none' }}>
                 {activity.map((a, i) => {
@@ -602,37 +600,53 @@ export function IdentityChip(): React.JSX.Element | null {
             )}
           </div>
 
-          {/* ── Section 4: Identity backup ── */}
-          <div className="px-3 py-2.5 border-b border-zinc-800">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">Keep your name</span>
-            <div className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400 mb-2">
-              <span className="flex-1 break-all leading-relaxed">
-                {revealed ? identity.wif : maskWif(identity.wif)}
-              </span>
-              <button
-                onClick={() => setRevealed(!revealed)}
-                className="shrink-0 text-[10px] text-zinc-500 hover:text-amber-400 transition-colors px-1"
+          {/* ── Section 4: Recovery key ── */}
+          <div className="border-b border-zinc-800">
+            <button
+              onClick={() => setRecoveryOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/40 transition-colors"
+            >
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Recovery key</span>
+              <svg
+                width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+                className={`text-zinc-600 transition-transform duration-200 ${recoveryOpen ? 'rotate-180' : ''}`}
               >
-                {revealed ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors"
-              >
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-              <button
-                onClick={handleDownload}
-                className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
-              >
-                Download
-              </button>
-            </div>
-            <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">
-              Save this to keep your name if you clear your browser data.
-            </p>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {recoveryOpen && (
+              <div className="px-3 pb-2.5 space-y-2">
+                <div className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400">
+                  <span className="flex-1 break-all leading-relaxed">
+                    {revealed ? identity.wif : maskWif(identity.wif)}
+                  </span>
+                  <button
+                    onClick={() => setRevealed(!revealed)}
+                    className="shrink-0 text-[10px] text-zinc-500 hover:text-amber-400 transition-colors px-1"
+                  >
+                    {revealed ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopy}
+                    className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors"
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    Save file
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-600 leading-relaxed">
+                  Save your recovery key to restore access from any device.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ── Section 5: Import identity ── */}
@@ -647,12 +661,12 @@ export function IdentityChip(): React.JSX.Element | null {
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                Import identity from another device
+                Restore from another device
               </button>
             ) : (
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Import identity</span>
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Restore from another device</span>
                   <button
                     onClick={resetImport}
                     className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
@@ -698,7 +712,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       disabled={importing}
                       className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {importing ? 'Importing...' : 'Choose backup file'}
+                      {importing ? 'Restoring...' : 'Choose backup file'}
                     </button>
                   </>
                 ) : (
@@ -715,7 +729,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       disabled={!importWif.trim() || importing}
                       className="w-full bg-zinc-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {importing ? 'Importing...' : 'Import key'}
+                      {importing ? 'Restoring...' : 'Restore from key'}
                     </button>
                   </>
                 )}

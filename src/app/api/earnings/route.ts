@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     activity.push({
       amount: p.amount_sats,
       direction: 'in',
-      label: p.payout_type === 'boost_bonus' ? 'Agentic fairness · your post booted' : 'Agentic fairness',
+      label: p.payout_type === 'boost_bonus' ? 'Agentic split · your post featured' : 'Agentic split',
       created_at: p.created_at,
       txid: p.txid,
     });
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     activity.push({
       amount: b.total_paid, // 0 = free boot, >0 = paid boot with actual cost
       direction: 'out',
-      label: 'Boot',
+      label: 'Boot featured',
       created_at: b.created_at,
     });
   }
