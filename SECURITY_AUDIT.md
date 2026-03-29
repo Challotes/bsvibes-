@@ -93,7 +93,7 @@
 ## MEDIUM (8 findings — before public launch)
 
 - M1: PBKDF2 at 100k iterations (increase to 600k)
-- M2: Backup file contains plaintext WIF (encrypt for secured identities)
+- M2: Backup file contains plaintext WIF — FIXED (encrypted with passphrase for protected users)
 - M3: Migration signature has no timestamp validation
 - M4: Rate limiter is in-memory, resets on restart
 - M5: /api/earnings exposes full financial history unauthenticated

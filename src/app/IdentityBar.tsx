@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { isIdentityEncrypted, upgradeIdentity, commitUpgrade, unlockIdentity, importIdentity, signPost } from '@/services/bsv/identity';
+import { encryptWif, decryptWif } from '@/services/bsv/crypto';
 import { migrateIdentity, cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
@@ -13,6 +14,17 @@ const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
 
 function maskWif(wif: string): string {
   return `\u2022\u2022\u2022\u2022\u2022\u2022${wif.slice(-4)}`;
+}
+
+/** Download a JSON object as a file. */
+function downloadJson(payload: Record<string, string>, filename: string): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function IdentityChip(): React.JSX.Element | null {
@@ -31,10 +43,26 @@ export function IdentityChip(): React.JSX.Element | null {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
+  const [hint, setHint] = useState('');
   const [upgradeError, setUpgradeError] = useState('');
   const [upgrading, setUpgrading] = useState(false);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
+
+  // Re-auth state (Change 1)
+  const [reAuthTime, setReAuthTime] = useState(0);
+  const [reAuthAction, setReAuthAction] = useState<(() => void) | null>(null);
+  const [reAuthPassphrase, setReAuthPassphrase] = useState('');
+  const [reAuthError, setReAuthError] = useState('');
+  // Ref to carry passphrase into doImport without state lag (Change 5)
+  const reAuthPassphraseRef = useRef('');
+
+  // Save-file encrypt state (Change 6)
+  const [showSaveEncrypt, setShowSaveEncrypt] = useState(false);
+  const [saveEncryptPassphrase, setSaveEncryptPassphrase] = useState('');
+  const [saveEncryptError, setSaveEncryptError] = useState('');
+  const [savingEncrypted, setSavingEncrypted] = useState(false);
+
   // Import state
   const [showImport, setShowImport] = useState(false);
   const [importMode, setImportMode] = useState<'file' | 'wif'>('file');
@@ -42,6 +70,19 @@ export function IdentityChip(): React.JSX.Element | null {
   const [importError, setImportError] = useState('');
   const [importing, setImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
+  // Encrypted file import state (Change 7)
+  const [encryptedImportData, setEncryptedImportData] = useState<{ wif_encrypted: string; name?: string } | null>(null);
+  const [encryptedImportPassphrase, setEncryptedImportPassphrase] = useState('');
+  const [encryptedImportError, setEncryptedImportError] = useState('');
+  const [decryptingImport, setDecryptingImport] = useState(false);
+  // Protected restore confirmation state (Change 5)
+  const [pendingRestoreWif, setPendingRestoreWif] = useState<string | null>(null);
+  const [pendingRestoreName, setPendingRestoreName] = useState<string | undefined>(undefined);
+
+  // Hint display state (Change 8)
+  const [showHint, setShowHint] = useState(false);
+  const [storedHint, setStoredHint] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   // Unlock state (shown when needsUnlock === true)
@@ -55,6 +96,14 @@ export function IdentityChip(): React.JSX.Element | null {
     const encrypted = isIdentityEncrypted();
     setIsProtected(encrypted);
     setRecoveryOpen(!encrypted);
+    // Load hint from encrypted store if present (Change 8)
+    try {
+      const raw = localStorage.getItem('bfn_keypair_enc');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { hint?: string };
+        setStoredHint(parsed.hint ?? null);
+      }
+    } catch { /* non-critical */ }
   }, []);
 
   // Re-check encryption status whenever the identity changes (import/upgrade/unlock)
@@ -64,10 +113,17 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(encrypted);
     // Default: expanded when unprotected, collapsed when protected
     setRecoveryOpen(!encrypted);
+    // Reload hint
+    try {
+      const raw = localStorage.getItem('bfn_keypair_enc');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { hint?: string };
+        setStoredHint(parsed.hint ?? null);
+      }
+    } catch { /* non-critical */ }
   }, [identity?.address, identity?.wif]);
 
-  // Live balance: poll WhatsOnChain every 5s (client-side, per-user, no server cost).
-  // Earnings: refresh on dropdown open (less frequent, server call).
+  // Live balance polling
   useEffect(() => {
     if (!identity?.address) return;
 
@@ -86,7 +142,7 @@ export function IdentityChip(): React.JSX.Element | null {
     return () => clearInterval(interval);
   }, [identity?.address]);
 
-  // Earnings + activity: fetch on mount + each time dropdown opens
+  // Earnings + activity
   useEffect(() => {
     if (!identity?.address) return;
     fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}`)
@@ -114,7 +170,7 @@ export function IdentityChip(): React.JSX.Element | null {
 
   if (isLoading) return null;
 
-  // Encrypted identity needs passphrase to unlock — show unlock prompt instead of null
+  // ── Unlock prompt ──
   if (needsUnlock && !identity) {
     async function handleUnlock(): Promise<void> {
       if (!unlockPassphrase) return;
@@ -125,6 +181,7 @@ export function IdentityChip(): React.JSX.Element | null {
         if (!unlocked) {
           setUnlockError('Wrong passphrase — try again');
         } else {
+          setReAuthTime(Date.now()); // grant grace window on successful unlock
           updateIdentity(unlocked);
           setUnlockPassphrase('');
         }
@@ -156,6 +213,21 @@ export function IdentityChip(): React.JSX.Element | null {
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
             />
             {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
+            {/* Hint display (Change 8) */}
+            {storedHint && (
+              <div className="text-[10px] text-zinc-600">
+                {showHint ? (
+                  <span className="text-zinc-400">Clue: {storedHint}</span>
+                ) : (
+                  <button
+                    onClick={() => setShowHint(true)}
+                    className="hover:text-zinc-400 transition-colors underline underline-offset-2"
+                  >
+                    Need a reminder?
+                  </button>
+                )}
+              </div>
+            )}
             <button
               onClick={handleUnlock}
               disabled={!unlockPassphrase || unlocking}
@@ -171,6 +243,52 @@ export function IdentityChip(): React.JSX.Element | null {
 
   if (!identity) return null;
 
+  // ── Change 1: Re-auth helpers ──
+
+  function isRecentlyAuthed(): boolean {
+    return Date.now() - reAuthTime <= 60_000;
+  }
+
+  function requireReAuth(action: () => void): void {
+    if (!isProtected || isRecentlyAuthed()) {
+      action();
+      return;
+    }
+    // Capture action as a stable callback — use a wrapper to avoid setState callable form
+    setReAuthAction(() => action);
+    setReAuthPassphrase('');
+    setReAuthError('');
+  }
+
+  async function handleReAuthConfirm(): Promise<void> {
+    if (!reAuthPassphrase) return;
+    setReAuthError('');
+    try {
+      const unlocked = await unlockIdentity(reAuthPassphrase);
+      if (!unlocked) {
+        setReAuthError('Wrong passphrase');
+        return;
+      }
+      const ts = Date.now();
+      setReAuthTime(ts);
+      reAuthPassphraseRef.current = reAuthPassphrase;
+      const pendingAction = reAuthAction;
+      setReAuthAction(null);
+      setReAuthPassphrase('');
+      if (pendingAction) pendingAction();
+    } catch {
+      setReAuthError('Something went wrong — try again');
+    }
+  }
+
+  function cancelReAuth(): void {
+    setReAuthAction(null);
+    setReAuthPassphrase('');
+    setReAuthError('');
+  }
+
+  // ── Event handlers ──
+
   function handleOpen(): void {
     const nextOpen = !open;
     setOpen(nextOpen);
@@ -178,36 +296,87 @@ export function IdentityChip(): React.JSX.Element | null {
   }
 
   function handleCopy(): void {
+    requireReAuth(() => {
+      if (!identity) return;
+      navigator.clipboard.writeText(identity.wif);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      if (!backedUp) {
+        localStorage.setItem(BACKED_UP_KEY, '1');
+        setBackedUp(true);
+      }
+    });
+  }
+
+  function handleToggleReveal(): void {
+    requireReAuth(() => setRevealed((v) => !v));
+  }
+
+  function handleDownload(): void {
+    if (isProtected) {
+      // Change 6: show inline encrypt + save UI
+      requireReAuth(() => {
+        setShowSaveEncrypt(true);
+        setSaveEncryptPassphrase('');
+        setSaveEncryptError('');
+      });
+      return;
+    }
+    // Unprotected: plaintext download (Change 4)
     if (!identity) return;
-    navigator.clipboard.writeText(identity.wif);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    downloadJson({
+      name: identity.name,
+      address: identity.address,
+      wif: identity.wif,
+      createdAt: new Date().toISOString(),
+      app: 'BSVibes',
+    }, `bsvibes-${identity.name}-recovery-key.json`);
     if (!backedUp) {
       localStorage.setItem(BACKED_UP_KEY, '1');
       setBackedUp(true);
     }
   }
 
-  function handleDownload(): void {
-    if (!identity) return;
-    const backup = JSON.stringify({
-      name: identity.name,
-      address: identity.address,
-      wif: identity.wif,
-      createdAt: new Date().toISOString(),
-      app: 'BSVibes',
-    }, null, 2);
-    const blob = new Blob([backup], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bsvibes-${identity.name}-recovery-key.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    if (!backedUp) {
-      localStorage.setItem(BACKED_UP_KEY, '1');
-      setBackedUp(true);
+  async function handleSaveEncrypted(): Promise<void> {
+    if (!identity || !saveEncryptPassphrase) return;
+    setSavingEncrypted(true);
+    setSaveEncryptError('');
+    try {
+      const unlocked = await unlockIdentity(saveEncryptPassphrase);
+      if (!unlocked) {
+        setSaveEncryptError('Wrong passphrase');
+        setSavingEncrypted(false);
+        return;
+      }
+      const encrypted = await encryptWif(identity.wif, saveEncryptPassphrase);
+      const date = new Date().toISOString().slice(0, 10);
+      downloadJson({
+        name: identity.name,
+        address: identity.address,
+        wif_encrypted: encrypted,
+        createdAt: new Date().toISOString(),
+        app: 'BSVibes',
+        note: 'Encrypted recovery key. Use your passphrase to restore.',
+      }, `bsvibes-${identity.name}-${date}.json`);
+      if (!backedUp) {
+        localStorage.setItem(BACKED_UP_KEY, '1');
+        setBackedUp(true);
+      }
+      setShowSaveEncrypt(false);
+      setSaveEncryptPassphrase('');
+    } catch {
+      setSaveEncryptError('Something went wrong — try again');
+    } finally {
+      setSavingEncrypted(false);
     }
+  }
+
+  function handleRecoveryToggle(): void {
+    requireReAuth(() => setRecoveryOpen((v) => !v));
+  }
+
+  function handleShowImport(): void {
+    requireReAuth(() => setShowImport(true));
   }
 
   async function handleUpgrade(): Promise<void> {
@@ -226,11 +395,10 @@ export function IdentityChip(): React.JSX.Element | null {
     setTransferStatus(null);
 
     try {
-      // Phase 1: generate keys, sign migration, transfer funds — but do NOT write to localStorage yet
-      const result = await upgradeIdentity(passphrase, identity.wif, identity.name);
+      // Phase 1: generate keys, sign migration, transfer funds
+      const result = await upgradeIdentity(passphrase, identity.wif, identity.name, hint.trim() || undefined);
 
       // Phase 2: register migration on the server BEFORE committing locally
-      // If this fails, we have not overwritten localStorage — user is still on old key
       await migrateIdentity(
         result.migration.oldPubkey,
         result.migration.newPubkey,
@@ -238,60 +406,49 @@ export function IdentityChip(): React.JSX.Element | null {
         result.migration.migrationMessage
       );
 
-      // Phase 3: server confirmed — now safe to commit encrypted key to localStorage
+      // Phase 3: server confirmed — commit encrypted key to localStorage
       commitUpgrade(result.encStore);
 
-      // FORCE auto-download backup of the NEW identity before marking upgrade complete.
-      // This is the critical safety gate — the user must have the file before we proceed.
-      // If the fund transfer failed, also include the OLD key so stranded funds can be recovered.
+      // Phase 4: force auto-download backup of the NEW identity (Change 2 & 3)
       const newIdentity = result.identity;
+      const date = new Date().toISOString().slice(0, 10);
       const backupPayload: Record<string, string> = {
         name: newIdentity.name,
         address: newIdentity.address,
-        wif: newIdentity.wif,
+        wif_encrypted: await encryptWif(newIdentity.wif, passphrase), // Change 2
         createdAt: new Date().toISOString(),
         app: 'BSVibes',
-        note: 'New identity created during security upgrade. Keep this file safe.',
+        note: 'Encrypted recovery key. Use your passphrase to restore.',
       };
+      if (hint.trim()) {
+        backupPayload.hint = hint.trim();
+      }
       if (result.fundTransfer.error) {
-        // Transfer failed — old key may still hold funds. Include it so the user
-        // can recover from the old address using any standard BSV wallet.
-        backupPayload.oldWif = identity.wif;
+        // Change 3: encrypt the old WIF in the backup too
+        backupPayload.oldWif_encrypted = await encryptWif(identity.wif, passphrase);
         backupPayload.oldAddress = identity.address;
         backupPayload.oldKeyNote =
-          'Fund transfer failed. Import oldWif into a BSV wallet to recover any balance from oldAddress.';
+          'Fund transfer failed. Decrypt oldWif_encrypted with your passphrase and import it into a BSV wallet to recover any balance from oldAddress.';
       }
-      const backupData = JSON.stringify(backupPayload, null, 2);
-      const blob = new Blob([backupData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bsvibes-${newIdentity.name}-recovery-key-${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadJson(backupPayload, `bsvibes-${newIdentity.name}-${date}.json`);
 
-      // Update context so UI reflects the new identity (same name, new address)
+      // Update context
       updateIdentity(newIdentity);
+      setReAuthTime(Date.now()); // grant grace window after successful upgrade
 
-      // Surface fund transfer result to the user — include new address so they know where funds went
       if (result.fundTransfer.txid) {
         const sats = result.fundTransfer.transferredSats.toLocaleString();
         setTransferStatus(`Transferred ${sats} sats to your new address (${newIdentity.address.slice(0, 8)}…${newIdentity.address.slice(-6)}).`);
-        console.log(`[BSVibes] Funds transferred: ${result.fundTransfer.transferredSats} sats to ${newIdentity.address}, txid: ${result.fundTransfer.txid}`);
       } else if (result.fundTransfer.error) {
-        // Non-fatal: identity is upgraded, but funds need manual recovery
-        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your previous recovery key is saved in the backup file.`);
-        console.error('[BSVibes] Fund transfer failed:', result.fundTransfer.error);
+        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your previous recovery key is saved (encrypted) in the backup file.`);
       }
-      // If no error and no txid, there were simply no funds — no message needed
 
       setBackupConfirmed(true);
       setIsProtected(true);
       setShowUpgrade(false);
       setPassphrase('');
       setConfirmPass('');
-      // Upgrading security is a power-user action — switch to Goat mode (sats)
-      // if they haven't already opted in. They can toggle back if they prefer.
+      setHint('');
       if (!isGoat) toggleCurrency();
     } catch (e) {
       setUpgradeError('Something went wrong — try again');
@@ -307,39 +464,64 @@ export function IdentityChip(): React.JSX.Element | null {
     setImportError('');
     setImportSuccess(false);
     setImportMode('file');
+    setEncryptedImportData(null);
+    setEncryptedImportPassphrase('');
+    setEncryptedImportError('');
+    setPendingRestoreWif(null);
+    setPendingRestoreName(undefined);
   }
 
   async function doImport(wif: string, name?: string): Promise<void> {
     setImporting(true);
     setImportError('');
     try {
-      // Auto-backup the CURRENT identity before replacing it.
-      // This is a silent safety net — the file lands in Downloads with no extra clicks.
-      if (identity) {
-        const preImportBackup = JSON.stringify({
+      // Change 5: if protected, auto-download encrypted backup first
+      if (isProtected && identity) {
+        const passForBackup = reAuthPassphraseRef.current;
+        reAuthPassphraseRef.current = ''; // clear after use
+        if (passForBackup) {
+          const encBackup = await encryptWif(identity.wif, passForBackup);
+          const date = new Date().toISOString().slice(0, 10);
+          downloadJson({
+            name: identity.name,
+            address: identity.address,
+            wif_encrypted: encBackup,
+            createdAt: new Date().toISOString(),
+            app: 'BSVibes',
+            note: 'Automatic encrypted backup saved before importing a different identity.',
+          }, `bsvibes-${identity.name}-${date}-backup.json`);
+          // Show confirmation before proceeding
+          setPendingRestoreWif(wif);
+          setPendingRestoreName(name);
+          setImporting(false);
+          return;
+        }
+      }
+
+      // Change 4: unprotected plaintext auto-backup
+      if (!isProtected && identity) {
+        downloadJson({
           name: identity.name,
           address: identity.address,
           wif: identity.wif,
           createdAt: new Date().toISOString(),
           app: 'BSVibes',
           note: 'Automatic backup saved before importing a different identity.',
-        }, null, 2);
-        const backupBlob = new Blob([preImportBackup], { type: 'application/json' });
-        const backupUrl = URL.createObjectURL(backupBlob);
-        const backupAnchor = document.createElement('a');
-        backupAnchor.href = backupUrl;
-        backupAnchor.download = `bsvibes-${identity.name}-recovery-key-pre-restore.json`;
-        backupAnchor.click();
-        URL.revokeObjectURL(backupUrl);
+        }, `bsvibes-${identity.name}-recovery-key.json`);
       }
 
+      await performImport(wif, name);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Restore failed');
+      setImporting(false);
+    }
+  }
+
+  async function performImport(wif: string, name?: string): Promise<void> {
+    try {
       const imported = await importIdentity(wif, name);
       updateIdentity(imported);
 
-      // Clean up any stale migration pointing away from this key.
-      // If the user previously upgraded (creating a migration A → B) and is now
-      // re-importing key A, we must remove that migration so payouts go to A, not B.
-      // Fire-and-forget: non-critical, failure should not block the import flow.
       const cleanupTs = Date.now();
       const cleanupMsg = `cleanup:${imported.pubkey}:${cleanupTs}`;
       signPost(cleanupMsg).then((sig) => {
@@ -362,28 +544,74 @@ export function IdentityChip(): React.JSX.Element | null {
     }
   }
 
+  async function confirmPendingRestore(): Promise<void> {
+    if (!pendingRestoreWif) return;
+    const wif = pendingRestoreWif;
+    const name = pendingRestoreName;
+    setPendingRestoreWif(null);
+    setPendingRestoreName(undefined);
+    setImporting(true);
+    await performImport(wif, name);
+  }
+
+  function cancelPendingRestore(): void {
+    setPendingRestoreWif(null);
+    setPendingRestoreName(undefined);
+    setImporting(false);
+  }
+
+  // Change 7: handle encrypted backup files
   function handleImportFile(e: React.ChangeEvent<HTMLInputElement>): void {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const text = ev.target?.result as string;
-      let parsed: { wif?: string; name?: string };
+      let parsed: { wif?: string; wif_encrypted?: string; name?: string; oldWif_encrypted?: string };
       try {
         parsed = JSON.parse(text);
       } catch {
         setImportError('Could not read file — make sure it is a BSVibes backup (.json)');
         return;
       }
-      if (!parsed?.wif) {
-        setImportError('File does not contain a valid recovery key');
+
+      if (parsed?.wif_encrypted) {
+        // Encrypted backup: show inline passphrase prompt
+        setEncryptedImportData({ wif_encrypted: parsed.wif_encrypted, name: parsed.name });
+        setEncryptedImportPassphrase('');
+        setEncryptedImportError('');
         return;
       }
-      await doImport(parsed.wif, parsed.name);
+
+      if (parsed?.wif) {
+        await doImport(parsed.wif, parsed.name);
+        return;
+      }
+
+      setImportError('File does not contain a valid recovery key');
     };
     reader.readAsText(file);
-    // Reset input so same file can be re-selected
     e.target.value = '';
+  }
+
+  async function handleDecryptAndImport(): Promise<void> {
+    if (!encryptedImportData || !encryptedImportPassphrase) return;
+    setDecryptingImport(true);
+    setEncryptedImportError('');
+    try {
+      const wif = await decryptWif(encryptedImportData.wif_encrypted, encryptedImportPassphrase);
+      if (!wif) {
+        setEncryptedImportError('Wrong passphrase — try again');
+        setDecryptingImport(false);
+        return;
+      }
+      setEncryptedImportData(null);
+      await doImport(wif, encryptedImportData.name);
+    } catch {
+      setEncryptedImportError('Something went wrong — try again');
+    } finally {
+      setDecryptingImport(false);
+    }
   }
 
   async function handleImportWif(): Promise<void> {
@@ -443,7 +671,7 @@ export function IdentityChip(): React.JSX.Element | null {
             </div>
           )}
 
-          {/* Upgrade form (inline, under security banner) */}
+          {/* Upgrade form */}
           {showUpgrade && !isProtected && (
             <div className="px-3 py-3 border-b border-zinc-800 space-y-2 bg-zinc-900/50">
               <p className="text-[11px] text-zinc-400 leading-relaxed">
@@ -464,10 +692,20 @@ export function IdentityChip(): React.JSX.Element | null {
                 onChange={(e) => { setConfirmPass(e.target.value); setUpgradeError(''); }}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
               />
+              {/* Change 8: optional hint */}
+              <input
+                type="text"
+                placeholder={`Memory clue (optional) — e.g. "blue house + 2019"`}
+                value={hint}
+                maxLength={100}
+                onChange={(e) => setHint(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              />
+              <p className="text-[10px] text-zinc-600 leading-relaxed">Clue is stored as plaintext — do not include password fragments.</p>
               {upgradeError && <p className="text-[11px] text-red-400">{upgradeError}</p>}
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setShowUpgrade(false); setPassphrase(''); setConfirmPass(''); setUpgradeError(''); }}
+                  onClick={() => { setShowUpgrade(false); setPassphrase(''); setConfirmPass(''); setHint(''); setUpgradeError(''); }}
                   className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
                 >
                   Cancel
@@ -483,7 +721,7 @@ export function IdentityChip(): React.JSX.Element | null {
             </div>
           )}
 
-          {/* Backup confirmation banner (shown immediately after upgrade) */}
+          {/* Backup confirmation banner */}
           {backupConfirmed && (
             <div className="px-3 py-2.5 border-b border-emerald-800/60 bg-emerald-950/40">
               <div className="flex items-start gap-2">
@@ -495,7 +733,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] text-emerald-300 font-semibold leading-snug">Recovery key saved to your device</p>
                   <p className="text-[11px] text-emerald-500/90 leading-relaxed mt-0.5">
-                    Your new identity has been downloaded as a recovery key file. Keep it safe — it is the only copy.
+                    Your new identity has been downloaded as an encrypted recovery key file. Keep it safe — it is the only copy.
                   </p>
                 </div>
                 <button
@@ -509,7 +747,7 @@ export function IdentityChip(): React.JSX.Element | null {
             </div>
           )}
 
-          {/* Fund transfer status message (shown after upgrade if relevant) */}
+          {/* Fund transfer status */}
           {transferStatus && (
             <div className={`px-3 py-2 border-b text-[11px] leading-relaxed ${
               transferStatus.startsWith('Note:')
@@ -606,8 +844,9 @@ export function IdentityChip(): React.JSX.Element | null {
 
           {/* ── Section 4: Recovery key ── */}
           <div className="border-b border-zinc-800">
+            {/* Change 1: re-auth gate on toggle */}
             <button
-              onClick={() => setRecoveryOpen((v) => !v)}
+              onClick={handleRecoveryToggle}
               className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/40 transition-colors"
             >
               <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Recovery key</span>
@@ -619,26 +858,62 @@ export function IdentityChip(): React.JSX.Element | null {
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
-            {recoveryOpen && (
+
+            {/* Change 1: inline re-auth prompt */}
+            {reAuthAction !== null && (
+              <div className="px-3 pb-3 space-y-2 bg-zinc-900/70">
+                <p className="text-[11px] text-zinc-400">Confirm your passphrase to continue.</p>
+                <input
+                  type="password"
+                  placeholder="Passphrase"
+                  value={reAuthPassphrase}
+                  autoFocus
+                  onChange={(e) => { setReAuthPassphrase(e.target.value); setReAuthError(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleReAuthConfirm(); }}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+                />
+                {reAuthError && <p className="text-[11px] text-red-400">{reAuthError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={cancelReAuth}
+                    className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReAuthConfirm}
+                    disabled={!reAuthPassphrase}
+                    className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {recoveryOpen && reAuthAction === null && (
               <div className="px-3 pb-2.5 space-y-2">
                 <div className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400">
                   <span className="flex-1 break-all leading-relaxed">
                     {revealed ? identity.wif : maskWif(identity.wif)}
                   </span>
+                  {/* Change 1: gate show/hide behind re-auth */}
                   <button
-                    onClick={() => setRevealed(!revealed)}
+                    onClick={handleToggleReveal}
                     className="shrink-0 text-[10px] text-zinc-500 hover:text-amber-400 transition-colors px-1"
                   >
                     {revealed ? 'Hide' : 'Show'}
                   </button>
                 </div>
                 <div className="flex gap-2">
+                  {/* Change 1: gate copy behind re-auth */}
                   <button
                     onClick={handleCopy}
                     className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors"
                   >
                     {copied ? 'Copied' : 'Copy'}
                   </button>
+                  {/* Change 6: gate save file behind re-auth */}
                   <button
                     onClick={handleDownload}
                     className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
@@ -646,8 +921,43 @@ export function IdentityChip(): React.JSX.Element | null {
                     Save file
                   </button>
                 </div>
+
+                {/* Change 6: inline encrypted save form for protected users */}
+                {showSaveEncrypt && isProtected && (
+                  <div className="space-y-2 pt-1 border-t border-zinc-700/60">
+                    <p className="text-[11px] text-zinc-400">Enter your passphrase to save an encrypted backup.</p>
+                    <input
+                      type="password"
+                      placeholder="Passphrase"
+                      value={saveEncryptPassphrase}
+                      autoFocus
+                      onChange={(e) => { setSaveEncryptPassphrase(e.target.value); setSaveEncryptError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEncrypted(); }}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+                    />
+                    {saveEncryptError && <p className="text-[11px] text-red-400">{saveEncryptError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowSaveEncrypt(false); setSaveEncryptPassphrase(''); setSaveEncryptError(''); }}
+                        className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveEncrypted}
+                        disabled={!saveEncryptPassphrase || savingEncrypted}
+                        className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {savingEncrypted ? 'Saving...' : 'Save encrypted'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-[10px] text-zinc-600 leading-relaxed">
-                  Save your recovery key to restore access from any device.
+                  {isProtected
+                    ? 'Your backup will be encrypted with your passphrase.'
+                    : 'Save your recovery key to restore access from any device.'}
                 </p>
               </div>
             )}
@@ -656,8 +966,9 @@ export function IdentityChip(): React.JSX.Element | null {
           {/* ── Section 5: Import identity ── */}
           <div className="px-3 py-2.5">
             {!showImport ? (
+              /* Change 1: gate "Restore from another device" behind re-auth */
               <button
-                onClick={() => setShowImport(true)}
+                onClick={handleShowImport}
                 className="w-full flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors py-0.5"
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -683,58 +994,115 @@ export function IdentityChip(): React.JSX.Element | null {
                   This will replace your current identity. Make sure you have your current key backed up first.
                 </p>
 
-                {/* Mode toggle */}
-                <div className="flex rounded-lg overflow-hidden border border-zinc-700 text-[11px]">
-                  <button
-                    onClick={() => { setImportMode('file'); setImportError(''); }}
-                    className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'file' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Backup file
-                  </button>
-                  <button
-                    onClick={() => { setImportMode('wif'); setImportError(''); }}
-                    className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'wif' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Paste key
-                  </button>
-                </div>
-
-                {importMode === 'file' ? (
-                  <>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">
-                      Select the <span className="font-mono text-zinc-400">.json</span> file you downloaded when you backed up your identity.
+                {/* Change 5: protected restore confirmation */}
+                {pendingRestoreWif !== null ? (
+                  <div className="space-y-2 bg-zinc-800/40 rounded-lg p-2.5 border border-zinc-700/60">
+                    <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">Your encrypted backup has been saved.</p>
+                    <p className="text-[11px] text-zinc-500 leading-relaxed">Continue with restore? This will replace your current identity.</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={cancelPendingRestore}
+                        className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={confirmPendingRestore}
+                        disabled={importing}
+                        className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {importing ? 'Restoring...' : 'Continue'}
+                      </button>
+                    </div>
+                  </div>
+                ) : encryptedImportData !== null ? (
+                  /* Change 7: encrypted file passphrase prompt */
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      This backup is encrypted. Enter the passphrase you used when creating it.
                     </p>
                     <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".json,application/json"
-                      onChange={handleImportFile}
-                      className="hidden"
+                      type="password"
+                      placeholder="Passphrase for this backup"
+                      value={encryptedImportPassphrase}
+                      autoFocus
+                      onChange={(e) => { setEncryptedImportPassphrase(e.target.value); setEncryptedImportError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleDecryptAndImport(); }}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
                     />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={importing}
-                      className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {importing ? 'Restoring...' : 'Choose backup file'}
-                    </button>
-                  </>
+                    {encryptedImportError && <p className="text-[11px] text-red-400">{encryptedImportError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setEncryptedImportData(null); setEncryptedImportPassphrase(''); setEncryptedImportError(''); }}
+                        className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDecryptAndImport}
+                        disabled={!encryptedImportPassphrase || decryptingImport}
+                        className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {decryptingImport ? 'Decrypting...' : 'Restore'}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <>
-                    <textarea
-                      placeholder="Paste your key here..."
-                      value={importWif}
-                      onChange={(e) => { setImportWif(e.target.value); setImportError(''); }}
-                      rows={3}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none leading-relaxed"
-                    />
-                    <button
-                      onClick={handleImportWif}
-                      disabled={!importWif.trim() || importing}
-                      className="w-full bg-zinc-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {importing ? 'Restoring...' : 'Restore from key'}
-                    </button>
+                    {/* Mode toggle */}
+                    <div className="flex rounded-lg overflow-hidden border border-zinc-700 text-[11px]">
+                      <button
+                        onClick={() => { setImportMode('file'); setImportError(''); }}
+                        className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'file' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Backup file
+                      </button>
+                      <button
+                        onClick={() => { setImportMode('wif'); setImportError(''); }}
+                        className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'wif' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Paste key
+                      </button>
+                    </div>
+
+                    {importMode === 'file' ? (
+                      <>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">
+                          Select the <span className="font-mono text-zinc-400">.json</span> file you downloaded when you backed up your identity.
+                        </p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".json,application/json"
+                          onChange={handleImportFile}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={importing}
+                          className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {importing ? 'Restoring...' : 'Choose backup file'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <textarea
+                          placeholder="Paste your key here..."
+                          value={importWif}
+                          onChange={(e) => { setImportWif(e.target.value); setImportError(''); }}
+                          rows={3}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none leading-relaxed"
+                        />
+                        <button
+                          onClick={handleImportWif}
+                          disabled={!importWif.trim() || importing}
+                          className="w-full bg-zinc-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {importing ? 'Restoring...' : 'Restore from key'}
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
 

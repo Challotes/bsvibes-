@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-30 — Encrypted Backups, Re-Auth, Hints, Recovery Tool
+
+Security hardening (8 changes):
+- Passphrase re-prompt with 60s grace window for Copy/Show/Save/Restore
+- Upgrade backup encrypted with passphrase (wif_encrypted, not plaintext wif)
+- Old WIF encrypted on failed fund transfer
+- Protected restore: encrypted auto-download + confirmation gate
+- Unprotected restore: keeps plaintext auto-download (no passphrase to encrypt with)
+- Save file encrypts when protected (re-prompts for passphrase)
+- Import handles encrypted backup files (detects wif_encrypted, prompts for passphrase)
+- Optional passphrase hint (stored in localStorage + backup file, shown on unlock prompt)
+- Standalone HTML recovery tool at /recover.html (offline, no dependencies, dark theme)
+- File naming: bsvibes-{name}-{date}.json with -backup suffix for auto-saves
+
 ## 2026-03-29 — Earnings History Survives Upgrades + Goat Mode on Upgrade
 
 - Fixed /api/earnings: now resolves full migration chain (BFS over migrations table, both directions) so earnings chart and activity feed survive security upgrades and cross-device restores

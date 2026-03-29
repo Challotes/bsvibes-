@@ -361,7 +361,8 @@ export function commitUpgrade(encStore: string): void {
 export async function upgradeIdentity(
   passphrase: string,
   oldWif: string,
-  currentName: string
+  currentName: string,
+  hint?: string
 ): Promise<{
   identity: Identity;
   encStore: string;
@@ -413,6 +414,7 @@ export async function upgradeIdentity(
     encrypted,
     name: currentName,
     address: newAddress,
+    ...(hint ? { hint } : {}),
   });
 
   // Cache for session so the new identity is usable immediately after commit
