@@ -2,6 +2,12 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-29 — Earnings History Survives Upgrades + Goat Mode on Upgrade
+
+- Fixed /api/earnings: now resolves full migration chain (BFS over migrations table, both directions) so earnings chart and activity feed survive security upgrades and cross-device restores
+- All three queries (total, activity, sparkline) now use IN (all chain addresses) instead of single address
+- IdentityBar: after successful security upgrade, auto-switches to Goat mode (sats) if user was in Noob mode
+
 ## 2026-03-29 — Identity Dropdown UX Overhaul
 
 - Full copy audit by designer + marketer: 44 findings, every string reviewed

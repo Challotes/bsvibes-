@@ -290,6 +290,9 @@ export function IdentityChip(): React.JSX.Element | null {
       setShowUpgrade(false);
       setPassphrase('');
       setConfirmPass('');
+      // Upgrading security is a power-user action — switch to Goat mode (sats)
+      // if they haven't already opted in. They can toggle back if they prefer.
+      if (!isGoat) toggleCurrency();
     } catch (e) {
       setUpgradeError('Something went wrong — try again');
       console.error('BSVibes: upgrade failed', e);
