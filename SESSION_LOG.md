@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-30 — Identity Card Redesign + Error Logging
+
+Major UX overhaul of identity card:
+- Split card into informational dropdown + "Manage identity" modal with labeled rows
+- Added change passphrase flow (verify current → enter new → key rotation + recovery file)
+- Copyable receive address on own row with copy icon and feedback
+- "Not protected" bar is now clickable → opens upgrade modal directly
+- Memory clue always visible, single passphrase entry for save (no double prompt)
+- Cancel buttons red for visibility, modal resets on close, uniform expand/cancel behavior
+- Advanced badge on "Show recovery key" row
+- Simplified FundAddress: removed boot cost when opened from card, z-index fix
+- Added error logging to on-chain post logging and wallet broadcast (6 log points)
+- Investigated post 339 on-chain failure: transient WoC issue, wallet healthy (199M sats)
+
 ## 2026-03-30 — Migration Chain Repair + Return Value Fix
 
 Critical bug found and fixed:

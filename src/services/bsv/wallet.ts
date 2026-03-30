@@ -170,10 +170,14 @@ async function getSourceTransaction(utxo: UTXO): Promise<Transaction | null> {
     const res = await fetch(
       `https://api.whatsonchain.com/v1/bsv/main/tx/${utxo.tx_hash}/hex`
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`BSVibes wallet: WoC /tx/hex returned ${res.status} for ${utxo.tx_hash}`);
+      return null;
+    }
     const hex = await res.text();
     return Transaction.fromHex(hex);
-  } catch {
+  } catch (e) {
+    console.error(`BSVibes wallet: getSourceTransaction failed for ${utxo.tx_hash}`, e);
     return null;
   }
 }
@@ -189,7 +193,10 @@ export async function buildAndBroadcast(
   outputs: Array<{ lockingScript: any; satoshis: number }>
 ): Promise<BroadcastResult> {
   const key = getServerKey();
-  if (!key) return { status: 'no_wallet' };
+  if (!key) {
+    console.error('BSVibes wallet: no BSV_SERVER_WIF configured');
+    return { status: 'no_wallet' };
+  }
 
   // Acquire the mutex — only one transaction builds at a time
   const release = await acquireTxMutex();
@@ -211,7 +218,10 @@ async function _buildAndBroadcastInner(
   const totalNeeded = outputs.reduce((sum, o) => sum + o.satoshis, 0) + 500; // +500 for estimated fee
   const utxos = await reserveUtxos(totalNeeded);
 
-  if (!utxos) return { status: 'insufficient_funds' };
+  if (!utxos) {
+    console.error('BSVibes wallet: insufficient funds or no UTXOs available');
+    return { status: 'insufficient_funds' };
+  }
 
   try {
     const tx = new Transaction();
@@ -220,6 +230,7 @@ async function _buildAndBroadcastInner(
     for (const utxo of utxos) {
       const sourceTx = await getSourceTransaction(utxo);
       if (!sourceTx) {
+        console.error(`BSVibes wallet: failed to fetch source tx ${utxo.tx_hash}`);
         releaseUtxos(utxos);
         return { status: 'broadcast_failed', error: 'Failed to fetch source transaction' };
       }

@@ -64,10 +64,12 @@ export async function createPost(formData: FormData): Promise<CreatePostResult> 
     .then((txid) => {
       if (txid) {
         db.prepare('UPDATE posts SET tx_id = ? WHERE id = ?').run(txid, postId);
+      } else {
+        console.error(`BSVibes: on-chain logging returned null for post ${postId}`);
       }
     })
-    .catch(() => {
-      // On-chain logging is best-effort — post still exists in SQLite
+    .catch((e) => {
+      console.error(`BSVibes: on-chain logging failed for post ${postId}`, e);
     });
 
   return { ok: true };

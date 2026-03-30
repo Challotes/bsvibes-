@@ -147,6 +147,13 @@
 - [x] Private & Offline banner in recovery files
 - [x] Re-auth grace window (60s) for sensitive actions (Copy/Show/Save/Restore)
 - [x] Passphrase hints on upgrade + recovery files
+- [x] Identity card split: informational card + "Manage identity" modal with labeled action rows
+- [x] Change passphrase flow (2-step: verify current, enter new, key rotation + recovery file)
+- [x] Copyable receive address on card header (own row, copy icon, "Copied!" feedback)
+- [x] "Not protected" bar clickable — opens upgrade modal directly with chevron affordance
+- [x] Memory clue always visible (no toggle), shown immediately on import + re-auth
+- [x] Single passphrase entry for save (re-auth → save, no double prompt)
+- [x] Error logging for on-chain post failures and wallet broadcast failures
 
 ## Phase 6.5: UX Polish — PLANNED
 
