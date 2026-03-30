@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-03-25
+> Last updated: 2026-03-30
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -141,6 +141,12 @@
 - [x] Atomic migration ordering (server confirms before key stored locally)
 - [x] Identity import with automatic migration cleanup (signed challenge required)
 - [x] Full tester audit: all identity/upgrade paths verified
+- [x] Migration return value checked — upgrade aborts if migration fails (prevents orphaned posts)
+- [x] Full identity dropdown redesign: radical simplification (43→24 state vars, extracted UpgradeModal, shared PassphrasePrompt)
+- [x] Self-contained HTML recovery files with embedded decryption (replaces JSON backups)
+- [x] Private & Offline banner in recovery files
+- [x] Re-auth grace window (60s) for sensitive actions (Copy/Show/Save/Restore)
+- [x] Passphrase hints on upgrade + recovery files
 
 ## Phase 6.5: UX Polish — PLANNED
 

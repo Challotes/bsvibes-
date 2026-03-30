@@ -158,12 +158,16 @@ function UpgradeModal({ isOpen, onClose, onSuccess, currentIdentity }: UpgradeMo
     try {
       const result = await upgradeIdentity(passphrase, currentIdentity.wif, currentIdentity.name, hint.trim() || undefined);
 
-      await migrateIdentity(
+      const migrationResult = await migrateIdentity(
         result.migration.oldPubkey,
         result.migration.newPubkey,
         result.migration.migrationSignature,
         result.migration.migrationMessage,
       );
+
+      if (!migrationResult.success) {
+        throw new Error('Migration failed — your posts would be orphaned. Upgrade aborted.');
+      }
 
       commitUpgrade(result.encStore);
 

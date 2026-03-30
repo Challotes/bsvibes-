@@ -2,6 +2,15 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-30 — Migration Chain Repair + Return Value Fix
+
+Critical bug found and fixed:
+- `migrateIdentity()` return value was never checked — silent failures orphaned posts
+- 280 posts were disconnected across 2 broken chain links (manual DB repair applied)
+- Upgrade now aborts if migration registration fails (prevents future orphans)
+- Root cause predated the redesign — existed since Phase 4
+- Updated ROADMAP, SECURITY_AUDIT, SESSION_LOG
+
 ## 2026-03-30 — Identity Dropdown Full Redesign
 
 Major simplification of identity dropdown:

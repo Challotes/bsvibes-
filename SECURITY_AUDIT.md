@@ -86,6 +86,8 @@
 
 **BUG-2 (High) — FIXED:** Same as H7 above. Migration now registered before key storage.
 
+**BUG-10 (Critical) — FIXED:** `migrateIdentity()` return value was never checked. If server-side signature verification failed, migration silently didn't register but upgrade continued — orphaning all posts under the old key. Fixed: upgrade now aborts if `migrateIdentity` returns `{ success: false }`. Two manual chain repairs applied to reconnect 280 orphaned posts.
+
 **BUG-6 (Medium) — OPEN:** boot-confirm stores booterPubkey as boosted_by but field expects BSV address. Mismatch for paid boots.
 
 **BUG-9 (Critical) — FIXED:** `isIdentityEncrypted()` always returned false. Checked raw JSON string for "enc:" prefix but stored value is JSON wrapper. Every encrypted identity guard was broken — unlock prompt never appeared, stale key generated after upgrade. Fixed by JSON-parsing and checking .encrypted field.
