@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { isIdentityEncrypted, upgradeIdentity, commitUpgrade, unlockIdentity, importIdentity, signPost } from '@/services/bsv/identity';
 import { encryptWif, decryptWif } from '@/services/bsv/crypto';
+import { generateBackupHtml, type BackupData } from '@/services/bsv/backup-template';
 import { migrateIdentity, cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
@@ -16,9 +17,10 @@ function maskWif(wif: string): string {
   return `\u2022\u2022\u2022\u2022\u2022\u2022${wif.slice(-4)}`;
 }
 
-/** Download a JSON object as a file. */
-function downloadJson(payload: Record<string, string>, filename: string): void {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+/** Download a BackupData object as a self-contained HTML recovery file. */
+function downloadBackup(data: BackupData, filename: string): void {
+  const html = generateBackupHtml(data);
+  const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -324,13 +326,12 @@ export function IdentityChip(): React.JSX.Element | null {
     }
     // Unprotected: plaintext download (Change 4)
     if (!identity) return;
-    downloadJson({
+    downloadBackup({
       name: identity.name,
       address: identity.address,
       wif: identity.wif,
       createdAt: new Date().toISOString(),
-      app: 'BSVibes',
-    }, `bsvibes-${identity.name}-recovery-key.json`);
+    }, `bsvibes-${identity.name}-recovery-key.html`);
     if (!backedUp) {
       localStorage.setItem(BACKED_UP_KEY, '1');
       setBackedUp(true);
@@ -350,14 +351,13 @@ export function IdentityChip(): React.JSX.Element | null {
       }
       const encrypted = await encryptWif(identity.wif, saveEncryptPassphrase);
       const date = new Date().toISOString().slice(0, 10);
-      downloadJson({
+      downloadBackup({
         name: identity.name,
         address: identity.address,
         wif_encrypted: encrypted,
         createdAt: new Date().toISOString(),
-        app: 'BSVibes',
         note: 'Encrypted recovery key. Use your passphrase to restore.',
-      }, `bsvibes-${identity.name}-${date}.json`);
+      }, `bsvibes-${identity.name}-${date}.html`);
       if (!backedUp) {
         localStorage.setItem(BACKED_UP_KEY, '1');
         setBackedUp(true);
@@ -412,12 +412,11 @@ export function IdentityChip(): React.JSX.Element | null {
       // Phase 4: force auto-download backup of the NEW identity (Change 2 & 3)
       const newIdentity = result.identity;
       const date = new Date().toISOString().slice(0, 10);
-      const backupPayload: Record<string, string> = {
+      const backupPayload: BackupData = {
         name: newIdentity.name,
         address: newIdentity.address,
         wif_encrypted: await encryptWif(newIdentity.wif, passphrase), // Change 2
         createdAt: new Date().toISOString(),
-        app: 'BSVibes',
         note: 'Encrypted recovery key. Use your passphrase to restore.',
       };
       if (hint.trim()) {
@@ -426,11 +425,8 @@ export function IdentityChip(): React.JSX.Element | null {
       if (result.fundTransfer.error) {
         // Change 3: encrypt the old WIF in the backup too
         backupPayload.oldWif_encrypted = await encryptWif(identity.wif, passphrase);
-        backupPayload.oldAddress = identity.address;
-        backupPayload.oldKeyNote =
-          'Fund transfer failed. Decrypt oldWif_encrypted with your passphrase and import it into a BSV wallet to recover any balance from oldAddress.';
       }
-      downloadJson(backupPayload, `bsvibes-${newIdentity.name}-${date}.json`);
+      downloadBackup(backupPayload, `bsvibes-${newIdentity.name}-${date}.html`);
 
       // Update context
       updateIdentity(newIdentity);
@@ -482,14 +478,13 @@ export function IdentityChip(): React.JSX.Element | null {
         if (passForBackup) {
           const encBackup = await encryptWif(identity.wif, passForBackup);
           const date = new Date().toISOString().slice(0, 10);
-          downloadJson({
+          downloadBackup({
             name: identity.name,
             address: identity.address,
             wif_encrypted: encBackup,
             createdAt: new Date().toISOString(),
-            app: 'BSVibes',
             note: 'Automatic encrypted backup saved before importing a different identity.',
-          }, `bsvibes-${identity.name}-${date}-backup.json`);
+          }, `bsvibes-${identity.name}-${date}-backup.html`);
           // Show confirmation before proceeding
           setPendingRestoreWif(wif);
           setPendingRestoreName(name);
@@ -500,14 +495,13 @@ export function IdentityChip(): React.JSX.Element | null {
 
       // Change 4: unprotected plaintext auto-backup
       if (!isProtected && identity) {
-        downloadJson({
+        downloadBackup({
           name: identity.name,
           address: identity.address,
           wif: identity.wif,
           createdAt: new Date().toISOString(),
-          app: 'BSVibes',
           note: 'Automatic backup saved before importing a different identity.',
-        }, `bsvibes-${identity.name}-recovery-key.json`);
+        }, `bsvibes-${identity.name}-recovery-key.html`);
       }
 
       await performImport(wif, name);
@@ -560,22 +554,50 @@ export function IdentityChip(): React.JSX.Element | null {
     setImporting(false);
   }
 
-  // Change 7: handle encrypted backup files
+  // Change 7: handle encrypted backup files (JSON and HTML formats)
   function handleImportFile(e: React.ChangeEvent<HTMLInputElement>): void {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      const text = ev.target?.result as string;
-      let parsed: { wif?: string; wif_encrypted?: string; name?: string; oldWif_encrypted?: string };
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        setImportError('Could not read file — make sure it is a BSVibes backup (.json)');
+      const text = (ev.target?.result as string) ?? '';
+
+      let parsed: { wif?: string; wif_encrypted?: string; name?: string; oldWif_encrypted?: string } | null = null;
+
+      // HTML backup: extract BACKUP_DATA JSON block
+      const trimmed = text.trimStart();
+      if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || text.includes('BACKUP_DATA')) {
+        const match = text.match(/const BACKUP_DATA\s*=\s*(\{[\s\S]*?\});/);
+        if (match) {
+          try {
+            parsed = JSON.parse(match[1]);
+          } catch {
+            setImportError('Could not read HTML backup — file may be corrupted');
+            return;
+          }
+        } else {
+          setImportError('Could not find backup data in this HTML file');
+          return;
+        }
+      } else if (trimmed.startsWith('{')) {
+        // Legacy JSON backup
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          setImportError('Could not read file — make sure it is a BSVibes backup (.html or .json)');
+          return;
+        }
+      } else {
+        setImportError('Could not read file — make sure it is a BSVibes backup (.html or .json)');
         return;
       }
 
-      if (parsed?.wif_encrypted) {
+      if (!parsed) {
+        setImportError('File does not contain a valid recovery key');
+        return;
+      }
+
+      if (parsed.wif_encrypted) {
         // Encrypted backup: show inline passphrase prompt
         setEncryptedImportData({ wif_encrypted: parsed.wif_encrypted, name: parsed.name });
         setEncryptedImportPassphrase('');
@@ -583,7 +605,7 @@ export function IdentityChip(): React.JSX.Element | null {
         return;
       }
 
-      if (parsed?.wif) {
+      if (parsed.wif) {
         await doImport(parsed.wif, parsed.name);
         return;
       }
@@ -1068,12 +1090,12 @@ export function IdentityChip(): React.JSX.Element | null {
                     {importMode === 'file' ? (
                       <>
                         <p className="text-[11px] text-zinc-500 leading-relaxed">
-                          Select the <span className="font-mono text-zinc-400">.json</span> file you downloaded when you backed up your identity.
+                          Select the <span className="font-mono text-zinc-400">.html</span> file you downloaded when you backed up your identity.
                         </p>
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept=".json,application/json"
+                          accept=".html,.json,text/html,application/json"
                           onChange={handleImportFile}
                           className="hidden"
                         />
