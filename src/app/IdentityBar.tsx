@@ -17,6 +17,18 @@ function maskWif(wif: string): string {
   return `\u2022\u2022\u2022\u2022\u2022\u2022${wif.slice(-4)}`;
 }
 
+/** Read the hint from the encrypted store without decrypting the WIF. */
+function getStoredHint(): string | undefined {
+  try {
+    const raw = localStorage.getItem('bfn_keypair_enc');
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { hint?: string };
+    return parsed.hint || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Download a BackupData object as a self-contained HTML recovery file. */
 function downloadBackup(data: BackupData, filename: string): void {
   const html = generateBackupHtml(data);
@@ -331,6 +343,7 @@ export function IdentityChip(): React.JSX.Element | null {
       address: identity.address,
       wif: identity.wif,
       createdAt: new Date().toISOString(),
+      hint: getStoredHint(),
     }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
     if (!backedUp) {
       localStorage.setItem(BACKED_UP_KEY, '1');
@@ -357,6 +370,7 @@ export function IdentityChip(): React.JSX.Element | null {
         wif_encrypted: encrypted,
         createdAt: new Date().toISOString(),
         note: 'Use your passphrase to restore.',
+        hint: getStoredHint(),
       }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
       if (!backedUp) {
         localStorage.setItem(BACKED_UP_KEY, '1');
@@ -484,6 +498,7 @@ export function IdentityChip(): React.JSX.Element | null {
             wif_encrypted: encBackup,
             createdAt: new Date().toISOString(),
             note: 'Previous identity saved before switching.',
+            hint: getStoredHint(),
           }, `bsvibes-${identity.name}-${date}.html`);
         } else {
           // Fallback: grace window was active so passphrase was not re-entered — use plaintext
@@ -494,6 +509,7 @@ export function IdentityChip(): React.JSX.Element | null {
             wif: identity.wif,
             createdAt: new Date().toISOString(),
             note: 'Previous identity saved before switching.',
+            hint: getStoredHint(),
           }, `bsvibes-${identity.name}-${date}.html`);
         }
         // Show confirmation before proceeding (both paths)
@@ -511,6 +527,7 @@ export function IdentityChip(): React.JSX.Element | null {
           wif: identity.wif,
           createdAt: new Date().toISOString(),
           note: 'Previous identity saved before switching.',
+          hint: getStoredHint(),
         }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
       }
 
