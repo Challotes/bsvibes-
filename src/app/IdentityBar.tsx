@@ -471,13 +471,15 @@ export function IdentityChip(): React.JSX.Element | null {
     setImporting(true);
     setImportError('');
     try {
-      // Change 5: if protected, auto-download encrypted backup first
+      // Change 5: if protected, auto-download backup first (encrypted if passphrase available,
+      // plaintext fallback if within the re-auth grace window where passphrase was not re-entered)
       if (isProtected && identity) {
         const passForBackup = reAuthPassphraseRef.current;
         reAuthPassphraseRef.current = ''; // clear after use
+        const date = new Date().toISOString().slice(0, 10);
         if (passForBackup) {
+          // Preferred path: encrypted backup using the re-auth passphrase
           const encBackup = await encryptWif(identity.wif, passForBackup);
-          const date = new Date().toISOString().slice(0, 10);
           downloadBackup({
             name: identity.name,
             address: identity.address,
@@ -485,12 +487,22 @@ export function IdentityChip(): React.JSX.Element | null {
             createdAt: new Date().toISOString(),
             note: 'Automatic encrypted backup saved before importing a different identity.',
           }, `bsvibes-${identity.name}-${date}-backup.html`);
-          // Show confirmation before proceeding
-          setPendingRestoreWif(wif);
-          setPendingRestoreName(name);
-          setImporting(false);
-          return;
+        } else {
+          // Fallback: grace window was active so passphrase was not re-entered — use plaintext backup
+          // so the user still has a recovery file before their identity is replaced.
+          downloadBackup({
+            name: identity.name,
+            address: identity.address,
+            wif: identity.wif,
+            createdAt: new Date().toISOString(),
+            note: 'Automatic backup saved before importing a different identity. Store this file securely.',
+          }, `bsvibes-${identity.name}-${date}-backup.html`);
         }
+        // Show confirmation before proceeding (both paths)
+        setPendingRestoreWif(wif);
+        setPendingRestoreName(name);
+        setImporting(false);
+        return;
       }
 
       // Change 4: unprotected plaintext auto-backup

@@ -255,6 +255,26 @@ export function generateBackupHtml(data: BackupData): string {
     '    }\n' +
     "    .offline-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }\n" +
     '    .badge-wrap { display: flex; justify-content: center; }\n' +
+    '    .privacy-banner {\n' +
+    '      background: #0d1f1a; border: 1px solid #1a4731; border-radius: 10px;\n' +
+    '      padding: 13px 16px; margin-bottom: 16px;\n' +
+    '      display: flex; align-items: flex-start; gap: 11px;\n' +
+    '    }\n' +
+    '    .privacy-banner-icon {\n' +
+    '      flex-shrink: 0; width: 32px; height: 32px;\n' +
+    '      background: #14532d; border-radius: 8px;\n' +
+    '      display: flex; align-items: center; justify-content: center;\n' +
+    '      margin-top: 1px;\n' +
+    '    }\n' +
+    '    .privacy-banner-icon svg { width: 16px; height: 16px; }\n' +
+    '    .privacy-banner-body { flex: 1; }\n' +
+    '    .privacy-banner-title {\n' +
+    '      font-size: 13px; font-weight: 600; color: #4ade80;\n' +
+    '      margin-bottom: 3px; letter-spacing: 0.01em;\n' +
+    '    }\n' +
+    '    .privacy-banner-desc {\n' +
+    '      font-size: 12px; color: #86efac; line-height: 1.5; opacity: 0.8;\n' +
+    '    }\n' +
     '    .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 24px; margin-bottom: 14px; }\n' +
     '    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; }\n' +
     '    .meta-label { color: #71717a; }\n' +
@@ -320,6 +340,19 @@ export function generateBackupHtml(data: BackupData): string {
     '    <h1>Recovery File</h1>\n' +
     '    <p class="subtitle">This file contains your encrypted identity.<br>Keep it somewhere safe.</p>\n' +
     '    <div class="badge-wrap"><div class="offline-badge">Works offline \u2014 no network calls</div></div>\n' +
+    '\n' +
+    '    <div class="privacy-banner">\n' +
+    '      <div class="privacy-banner-icon">\n' +
+    '        <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n' +
+    '          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>\n' +
+    '          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>\n' +
+    '        </svg>\n' +
+    '      </div>\n' +
+    '      <div class="privacy-banner-body">\n' +
+    '        <div class="privacy-banner-title">Private &amp; Offline</div>\n' +
+    '        <div class="privacy-banner-desc">This page runs entirely on your device. No data is sent anywhere.</div>\n' +
+    '      </div>\n' +
+    '    </div>\n' +
     '\n' +
     '    <div class="card">\n' +
     '      <div class="meta-row">\n' +
