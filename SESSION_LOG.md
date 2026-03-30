@@ -2,6 +2,23 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-30 — Identity Dropdown Full Redesign
+
+Major simplification of identity dropdown:
+- State reduced from 43 to ~24 variables
+- UpgradeModal extracted as separate component (no more inline form push-down)
+- PassphrasePrompt shared component (replaces 4 duplicate passphrase forms)
+- Masked WIF display removed (meaningless to users)
+- Advanced disclosure hides Show/Copy/Paste key
+- Restore simplified to one-button file picker
+- All 6 bugs fixed (B1-B6): plaintext fallback, double encrypt, fragile regex,
+  state persistence, mutual exclusion, download throttle
+- Unified recovery files: always both keys, no more "backup" terminology
+- Self-contained HTML recovery files with embedded BSVibes icon
+- Private & Offline banner in recovery files
+- Passphrase hint in all download paths
+- File naming: bsvibes-{name}-{date}.html
+
 ## 2026-03-30 — Encrypted Backups, Re-Auth, Hints, Recovery Tool
 
 Security hardening (8 changes):

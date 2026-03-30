@@ -378,8 +378,9 @@ export function generateBackupHtml(data: BackupData): string {
     '  </div>\n' +
     '\n' +
     '  <script>\n' +
-    '    // Embedded recovery data — do not edit\n' +
+    '    // @BACKUP_DATA_START\n' +
     '    const BACKUP_DATA = ' + dataJson + ';\n' +
+    '    // @BACKUP_DATA_END\n' +
     '\n' +
     "    function esc(str) {\n" +
     "      return String(str)\n" +
