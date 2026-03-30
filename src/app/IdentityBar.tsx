@@ -331,7 +331,7 @@ export function IdentityChip(): React.JSX.Element | null {
       address: identity.address,
       wif: identity.wif,
       createdAt: new Date().toISOString(),
-    }, `bsvibes-${identity.name}-recovery-key.html`);
+    }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
     if (!backedUp) {
       localStorage.setItem(BACKED_UP_KEY, '1');
       setBackedUp(true);
@@ -356,8 +356,8 @@ export function IdentityChip(): React.JSX.Element | null {
         address: identity.address,
         wif_encrypted: encrypted,
         createdAt: new Date().toISOString(),
-        note: 'Encrypted recovery key. Use your passphrase to restore.',
-      }, `bsvibes-${identity.name}-${date}.html`);
+        note: 'Use your passphrase to restore.',
+      }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
       if (!backedUp) {
         localStorage.setItem(BACKED_UP_KEY, '1');
         setBackedUp(true);
@@ -417,16 +417,14 @@ export function IdentityChip(): React.JSX.Element | null {
         address: newIdentity.address,
         wif_encrypted: await encryptWif(newIdentity.wif, passphrase), // Change 2
         createdAt: new Date().toISOString(),
-        note: 'Encrypted recovery key. Use your passphrase to restore.',
+        note: 'Use your passphrase to restore.',
       };
       if (hint.trim()) {
         backupPayload.hint = hint.trim();
       }
-      if (result.fundTransfer.error) {
-        // Change 3: encrypt the old WIF in the backup too
-        backupPayload.oldWif_encrypted = await encryptWif(identity.wif, passphrase);
-      }
-      downloadBackup(backupPayload, `bsvibes-${newIdentity.name}-${date}.html`);
+      // Always include the old WIF (encrypted) so users can recover either key from one file
+      backupPayload.oldWif_encrypted = await encryptWif(identity.wif, passphrase);
+      downloadBackup(backupPayload, `bsvibes-${newIdentity.name}-${new Date().toISOString().slice(0, 10)}.html`);
 
       // Update context
       updateIdentity(newIdentity);
@@ -436,7 +434,7 @@ export function IdentityChip(): React.JSX.Element | null {
         const sats = result.fundTransfer.transferredSats.toLocaleString();
         setTransferStatus(`Transferred ${sats} sats to your new address (${newIdentity.address.slice(0, 8)}…${newIdentity.address.slice(-6)}).`);
       } else if (result.fundTransfer.error) {
-        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your previous recovery key is saved (encrypted) in the backup file.`);
+        setTransferStatus(`Note: fund transfer failed — ${result.fundTransfer.error}. Your previous recovery key is saved (encrypted) in the recovery file.`);
       }
 
       setBackupConfirmed(true);
@@ -485,18 +483,18 @@ export function IdentityChip(): React.JSX.Element | null {
             address: identity.address,
             wif_encrypted: encBackup,
             createdAt: new Date().toISOString(),
-            note: 'Automatic encrypted backup saved before importing a different identity.',
-          }, `bsvibes-${identity.name}-${date}-backup.html`);
+            note: 'Previous identity saved before switching.',
+          }, `bsvibes-${identity.name}-${date}.html`);
         } else {
-          // Fallback: grace window was active so passphrase was not re-entered — use plaintext backup
+          // Fallback: grace window was active so passphrase was not re-entered — use plaintext
           // so the user still has a recovery file before their identity is replaced.
           downloadBackup({
             name: identity.name,
             address: identity.address,
             wif: identity.wif,
             createdAt: new Date().toISOString(),
-            note: 'Automatic backup saved before importing a different identity. Store this file securely.',
-          }, `bsvibes-${identity.name}-${date}-backup.html`);
+            note: 'Previous identity saved before switching.',
+          }, `bsvibes-${identity.name}-${date}.html`);
         }
         // Show confirmation before proceeding (both paths)
         setPendingRestoreWif(wif);
@@ -505,15 +503,15 @@ export function IdentityChip(): React.JSX.Element | null {
         return;
       }
 
-      // Change 4: unprotected plaintext auto-backup
+      // Change 4: unprotected plaintext auto-save before import
       if (!isProtected && identity) {
         downloadBackup({
           name: identity.name,
           address: identity.address,
           wif: identity.wif,
           createdAt: new Date().toISOString(),
-          note: 'Automatic backup saved before importing a different identity.',
-        }, `bsvibes-${identity.name}-recovery-key.html`);
+          note: 'Previous identity saved before switching.',
+        }, `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`);
       }
 
       await performImport(wif, name);
@@ -584,11 +582,11 @@ export function IdentityChip(): React.JSX.Element | null {
           try {
             parsed = JSON.parse(match[1]);
           } catch {
-            setImportError('Could not read HTML backup — file may be corrupted');
+            setImportError('Could not read this recovery file — it may be corrupted');
             return;
           }
         } else {
-          setImportError('Could not find backup data in this HTML file');
+          setImportError('Could not find recovery data in this HTML file');
           return;
         }
       } else if (trimmed.startsWith('{')) {
@@ -596,11 +594,11 @@ export function IdentityChip(): React.JSX.Element | null {
         try {
           parsed = JSON.parse(trimmed);
         } catch {
-          setImportError('Could not read file — make sure it is a BSVibes backup (.html or .json)');
+          setImportError('Could not read file — make sure it is a BSVibes recovery file (.html or .json)');
           return;
         }
       } else {
-        setImportError('Could not read file — make sure it is a BSVibes backup (.html or .json)');
+        setImportError('Could not read file — make sure it is a BSVibes recovery file (.html or .json)');
         return;
       }
 
@@ -959,7 +957,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 {/* Change 6: inline encrypted save form for protected users */}
                 {showSaveEncrypt && isProtected && (
                   <div className="space-y-2 pt-1 border-t border-zinc-700/60">
-                    <p className="text-[11px] text-zinc-400">Enter your passphrase to save an encrypted backup.</p>
+                    <p className="text-[11px] text-zinc-400">Enter your passphrase to save an encrypted recovery file.</p>
                     <input
                       type="password"
                       placeholder="Passphrase"
@@ -990,7 +988,7 @@ export function IdentityChip(): React.JSX.Element | null {
 
                 <p className="text-[10px] text-zinc-600 leading-relaxed">
                   {isProtected
-                    ? 'Your backup will be encrypted with your passphrase.'
+                    ? 'Your recovery file will be encrypted with your passphrase.'
                     : 'Save your recovery key to restore access from any device.'}
                 </p>
               </div>
@@ -1031,7 +1029,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 {/* Change 5: protected restore confirmation */}
                 {pendingRestoreWif !== null ? (
                   <div className="space-y-2 bg-zinc-800/40 rounded-lg p-2.5 border border-zinc-700/60">
-                    <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">Your encrypted backup has been saved.</p>
+                    <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">Your recovery file has been saved.</p>
                     <p className="text-[11px] text-zinc-500 leading-relaxed">Continue with restore? This will replace your current identity.</p>
                     <div className="flex gap-2">
                       <button
@@ -1053,11 +1051,11 @@ export function IdentityChip(): React.JSX.Element | null {
                   /* Change 7: encrypted file passphrase prompt */
                   <div className="space-y-2">
                     <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      This backup is encrypted. Enter the passphrase you used when creating it.
+                      This recovery file is encrypted. Enter the passphrase you used when creating it.
                     </p>
                     <input
                       type="password"
-                      placeholder="Passphrase for this backup"
+                      placeholder="Passphrase for this file"
                       value={encryptedImportPassphrase}
                       autoFocus
                       onChange={(e) => { setEncryptedImportPassphrase(e.target.value); setEncryptedImportError(''); }}
@@ -1089,7 +1087,7 @@ export function IdentityChip(): React.JSX.Element | null {
                         onClick={() => { setImportMode('file'); setImportError(''); }}
                         className={`flex-1 py-1.5 font-medium transition-colors ${importMode === 'file' ? 'bg-zinc-700 text-white' : 'bg-transparent text-zinc-500 hover:text-zinc-300'}`}
                       >
-                        Backup file
+                        Recovery file
                       </button>
                       <button
                         onClick={() => { setImportMode('wif'); setImportError(''); }}
@@ -1102,7 +1100,7 @@ export function IdentityChip(): React.JSX.Element | null {
                     {importMode === 'file' ? (
                       <>
                         <p className="text-[11px] text-zinc-500 leading-relaxed">
-                          Select the <span className="font-mono text-zinc-400">.html</span> file you downloaded when you backed up your identity.
+                          Select the <span className="font-mono text-zinc-400">.html</span> recovery file you saved.
                         </p>
                         <input
                           ref={fileInputRef}
@@ -1116,7 +1114,7 @@ export function IdentityChip(): React.JSX.Element | null {
                           disabled={importing}
                           className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {importing ? 'Restoring...' : 'Choose backup file'}
+                          {importing ? 'Restoring...' : 'Choose recovery file'}
                         </button>
                       </>
                     ) : (

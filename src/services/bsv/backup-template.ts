@@ -1,6 +1,6 @@
 /**
  * backup-template.ts
- * Generates a self-contained HTML recovery file for BSVibes identity backups.
+ * Generates a self-contained HTML recovery file for BSVibes identities.
  * The generated file works entirely offline — no network calls, no external scripts.
  */
 
@@ -49,7 +49,7 @@ function escapeHtmlAttr(str: string): string {
  * Embed it in a Blob and download as `.html`.
  *
  * Behaviour:
- *  - If `wif` is present → WIF is displayed immediately on page load (unprotected backup).
+ *  - If `wif` is present → WIF is displayed immediately on page load (unprotected).
  *  - If `wif_encrypted` is present → passphrase input + PBKDF2/AES-GCM decrypt flow.
  */
 export function generateBackupHtml(data: BackupData): string {
@@ -65,7 +65,7 @@ export function generateBackupHtml(data: BackupData): string {
   // --- Conditional HTML section (body content) ---
   const bodySection = isPlaintext
     ? [
-        '    <!-- Plaintext backup: WIF shown immediately -->',
+        '    <!-- Plaintext recovery: WIF shown immediately -->',
         '    <div class="card" id="plaintext-section">',
         '      <div class="wif-block">',
         '        <div class="wif-label">Your Key (WIF)</div>',
@@ -73,13 +73,13 @@ export function generateBackupHtml(data: BackupData): string {
         '        <button class="copy-btn" id="copy-wif-btn" onclick="copyWif()">Copy</button>',
         '      </div>',
         '      <p style="font-size:11px;color:#71717a;margin-top:10px;line-height:1.5;">',
-        '        This backup is not encrypted. Anyone with this file can access your identity.',
-        '        Consider using a passphrase-protected backup in future.',
+        '        This recovery file is not encrypted. Anyone with this file can access your identity.',
+        '        Consider using a passphrase-protected recovery file in future.',
         '      </p>',
         '    </div>',
       ].join('\n')
     : [
-        '    <!-- Encrypted backup: passphrase required -->',
+        '    <!-- Encrypted recovery file: passphrase required -->',
         '    <div class="card" id="decrypt-section">',
         data.hint ? '      <div class="hint-box"><strong>Memory clue:</strong> <span id="hint-text"></span></div>' : '',
         '      <label for="passphrase-input">Enter your passphrase to reveal your key</label>',
@@ -119,7 +119,7 @@ export function generateBackupHtml(data: BackupData): string {
   // --- Conditional JS section ---
   const jsSection = isPlaintext
     ? [
-        "    // Plaintext: show WIF immediately",
+        "    // Plaintext recovery: show WIF immediately",
         "    document.getElementById('wif-display').textContent = BACKUP_DATA.wif || '';",
         "    function copyWif() {",
         "      const btn = document.getElementById('copy-wif-btn');",
@@ -378,7 +378,7 @@ export function generateBackupHtml(data: BackupData): string {
     '  </div>\n' +
     '\n' +
     '  <script>\n' +
-    '    // Embedded backup data — do not edit\n' +
+    '    // Embedded recovery data — do not edit\n' +
     '    const BACKUP_DATA = ' + dataJson + ';\n' +
     '\n' +
     "    function esc(str) {\n" +
