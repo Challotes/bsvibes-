@@ -424,20 +424,24 @@ export function IdentityChip(): React.JSX.Element | null {
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
+      // Don't close the dropdown if the upgrade modal is open — the modal renders
+      // outside dropdownRef so every click inside it would otherwise trigger this.
+      if (showUpgradeModal) return;
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         closeDropdown();
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
+  }, [open, showUpgradeModal]);
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function closeDropdown() {
     setOpen(false);
     // B4 fix: clear all transient form state when dropdown closes
-    setShowUpgradeModal(false);
+    // Note: do NOT clear showUpgradeModal here — the modal renders outside the
+    // dropdown ref and manages its own lifecycle via its onClose prop.
     setShowSavePassphrase(false);
     setSaveError('');
     setReAuthAction(null);
