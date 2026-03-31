@@ -655,6 +655,22 @@ export function IdentityChip(): React.JSX.Element | null {
       .catch(() => setEarnedSats(0));
   }, [identity?.address, open]);
 
+  // Background earnings poll (30s) — drives the chip flash for real earnings only
+  useEffect(() => {
+    if (!identity?.address) return;
+    const poll = () => {
+      fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}&summary=1`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (typeof data.totalEarned === 'number') setEarnedSats(data.totalEarned);
+        })
+        .catch(() => {});
+    };
+    const interval = setInterval(poll, 30_000);
+    poll(); // initial fetch
+    return () => clearInterval(interval);
+  }, [identity?.address]);
+
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
@@ -1419,7 +1435,7 @@ export function IdentityChip(): React.JSX.Element | null {
           <span className={`w-2 h-2 rounded-full ${isProtected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           <span className="text-zinc-300">{identity.name}</span>
           {balanceSats !== null && balanceSats > 0 && (
-            <AnimatedBalance sats={balanceSats} bsvPrice={bsvPrice} isGoat={isGoat} className="text-[10px]" />
+            <AnimatedBalance sats={balanceSats} bsvPrice={bsvPrice} isGoat={isGoat} className="text-[10px]" flashTrigger={earnedSats ?? 0} />
           )}
           {showWarningDot && (
             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">

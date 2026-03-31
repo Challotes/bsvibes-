@@ -2,6 +2,18 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-31 — Spent Persistence + Earnings Notifications
+
+Fixed two bugs and added earnings flash:
+- Persisted `_spent` Set to localStorage — survives page refresh, prevents double-spend
+  errors from stale WoC UTXO data (was causing DOUBLE_SPEND_ATTEMPTED after refresh)
+- Fixed false 24k earnings notification: AnimatedBalance was firing on any balance change
+  (consolidation, deposits). Now uses `flashTrigger` prop driven by real earnings only.
+- Added `/api/earnings?summary=1` fast path (returns just totalEarned, no joins)
+- Background 30s poll for earnedSats — chip flashes "+X sats · Agentic fairness" only
+  when real boot payouts arrive, not for balance changes
+- Skips flash on initial page load to avoid false notification
+
 ## 2026-03-31 — Auto-Consolidation for Fragmented Wallets
 
 Built and shipped auto-consolidation:

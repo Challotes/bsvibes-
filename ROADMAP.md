@@ -157,6 +157,8 @@
 - [x] UTXO consolidation: smallest-first selection, up to 20 inputs per boot, gradual defrag
 - [x] Explicit fee model: SatoshisPerKilobyte(100) — no GorillaPool round-trip, ARC-compatible
 - [x] Auto-consolidation for heavily fragmented wallets (WoC broadcaster at 10 sat/kb)
+- [x] Spent UTXO persistence (localStorage) — prevents double-spend after page refresh
+- [x] Earnings-only notification: chip flashes for real payouts, not balance changes (30s poll)
 
 ## Phase 6.5: UX Polish — PLANNED
 

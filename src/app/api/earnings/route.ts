@@ -90,6 +90,14 @@ export async function GET(request: Request) {
   const allAddresses = resolveAllAddresses(address);
   const placeholders = allAddresses.map(() => '?').join(', ');
 
+  // Fast path: ?summary=1 returns only totalEarned (used by background poll)
+  if (searchParams.get('summary') === '1') {
+    const total = db.prepare(
+      `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`
+    ).get(...allAddresses) as { total: number };
+    return Response.json({ totalEarned: total.total });
+  }
+
   // Sum all payouts across the full address chain
   const total = db.prepare(
     `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`

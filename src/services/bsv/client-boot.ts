@@ -79,8 +79,29 @@ function acquireTxMutex(): Promise<() => void> {
 
 // ── Spent tracking & 0-conf chaining ───────────────────────
 
-/** UTXOs consumed as inputs — blacklist for stale WoC data */
-const _spent = new Set<string>();
+/** UTXOs consumed as inputs — blacklist for stale WoC data.
+ *  Persisted to localStorage so it survives page refreshes. */
+const SPENT_STORAGE_KEY = 'bsvibes_spent_utxos';
+
+function loadSpentSet(): Set<string> {
+  try {
+    const stored = localStorage.getItem(SPENT_STORAGE_KEY);
+    return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSpentSet(spent: Set<string>): void {
+  try {
+    // Keep only the most recent entries to avoid unbounded growth
+    const arr = Array.from(spent);
+    const trimmed = arr.length > 500 ? arr.slice(-500) : arr;
+    localStorage.setItem(SPENT_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch { /* localStorage unavailable — silent fail */ }
+}
+
+let _spent = loadSpentSet();
 
 /** Change outputs from recent broadcasts, immediately spendable */
 const _pendingChange: ClientUtxo[] = [];
@@ -121,11 +142,14 @@ async function fetchUtxos(address: string, neededSats?: number): Promise<ClientU
 
   // Clean up spent set: if WoC no longer returns a spent UTXO, it's confirmed spent
   const wocKeys = new Set(wocUtxos.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+  let spentChanged = false;
   for (const spentKey of _spent) {
     if (!wocKeys.has(spentKey)) {
       _spent.delete(spentKey);
+      spentChanged = true;
     }
   }
+  if (spentChanged) saveSpentSet(_spent);
 
   // Merge pending change + filtered WoC, sort largest first
   const all: ClientUtxo[] = [..._pendingChange, ...filtered];
@@ -460,12 +484,14 @@ async function _clientSideBootInner(
 
           // Cap queues to avoid unbounded growth
           while (_pendingChange.length > 50) _pendingChange.shift();
-          while (_spent.size > 200) {
+          while (_spent.size > 500) {
             const first = _spent.values().next().value;
             if (first) _spent.delete(first);
           }
         }
       }
+
+      saveSpentSet(_spent);
 
       return { status: 'success', txid };
     }
@@ -602,6 +628,7 @@ export async function consolidateUtxos(
         if (first) _spent.delete(first);
       }
 
+      saveSpentSet(_spent);
       return { status: 'success', txid };
     }
 
