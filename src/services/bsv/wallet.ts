@@ -312,6 +312,25 @@ async function _buildAndBroadcastInner(
       return { status: 'success', txid };
     }
 
+    // Self-heal on double-spend: blacklist the competing tx's inputs and retry once
+    const dsResult = broadcastResult as { code?: string; more?: { competingTxs?: string[] } };
+    if (dsResult.code === 'DOUBLE_SPEND_ATTEMPTED' && dsResult.more?.competingTxs?.length) {
+      console.warn('BSVibes wallet: double-spend detected, blacklisting competing UTXOs and retrying');
+      for (const competingTxid of dsResult.more.competingTxs) {
+        try {
+          const txRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${competingTxid}`);
+          if (txRes.ok) {
+            const txData = await txRes.json() as { vin?: Array<{ txid: string; vout: number }> };
+            for (const input of txData.vin ?? []) {
+              _spent.add(utxoKey(input.txid, input.vout));
+            }
+          }
+        } catch { /* best effort */ }
+      }
+      releaseUtxos(utxos);
+      return _buildAndBroadcastInner(key, outputs);
+    }
+
     releaseUtxos(utxos);
     console.error('BSVibes: broadcast failed', broadcastResult);
     return { status: 'broadcast_failed', error: String(broadcastResult) };

@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-31 — Server Double-Spend Self-Healing + TimeAgo Fix
+
+Two fixes:
+- Server wallet now self-heals on DOUBLE_SPEND_ATTEMPTED: fetches competing tx
+  from WoC, blacklists its inputs in _spent, retries automatically. No more
+  stuck server wallet after dev server restart.
+- TimeAgo timestamps refresh every 60s without page reload (tick counter in PostList)
+
 ## 2026-03-31 — Spent Persistence + Earnings Notifications
 
 Fixed two bugs and added earnings flash:

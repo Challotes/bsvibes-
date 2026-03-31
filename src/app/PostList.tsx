@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
@@ -200,6 +200,13 @@ export function PostList({
   bootPrice,
   freeBootsRemaining,
 }: PostListProps) {
+  // Re-render every 60s to keep timeAgo labels fresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
       <div ref={genesisRef} />
