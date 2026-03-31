@@ -314,7 +314,7 @@ async function autoTransferFunds(
       change: true,
     });
 
-    await tx.fee(new SatoshisPerKilobyte(50));
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);

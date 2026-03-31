@@ -2,14 +2,25 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-31 — Fee Rate Tuning + Broadcast Strategy
+
+Investigated ARC "fee too low" errors after UTXO consolidation changes:
+- 500 sat/kb was 5x the real rate but 50 sat/kb produced 57 sats — ARC wanted 112
+- ARC's actual minimum is ~100 sat/kb, settled on SatoshisPerKilobyte(100) across all 3 tx builders
+- Researched WoC vs ARC broadcasting: ARC is better for user-facing txs (direct to miner, 0-conf reliable)
+- WoC at 1-10 sat/kb is ideal for consolidation-only (Phase 2) — 100x cheaper for large inputs
+- Ran full scenario analysis: healthy wallets, moderate/heavy/extreme fragmentation, dust hell, mixed
+- Posts and boots confirmed working: all latest posts ON-CHAIN, paid boots broadcasting successfully
+- Cursor browser (304 tiny UTXOs) still needs auto-consolidation — queued for Phase 2
+
 ## 2026-03-30 — UTXO Fragmentation Fix
 
 Resolved the "fee too low" failure hitting users with many tiny payout UTXOs:
 - Replaced simple largest-first UTXO selection with smallest-first opportunistic consolidation
 - Each boot now consumes up to 20 tiny UTXOs at once; user with 290 UTXOs consolidates fully in ~15 boots
-- Added `estimateFee()` helper (0.5 sat/byte, 200 sat floor) so fee budget is accurate before UTXO selection
-- Replaced `tx.fee()` default (LivePolicy, requires GorillaPool round-trip) with `SatoshisPerKilobyte(500)` in both `client-boot.ts` and `wallet.ts` — faster, deterministic, no external dependency
-- Also applied the explicit fee model to server wallet for consistency
+- Added `estimateFee()` helper (0.1 sat/byte, 100 sat floor) so fee budget is accurate before UTXO selection
+- Replaced `tx.fee()` default (LivePolicy, requires GorillaPool round-trip) with explicit SatoshisPerKilobyte
+- Also applied the explicit fee model to server wallet and identity.ts for consistency
 
 ## 2026-03-30 — Identity Card Redesign + Error Logging
 

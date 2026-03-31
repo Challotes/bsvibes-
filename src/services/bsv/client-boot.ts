@@ -172,9 +172,9 @@ function validateShares(shares: BootShare[], bootPriceSats: number): string | nu
 /**
  * Maximum inputs per boot transaction.
  *
- * Each P2PKH input is ~148 bytes. At 0.05 sat/byte (50 sat/kb):
- *   20 inputs  = ~2,960 bytes = ~148 sats fee — easily covered by boot price
- *   50 inputs  = ~7,400 bytes = ~370 sats fee — well within boot price floor
+ * Each P2PKH input is ~148 bytes. At 0.1 sat/byte (100 sat/kb):
+ *   20 inputs  = ~2,960 bytes = ~296 sats fee — easily covered by boot price
+ *   50 inputs  = ~7,400 bytes = ~740 sats fee — within boot price floor
  *
  * Capping at 20 keeps the fee well under 1,500 sats on any realistic BSV fee rate.
  * Users with >20 UTXOs consolidate at a rate of ~20 per boot (change output merges them).
@@ -185,11 +185,11 @@ const MAX_CONSOLIDATION_INPUTS = 20;
 /**
  * Estimate the fee for a transaction with N inputs and M outputs (P2PKH).
  * Byte formula: 10 (overhead) + 148 * inputs + 34 * outputs + 80 (OP_RETURN est.)
- * Rate: 0.05 sat/byte (50 sat/kb) with a 50 sat floor to ensure ARC acceptance.
+ * Rate: 0.1 sat/byte (100 sat/kb) to match ARC's minimum policy.
  */
 function estimateFee(inputCount: number, outputCount: number): number {
   const bytes = 10 + 148 * inputCount + 34 * outputCount + 80;
-  return Math.max(50, Math.ceil(bytes * 0.05));
+  return Math.max(100, Math.ceil(bytes * 0.1));
 }
 
 /**
@@ -405,7 +405,7 @@ async function _clientSideBootInner(
     // Use an explicit 50 sat/kb fee model — safely above ARC's minimum (~100 sat/kb
     // policy, but actual acceptance is lower) while being 10x cheaper than 500 sat/kb.
     // At 50 sat/kb a 20-input tx is ~163 sats — negligible relative to boot price.
-    await tx.fee(new SatoshisPerKilobyte(50));
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 sats.

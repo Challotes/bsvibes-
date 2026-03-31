@@ -256,7 +256,7 @@ async function _buildAndBroadcastInner(
 
     // Use an explicit 50 sat/kb fee model — avoids GorillaPool round-trip and ensures
     // ARC acceptance while keeping fees low (10x cheaper than 500 sat/kb).
-    await tx.fee(new SatoshisPerKilobyte(50));
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 satoshis.

@@ -154,6 +154,9 @@
 - [x] Memory clue always visible (no toggle), shown immediately on import + re-auth
 - [x] Single passphrase entry for save (re-auth → save, no double prompt)
 - [x] Error logging for on-chain post failures and wallet broadcast failures
+- [x] UTXO consolidation: smallest-first selection, up to 20 inputs per boot, gradual defrag
+- [x] Explicit fee model: SatoshisPerKilobyte(100) — no GorillaPool round-trip, ARC-compatible
+- [ ] Auto-consolidation for heavily fragmented wallets (WoC broadcaster at 10 sat/kb)
 
 ## Phase 6.5: UX Polish — PLANNED
 
