@@ -2,6 +2,15 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-30 — UTXO Fragmentation Fix
+
+Resolved the "fee too low" failure hitting users with many tiny payout UTXOs:
+- Replaced simple largest-first UTXO selection with smallest-first opportunistic consolidation
+- Each boot now consumes up to 20 tiny UTXOs at once; user with 290 UTXOs consolidates fully in ~15 boots
+- Added `estimateFee()` helper (0.5 sat/byte, 200 sat floor) so fee budget is accurate before UTXO selection
+- Replaced `tx.fee()` default (LivePolicy, requires GorillaPool round-trip) with `SatoshisPerKilobyte(500)` in both `client-boot.ts` and `wallet.ts` — faster, deterministic, no external dependency
+- Also applied the explicit fee model to server wallet for consistency
+
 ## 2026-03-30 — Identity Card Redesign + Error Logging
 
 Major UX overhaul of identity card:

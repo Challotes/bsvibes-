@@ -170,25 +170,77 @@ function validateShares(shares: BootShare[], bootPriceSats: number): string | nu
 // ── UTXO selection ──────────────────────────────────────────
 
 /**
- * Select UTXOs to cover the target amount.
- * Uses a simple largest-first strategy to minimize input count.
+ * Maximum inputs per boot transaction.
+ *
+ * Each P2PKH input is ~148 bytes. At 0.5 sat/byte (conservative):
+ *   20 inputs  = ~2,960 bytes = ~1,480 sats fee — easily covered by boot price
+ *   50 inputs  = ~7,400 bytes = ~3,700 sats fee — approaches boot price floor
+ *
+ * Capping at 20 keeps the fee well under 1,500 sats on any realistic BSV fee rate.
+ * Users with >20 UTXOs consolidate at a rate of ~20 per boot (change output merges them).
+ * A user with 290 UTXOs is fully consolidated after ~15 boots.
+ */
+const MAX_CONSOLIDATION_INPUTS = 20;
+
+/**
+ * Estimate the fee for a transaction with N inputs and M outputs (P2PKH).
+ * Byte formula: 10 (overhead) + 148 * inputs + 34 * outputs + 80 (OP_RETURN est.)
+ * Rate: 0.5 sat/byte with a 200 sat floor to ensure ARC acceptance.
+ */
+function estimateFee(inputCount: number, outputCount: number): number {
+  const bytes = 10 + 148 * inputCount + 34 * outputCount + 80;
+  return Math.max(200, Math.ceil(bytes * 0.5));
+}
+
+/**
+ * Select UTXOs to cover the target amount, opportunistically consolidating extras.
+ *
+ * Strategy:
+ * 1. Sort UTXOs smallest-first so tiny ones get swept up first.
+ * 2. Fill up to MAX_CONSOLIDATION_INPUTS, re-calculating the fee budget each time.
+ * 3. Stop early if we have enough value AND adding another input costs more in fee
+ *    than the UTXO is worth (dust threshold).
+ *
+ * Effect: users with many tiny UTXOs consolidate ~20 per boot for free.
+ * Users with a single large UTXO select just that one (unchanged behaviour).
  */
 function selectUtxos(
   utxos: ClientUtxo[],
-  targetSats: number,
-): { selected: ClientUtxo[]; total: number } | null {
-  // Sort descending by value — fewer inputs = lower fee
-  const sorted = [...utxos].sort((a, b) => b.value - a.value);
+  bootPriceSats: number,
+  outputCount: number,
+): { selected: ClientUtxo[]; total: number; estimatedFee: number } | null {
+  if (utxos.length === 0) return null;
+
+  // Separate large UTXOs (can cover boot alone) from tiny ones
+  // Smallest-first so tiny UTXOs get consumed on each boot
+  const sorted = [...utxos].sort((a, b) => a.value - b.value);
 
   const selected: ClientUtxo[] = [];
   let total = 0;
 
   for (const utxo of sorted) {
+    if (selected.length >= MAX_CONSOLIDATION_INPUTS) break;
+
     selected.push(utxo);
     total += utxo.value;
-    if (total >= targetSats) {
-      return { selected, total };
+
+    const fee = estimateFee(selected.length, outputCount);
+    const needed = bootPriceSats + fee;
+
+    // We have enough. Check if the next UTXO is worth including.
+    // Include it only if it's worth more than the marginal fee cost of one extra input.
+    if (total >= needed) {
+      const nextUtxo = sorted[selected.length]; // next candidate (not yet selected)
+      if (!nextUtxo) break; // no more UTXOs
+      const marginalFee = estimateFee(selected.length + 1, outputCount) - fee;
+      if (nextUtxo.value <= marginalFee) break; // dust — stop here
+      // Otherwise keep going to consolidate it
     }
+  }
+
+  const fee = estimateFee(selected.length, outputCount);
+  if (total >= bootPriceSats + fee) {
+    return { selected, total, estimatedFee: fee };
   }
 
   return null; // Insufficient funds
@@ -243,7 +295,7 @@ async function _clientSideBootInner(
   bootPriceSats: number,
 ): Promise<ClientBootResult> {
   try {
-    const { Transaction, PrivateKey, P2PKH, Script, OP } = await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, Script, OP, SatoshisPerKilobyte } = await getBsvSdk();
 
     // ── Parse private key ───────────────────────────────────
     let privateKey: InstanceType<typeof PrivateKey>;
@@ -254,13 +306,11 @@ async function _clientSideBootInner(
     }
 
     // ── Fetch UTXOs (with spent-filtering + pending change) ─
-    // Estimate fee early so we can check pending change coverage
-    const estimatedInputs = 3; // conservative estimate for pending change check
-    const estimatedFee = Math.max(
-      1,
-      Math.ceil((150 * estimatedInputs + 34 * (shares.length + 2) + 80) / 1000),
-    );
-    const totalNeeded = bootPriceSats + estimatedFee;
+    // Use a conservative worst-case estimate for the pending-change shortcut check:
+    // MAX_CONSOLIDATION_INPUTS inputs, shares.length + 2 outputs (payouts + OP_RETURN + change)
+    const outputCount = shares.length + 2; // contributor outputs + OP_RETURN + change
+    const worstCaseFee = estimateFee(MAX_CONSOLIDATION_INPUTS, outputCount);
+    const totalNeeded = bootPriceSats + worstCaseFee;
 
     const utxos = await fetchUtxos(userAddress, totalNeeded);
 
@@ -271,14 +321,17 @@ async function _clientSideBootInner(
 
     const balance = utxos.reduce((sum, u) => sum + u.value, 0);
 
-    // ── Select UTXOs ────────────────────────────────────────
-    const selection = selectUtxos(utxos, totalNeeded);
+    // ── Select UTXOs (with opportunistic consolidation) ─────
+    // Grabs up to MAX_CONSOLIDATION_INPUTS tiny UTXOs on every boot.
+    // Users with fragmented wallets consolidate ~20 UTXOs per boot for free.
+    const selection = selectUtxos(utxos, bootPriceSats, outputCount);
     if (!selection) {
       console.warn(
-        `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${totalNeeded} sats (price=${bootPriceSats} + fee=${estimatedFee}), address=${userAddress}`,
+        `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${bootPriceSats + worstCaseFee} sats, address=${userAddress}`,
       );
       return { status: 'insufficient_funds', balance };
     }
+    const { estimatedFee } = selection;
 
     // ── Fetch source transactions (parallel) ────────────────
     // For 0-conf chained UTXOs, sourceTransaction is already attached — skip the fetch
@@ -349,7 +402,11 @@ async function _clientSideBootInner(
     });
 
     // ── Fee calculation and signing ─────────────────────────
-    await tx.fee();
+    // Use an explicit 500 sat/kb fee model (5x the real BSV rate of ~100 sat/kb).
+    // This avoids a network round-trip to GorillaPool for the live rate AND ensures
+    // ARC never rejects due to "fee too low" — even if the live rate briefly spikes.
+    // At 500 sat/kb a 20-input tx is ~1,480 sats — well within any boot price.
+    await tx.fee(new SatoshisPerKilobyte(500));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 sats.

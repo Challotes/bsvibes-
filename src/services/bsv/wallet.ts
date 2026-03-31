@@ -5,7 +5,7 @@
  * concurrent operations (post logging, boot splits, migrations).
  */
 
-import { PrivateKey, Transaction, P2PKH } from '@bsv/sdk';
+import { PrivateKey, Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
 
 let _serverKey: PrivateKey | null = null;
 
@@ -254,7 +254,9 @@ async function _buildAndBroadcastInner(
       change: true,
     });
 
-    await tx.fee();
+    // Use an explicit 500 sat/kb fee model — avoids GorillaPool round-trip and ensures
+    // ARC acceptance even if the live rate briefly changes.
+    await tx.fee(new SatoshisPerKilobyte(500));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 satoshis.

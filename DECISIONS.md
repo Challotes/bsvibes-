@@ -164,6 +164,14 @@
 | 5 | JSON.parse without try/catch | Medium | FIXED (2026-03-25) — returns null on parse failure |
 | 6 | Database file in project root | Low | TODO |
 
+## UTXO Management (settled)
+
+- **Fee model:** Always pass `new SatoshisPerKilobyte(500)` explicitly to `tx.fee()` in both client-boot and server wallet. Never rely on the default `LivePolicy` (requires a GorillaPool network round-trip and uses ~100 sat/kb which can cause ARC rejection on high-input txs). 500 sat/kb is 5x the real BSV rate — deterministic, fast, and always accepted.
+- **Consolidation strategy (Option F — "sweep on boot"):** `selectUtxos()` uses smallest-first ordering and includes up to 20 inputs per boot transaction. Users with many tiny UTXOs consolidate ~20 per boot for free via the change output. 290 UTXOs → fully consolidated in ~15 boots. Cost per consolidation: marginal extra tx bytes, no separate consolidation transaction needed.
+- **No server custody:** Options A/C/D (server consolidation, held payouts, threshold batching) were all rejected — they require server custody or break the trustless model.
+- **Dust threshold:** During UTXO selection, once boot + fee is covered, additional inputs are only included if their value exceeds the marginal fee cost of adding one more input (~74 sats). Absolute dust is never swept.
+- **MAX_CONSOLIDATION_INPUTS = 20:** 20 P2PKH inputs ≈ 2,960 bytes ≈ 1,480 sats at 500 sat/kb. Stays well under any boot price floor (1,000 sats minimum). Tunable constant in `client-boot.ts`.
+
 ## Wallet Integration (future)
 
 - Yours Wallet integration via `@1sat/connect` for power users

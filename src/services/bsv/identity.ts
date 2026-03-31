@@ -286,7 +286,7 @@ async function autoTransferFunds(
 
     console.log(`[BSVibes] autoTransferFunds: spending ${utxos.length} inputs, total ${totalSats} sats`);
 
-    const { Transaction, PrivateKey, P2PKH } = await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte } = await getBsvSdk();
     const oldKey = PrivateKey.fromWif(oldWif);
 
     // Fetch source tx hexes in batches to respect WoC rate limit
@@ -314,7 +314,7 @@ async function autoTransferFunds(
       change: true,
     });
 
-    await tx.fee();
+    await tx.fee(new SatoshisPerKilobyte(500));
     await tx.sign();
 
     console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);
