@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
 import { bootPost } from './actions';
-import { clientSideBoot } from '@/services/bsv/client-boot';
+import { clientSideBoot, consolidateUtxos } from '@/services/bsv/client-boot';
 import { useIdentityContext } from '@/contexts/IdentityContext';
 import { Genesis } from './Genesis';
 import { timeAgo } from '@/lib/utils';
@@ -23,6 +23,7 @@ interface BootButtonProps {
 function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded, onFreeBootUsed }: BootButtonProps) {
   const { identity } = useIdentityContext();
   const [isBooting, setIsBooting] = useState(false);
+  const [bootPhase, setBootPhase] = useState<'idle' | 'preparing' | 'booting'>('idle');
   const [optimisticBoots, setOptimisticBoots] = useState(0);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
         onFreeBootUsed?.();
 
         // Paid boot — client builds trustless tx.
+        setBootPhase('booting');
         const sharesRes = await fetch(`/api/boot-shares?postId=${postId}&pubkey=${encodeURIComponent(identity.address)}`);
         if (!sharesRes.ok) {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));
@@ -67,13 +69,33 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
         }
         const sharesData = await sharesRes.json();
 
-        const bootResult = await clientSideBoot(
+        let bootResult = await clientSideBoot(
           identity.wif,
           identity.address,
           postId,
           sharesData.shares,
           sharesData.bootPrice,
         );
+
+        // Wallet too fragmented — consolidate first, then retry boot
+        if (bootResult.status === 'needs_consolidation') {
+          setBootPhase('preparing');
+          const consolidateResult = await consolidateUtxos(identity.wif, identity.address);
+          if (consolidateResult.status !== 'success') {
+            console.error('[BootButton] consolidation failed:', consolidateResult.error);
+            setOptimisticBoots((prev) => Math.max(0, prev - 1));
+            return;
+          }
+          // Retry boot with consolidated UTXO (0-conf chained)
+          setBootPhase('booting');
+          bootResult = await clientSideBoot(
+            identity.wif,
+            identity.address,
+            postId,
+            sharesData.shares,
+            sharesData.bootPrice,
+          );
+        }
 
         if (bootResult.status === 'insufficient_funds') {
           setOptimisticBoots((prev) => Math.max(0, prev - 1));
@@ -104,6 +126,7 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
       onBooted?.();
     } finally {
       setIsBooting(false);
+      setBootPhase('idle');
     }
   }
 
@@ -128,12 +151,18 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
         }`}
         title={title}
       >
-        <BootIcon size={13} className={displayCount > 0 ? 'text-amber-500' : ''} />
+        {bootPhase === 'preparing' ? (
+          <span className="text-[9px] text-amber-400 px-1">Preparing...</span>
+        ) : bootPhase === 'booting' ? (
+          <span className="text-[9px] text-amber-400 px-1">Booting...</span>
+        ) : (
+          <BootIcon size={13} className={displayCount > 0 ? 'text-amber-500' : ''} />
+        )}
       </button>
-      {displayCount > 0 && (
+      {bootPhase === 'idle' && displayCount > 0 && (
         <span className="text-[9px] text-zinc-600 mt-0.5">{displayCount}</span>
       )}
-      {isFree && canBoot && (
+      {bootPhase === 'idle' && isFree && canBoot && (
         <span className="text-[8px] text-emerald-600 mt-0.5">FREE</span>
       )}
     </div>

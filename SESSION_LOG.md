@@ -2,6 +2,18 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-03-31 — Auto-Consolidation for Fragmented Wallets
+
+Built and shipped auto-consolidation:
+- clientSideBoot returns 'needs_consolidation' when wallet has funds but is too fragmented
+- consolidateUtxos() sweeps all UTXOs into one via WhatsOnChainBroadcaster at 10 sat/kb
+- Boot button shows "Preparing..." during consolidation, "Booting..." during boot
+- Batched source tx fetches (20 at a time) to avoid rate limits
+- Bumped /api/tx-hex rate limit from 60 to 500/min for consolidation support
+- Filters dust below 10 sats (not worth spending)
+- Consolidated output 0-conf chained — boot fires immediately after consolidation
+- Tested: Cursor browser (300 tiny UTXOs) consolidated and booted successfully
+
 ## 2026-03-31 — Fee Rate Tuning + Broadcast Strategy
 
 Investigated ARC "fee too low" errors after UTXO consolidation changes:

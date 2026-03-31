@@ -7,12 +7,12 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 500;
 
 export async function GET(request: Request) {
-  // H6 fix: rate limit by IP — 60 requests per minute.
+  // Rate limit by IP — 500/min to support UTXO consolidation (many source tx fetches).
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
     'unknown';
-  const rl = rateLimit(`tx-hex:${ip}`, { limit: 60, windowMs: 60_000 });
+  const rl = rateLimit(`tx-hex:${ip}`, { limit: 500, windowMs: 60_000 });
   if (!rl.success) {
     return new Response('Rate limit exceeded', { status: 429 });
   }

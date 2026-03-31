@@ -32,7 +32,7 @@ export interface BootShare {
 }
 
 export interface ClientBootResult {
-  status: 'success' | 'insufficient_funds' | 'broadcast_failed' | 'error';
+  status: 'success' | 'insufficient_funds' | 'needs_consolidation' | 'broadcast_failed' | 'error';
   txid?: string;
   error?: string;
   balance?: number;
@@ -326,6 +326,15 @@ async function _clientSideBootInner(
     // Users with fragmented wallets consolidate ~20 UTXOs per boot for free.
     const selection = selectUtxos(utxos, bootPriceSats, outputCount);
     if (!selection) {
+      // Check if total balance COULD cover boot after consolidation
+      // (wallet is too fragmented, not actually broke)
+      const minBootFee = estimateFee(1, outputCount); // 1 consolidated input
+      if (balance >= bootPriceSats + minBootFee) {
+        console.log(
+          `[clientSideBoot] Wallet fragmented: balance=${balance} sats across ${utxos.length} UTXOs — needs consolidation`,
+        );
+        return { status: 'needs_consolidation', balance };
+      }
       console.warn(
         `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${bootPriceSats + worstCaseFee} sats, address=${userAddress}`,
       );
@@ -472,5 +481,139 @@ async function _clientSideBootInner(
       status: 'error',
       error: e instanceof Error ? e.message : String(e),
     };
+  }
+}
+
+// ── UTXO Consolidation ─────────────────────────────────────────
+
+/** Minimum UTXO value worth including in consolidation (below this is dust) */
+const DUST_THRESHOLD = 10;
+
+/**
+ * Consolidate all UTXOs into a single output.
+ * Uses WhatsOnChainBroadcaster at 10 sat/kb — bypasses ARC's higher minimum.
+ * Consolidation is not time-sensitive so a lower fee rate is safe.
+ *
+ * Called automatically when clientSideBoot returns 'needs_consolidation'.
+ * The user sees "Preparing..." while this runs.
+ */
+export async function consolidateUtxos(
+  wif: string,
+  userAddress: string,
+): Promise<ClientBootResult> {
+  const release = await acquireTxMutex();
+
+  try {
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } = await getBsvSdk();
+
+    let privateKey: InstanceType<typeof PrivateKey>;
+    try {
+      privateKey = PrivateKey.fromWif(wif);
+    } catch {
+      return { status: 'error', error: 'Invalid private key' };
+    }
+
+    const utxos = await fetchUtxos(userAddress);
+
+    if (utxos.length <= 1) {
+      return { status: 'success', txid: '' }; // nothing to consolidate
+    }
+
+    // Filter out dust UTXOs that cost more to spend than they're worth
+    const spendable = utxos.filter((u) => u.value >= DUST_THRESHOLD);
+    if (spendable.length <= 1) {
+      return { status: 'success', txid: '' };
+    }
+
+    const total = spendable.reduce((sum, u) => sum + u.value, 0);
+    console.log(`[consolidateUtxos] Sweeping ${spendable.length} UTXOs (${total} sats) for ${userAddress}`);
+
+    const tx = new Transaction();
+
+    // Fetch source transactions in batches of 20 to avoid rate limits
+    const BATCH_SIZE = 20;
+    const sourceTxs: Array<{ utxo: ClientUtxo; sourceTx: InstanceType<typeof Transaction> }> = [];
+    try {
+      for (let i = 0; i < spendable.length; i += BATCH_SIZE) {
+        const batch = spendable.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(async (utxo) => {
+            if (utxo.sourceTransaction) return { utxo, sourceTx: utxo.sourceTransaction };
+            const hex = await fetchSourceTxHex(utxo.tx_hash);
+            return { utxo, sourceTx: Transaction.fromHex(hex) };
+          }),
+        );
+        sourceTxs.push(...results);
+      }
+    } catch (e) {
+      return { status: 'broadcast_failed', error: `Failed to fetch source transactions: ${e instanceof Error ? e.message : String(e)}` };
+    }
+
+    for (const { utxo, sourceTx } of sourceTxs) {
+      tx.addInput({
+        sourceTransaction: sourceTx,
+        sourceOutputIndex: utxo.tx_pos,
+        unlockingScriptTemplate: new P2PKH().unlock(privateKey),
+      });
+    }
+
+    // Single change output back to self
+    tx.addOutput({
+      lockingScript: new P2PKH().lock(userAddress),
+      change: true,
+    });
+
+    // 10 sat/kb — much cheaper than ARC's 100 sat/kb minimum
+    await tx.fee(new SatoshisPerKilobyte(10));
+    await tx.sign();
+
+    // Broadcast via WhatsOnChain — relays to miners who accept 10 sat/kb
+    const woc = new WhatsOnChainBroadcaster('main');
+    const broadcastResult = await tx.broadcast(woc);
+
+    if (broadcastResult.status === 'success') {
+      const txid = tx.id('hex') as string;
+      console.log(`[consolidateUtxos] Success: ${spendable.length} UTXOs → 1, txid=${txid}`);
+
+      // Track spent UTXOs
+      for (const utxo of spendable) {
+        _spent.add(utxoKey(utxo.tx_hash, utxo.tx_pos));
+      }
+      // Remove any pending change that was consumed
+      for (let i = _pendingChange.length - 1; i >= 0; i--) {
+        const key = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+        if (_spent.has(key)) _pendingChange.splice(i, 1);
+      }
+      // Register consolidated output as pending change for 0-conf chaining
+      const changeSats = tx.outputs[0]?.satoshis;
+      if (changeSats && changeSats > 0) {
+        _pendingChange.push({
+          tx_hash: txid,
+          tx_pos: 0,
+          value: changeSats,
+          sourceTransaction: tx,
+        });
+      }
+
+      // Cap queues
+      while (_pendingChange.length > 50) _pendingChange.shift();
+      while (_spent.size > 500) {
+        const first = _spent.values().next().value;
+        if (first) _spent.delete(first);
+      }
+
+      return { status: 'success', txid };
+    }
+
+    console.error('[consolidateUtxos] Broadcast failed:', broadcastResult);
+    return {
+      status: 'broadcast_failed',
+      error: typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult),
+    };
+  } catch (e) {
+    console.error('[consolidateUtxos] Error:', e);
+    return { status: 'error', error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    release();
   }
 }
