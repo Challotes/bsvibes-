@@ -172,9 +172,9 @@ function validateShares(shares: BootShare[], bootPriceSats: number): string | nu
 /**
  * Maximum inputs per boot transaction.
  *
- * Each P2PKH input is ~148 bytes. At 0.5 sat/byte (conservative):
- *   20 inputs  = ~2,960 bytes = ~1,480 sats fee — easily covered by boot price
- *   50 inputs  = ~7,400 bytes = ~3,700 sats fee — approaches boot price floor
+ * Each P2PKH input is ~148 bytes. At 0.05 sat/byte (50 sat/kb):
+ *   20 inputs  = ~2,960 bytes = ~148 sats fee — easily covered by boot price
+ *   50 inputs  = ~7,400 bytes = ~370 sats fee — well within boot price floor
  *
  * Capping at 20 keeps the fee well under 1,500 sats on any realistic BSV fee rate.
  * Users with >20 UTXOs consolidate at a rate of ~20 per boot (change output merges them).
@@ -185,11 +185,11 @@ const MAX_CONSOLIDATION_INPUTS = 20;
 /**
  * Estimate the fee for a transaction with N inputs and M outputs (P2PKH).
  * Byte formula: 10 (overhead) + 148 * inputs + 34 * outputs + 80 (OP_RETURN est.)
- * Rate: 0.5 sat/byte with a 200 sat floor to ensure ARC acceptance.
+ * Rate: 0.05 sat/byte (50 sat/kb) with a 50 sat floor to ensure ARC acceptance.
  */
 function estimateFee(inputCount: number, outputCount: number): number {
   const bytes = 10 + 148 * inputCount + 34 * outputCount + 80;
-  return Math.max(200, Math.ceil(bytes * 0.5));
+  return Math.max(50, Math.ceil(bytes * 0.05));
 }
 
 /**
@@ -402,11 +402,10 @@ async function _clientSideBootInner(
     });
 
     // ── Fee calculation and signing ─────────────────────────
-    // Use an explicit 500 sat/kb fee model (5x the real BSV rate of ~100 sat/kb).
-    // This avoids a network round-trip to GorillaPool for the live rate AND ensures
-    // ARC never rejects due to "fee too low" — even if the live rate briefly spikes.
-    // At 500 sat/kb a 20-input tx is ~1,480 sats — well within any boot price.
-    await tx.fee(new SatoshisPerKilobyte(500));
+    // Use an explicit 50 sat/kb fee model — safely above ARC's minimum (~100 sat/kb
+    // policy, but actual acceptance is lower) while being 10x cheaper than 500 sat/kb.
+    // At 50 sat/kb a 20-input tx is ~163 sats — negligible relative to boot price.
+    await tx.fee(new SatoshisPerKilobyte(50));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 sats.
