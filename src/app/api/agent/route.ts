@@ -1,5 +1,5 @@
 import { rateLimit } from '@/lib/rate-limit';
-import { AGENT_SYSTEM_PROMPT } from '@/data/agent-prompt';
+import { buildAgentPrompt } from '@/data/agent-prompt';
 
 // Concurrency limiter — max 3 simultaneous Anthropic requests
 let _activeRequests = 0;
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        system: AGENT_SYSTEM_PROMPT,
+        system: buildAgentPrompt(apiMessages[apiMessages.length - 1]?.content ?? ''),
         messages: apiMessages,
         stream: true,
       }),

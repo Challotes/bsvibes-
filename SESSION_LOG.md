@@ -2,6 +2,17 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-01 — Agent Chat Dynamic Context + Vision Updates
+
+- Agent chat now reads project MDs dynamically instead of stale hardcoded prompt
+- Question classifier routes to relevant MDs (FAIRNESS.md for money questions, ROADMAP.md for "what's next", etc.)
+- CLAUDE.md always included as base context, up to 2 topic-specific MDs added per request
+- agent-knowledge.ts keyword Q&A system no longer used (superseded by dynamic MDs)
+- Added North Star vision to DIRECTION.md (universal contribution tracking across forks)
+- DB query tools (live oracle) planned for next iteration
+- Explored: boot signals as AI-readable economic data, AFP royalty protocol, handle system, miner deals
+- "just now" for timestamps under 60s, timeAgo auto-refresh every 60s
+
 ## 2026-03-31 — Server Double-Spend Self-Healing + TimeAgo Fix
 
 Two fixes:

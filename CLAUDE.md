@@ -34,7 +34,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis (amber accent, "Chat with the agent" link)
 - `src/app/Genesis.tsx` — Manifesto + founding conversation (always visible at top of feed, NOT collapsible by design)
 - `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent, highlight-on-demand)
-- `src/data/agent-prompt.ts` — Shared system prompt for agent chat (single source of truth)
+- `src/data/agent-prompt.ts` — Dynamic agent prompt builder (loads project MDs at request time based on question classification)
 - `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
 - `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
 - `src/app/api/boot-shares/route.ts` — Returns contributor shares + boot price for client-side tx building

@@ -167,6 +167,8 @@
 - [ ] Notification system (bell icon — "anon_x7f2 featured your post", daily earnings summary)
 - [ ] Content moderation (report mechanism, basic filtering)
 - [ ] Deploy to Railway + custom domain
+- [x] Agent chat: dynamic MD loading (reads project MDs at request time, always current)
+- [ ] Agent chat: DB query tools (live oracle — real post counts, contributor stats, boot prices)
 
 ## Phase 7: The Recursive Model — PLANNED
 
