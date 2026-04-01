@@ -10,6 +10,31 @@ Start with literally nothing — just a board for posting ideas. Every post is l
 
 The platform is not built then launched. It is planted as a seed and grown with the community. Every person who posts an idea, suggests a feature, or helps shape direction becomes a contributor with on-chain proof of participation. Contributions are tracked from post #1.
 
+## The North Star
+
+The endgame isn't one platform. It's a universal system where **whoever contributes first, gets credit — provably, permanently, across every project that uses their work.**
+
+An idea posted on-chain has a timestamp. If someone codes that idea later, the original poster gets credit — the idea came first. If code exists before someone posts it as an idea, the coder gets credit. On-chain timestamps are the arbiter. No disputes, no committees, no politics.
+
+This works across forks. BSVibes is open source. Anyone can fork it, improve it, launch their own version. That's not a threat — it's the model working. Contributors don't pick sides. They post ideas, write code, and earn proportionally from every project that uses their contribution. The best projects attract the most activity. Competition drives quality, not lock-in.
+
+**How it works:**
+- Every contribution is timestamped on-chain (posts, code commits linked to BSV identity)
+- Priority is provable — who was first is a fact, not an opinion
+- The fairness system distributes revenue to contributors in real-time
+- As new contributions come in, everyone's share adjusts live
+- If code gets removed, contributions adjust downward
+- This happens across all forks and spawned projects simultaneously
+
+**Why open source is the only strategy:**
+- Every fork proves the model works — that's compounding credibility
+- The value isn't the code (anyone can copy it) — it's the community, the on-chain history, and the rules everyone plays by
+- BSVibes designed the fairness rules. That's the moat. The code is just the implementation.
+
+**What exists today:** On-chain posts, contribution scoring, trustless split payments, identity with migration chains. The foundation.
+
+**What comes next:** Cross-project contribution tracking, code-commit linking to on-chain identity, a shared protocol for forks to recognise each other's contributors. Phase 7 (the recursive model) is the first step toward this.
+
 ## The Core Loop
 
 1. User posts idea
