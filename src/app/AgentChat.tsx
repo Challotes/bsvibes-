@@ -24,18 +24,32 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef(messages);
 
+  const [userScrolled, setUserScrolled] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (open && messages.length === 0) {
       setMessages([{
         from: 'agent',
-        text: 'Hey — I know everything about BSVibes. Ask me anything, or tap a question below.',
+        text: "Hey! I can help you understand BSVibes, brainstorm ideas for posts, or answer any questions. What are you curious about?",
       }]);
     }
   }, [open, messages.length]);
 
+  // Only auto-scroll if user hasn't manually scrolled up
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!userScrolled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, userScrolled]);
+
+  // Reset scroll tracking when user sends a new message
+  function handleUserScroll() {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setUserScrolled(!atBottom);
+  }
 
   useEffect(() => {
     if (open) {
@@ -66,6 +80,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
     setMessages([...newMessages, thinking]);
     setInput('');
     setIsStreaming(true);
+    setUserScrolled(false); // auto-scroll to user's own message
 
     // Abort any previous stream
     abortRef.current?.abort();
@@ -177,7 +192,9 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
 
           {/* Messages */}
           <div
-            className="h-[50vh] sm:h-[320px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
+            ref={messagesContainerRef}
+            onScroll={handleUserScroll}
+            className="h-[60vh] sm:h-[450px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
             style={{ scrollbarWidth: 'none' }}
           >
             {messages.map((msg, i) => (
