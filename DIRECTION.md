@@ -96,9 +96,36 @@ The biggest barrier to crypto adoption is complexity. We eliminate it:
 
 ## The Recursive Model
 
-Once the platform works, any post can become its own project. Someone posts "We should build a recipe app" — if it gains traction, it spawns into its own platform with the same contribution tracking, fairness agent, and model.
+Once the platform works, any post can become its own project. Someone posts an idea, it gets booted (economic signal), and if it gains enough traction it spawns into its own platform with the same contribution tracking, fairness agent, and model.
 
 "Every idea is a seed. Every seed can grow into a forest."
+
+### What could be built
+
+It doesn't matter what the idea is. The model works for anything:
+
+- **A travel app** — "locals should review restaurants, not tourists." Someone posts it, it gets booted, a project spawns. A designer contributes the UI. A developer builds the backend. The person who posted the original idea earns from the project forever — because they were first and it's provable.
+- **A music platform** — "artists should own their distribution." Every listen splits revenue: the artist, the person who had the idea, the developers who built it, the designer who made it beautiful. All in one transaction.
+- **Social media** — "users should own the algorithm." Spawns, contributors build it, the fairness system distributes revenue to everyone who helped. No venture capital needed.
+- **A cooking community** — recipe creators earn when their recipes get used. Meal planning apps spawn from it. Revenue flows back to the original contributors.
+- **Anything** — a marketplace, a booking system, a game, a tool. The subject doesn't matter. The model is the same: post the idea, build it together, earn proportionally.
+
+### How project ownership works
+
+The person who spawns a project becomes the project owner. They can:
+- Direct development priorities
+- Set the initial fairness parameters for their project
+- Use BSVibes' community as their first users and contributors
+- Drop tokens to their users if they want (BSV-21 — nothing stops them)
+- The fairness system tracks contributions automatically — no payroll, no invoicing
+
+### We don't pump. We give value.
+
+There's no BSVibes token. No presale. No "buy our coin." The value IS the contribution. You earn by doing, not by speculating.
+
+If a project owner wants to issue their own token on their spawned project — loyalty points, governance tokens, whatever — that's their choice. But the base layer is always: real work → real payment. The fairness system pays in real money (BSV), not promises.
+
+You can sit on the platform and talk. You can share ideas. You can contribute code. You can just have vibes. It's all signal. The system tracks what matters and the money follows.
 
 ## Open Source Strategy
 
