@@ -119,7 +119,7 @@ The person who spawns a project becomes the project owner. They can:
 - Drop tokens to their users if they want (BSV-21 — nothing stops them)
 - The fairness system tracks contributions automatically — no payroll, no invoicing
 
-### We don't pump. We give value.
+### Yeah, we pump. We pump real value.
 
 There's no BSVibes token. No presale. No "buy our coin." The value IS the contribution. You earn by doing, not by speculating.
 
