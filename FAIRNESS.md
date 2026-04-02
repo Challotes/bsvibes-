@@ -173,15 +173,18 @@ The current model is deliberately simple so we can prove the mechanism works (pa
 
 ## Prior Art & Novelty
 
-We could have patented this. Instead we put it on-chain and gave it to everyone.
+We could have submitted patents for some or all of these innovations. We didn't. We put them on-chain and gave them to everyone.
+
+By publishing on-chain, we didn't just open source the code — we created prior art that blocks future patents on these ideas. Nobody can lock this up now. Not big tech, not patent trolls, not competitors. The Agentic Fairness Protocol, the contribution scoring, the trustless split payments, the zero-friction identity with on-chain key migration — it's all public, timestamped, and permanently verifiable on BSV.
 
 Independent prior art research (2026-04-02) confirmed:
+- **The Agentic Fairness Protocol (AFP) is genuinely novel.** No prior art exists for on-chain project lineage + cascading royalties to weighted contributor pools + fork-triggered obligation.
+- **The Agentic Fairness system is partially novel.** Nobody combines AI-governed parameter tuning + sqrt×decay scoring + automatic real-money atomic multi-output splits from live revenue.
+- **The zero-friction identity with on-chain key migration** is partially novel. Contribution history following key rotations via OP_RETURN chain resolution is new.
 
-- **The Agentic Fairness Protocol (AFP) is genuinely novel.** No prior art found for: on-chain project lineage registration + cascading royalties to weighted contributor pools + fork-triggered obligation. ERC-2981 does single-level NFT royalties to one wallet. Nobody has built a cross-project cascade to contributor pools.
-- **The Agentic Fairness system is partially novel.** SourceCred uses PageRank (different algorithm). Gitcoin uses sqrt for matching pools (different application). Nobody combines AI-governed bounded parameter tuning + sqrt×decay scoring + automatic real-money atomic multi-output splits from live revenue.
-- **The zero-friction identity with on-chain key migration** is partially novel. KERI covers key rotation chains, but contribution history following key migrations via OP_RETURN chain resolution is new.
+When we build this out together — faster, forked, iterated — the community stays in control. Ideas that are built upon openly stay so far in front that patents become irrelevant. We are the innovation. It is YOUR data, and you can prove it.
 
-The on-chain timestamps on BSV prove everything — every post, every boot, every split payment is timestamped immutably. Our prior art is on the blockchain, permanently, verifiable by anyone.
+Do you get it, anon?
 
 ## Open Questions
 
