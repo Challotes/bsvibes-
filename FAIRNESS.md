@@ -171,6 +171,18 @@ This is a simple post-count + engagement model. It's a starting demo. Real value
 
 The current model is deliberately simple so we can prove the mechanism works (payments split correctly, on-chain, verifiable) before adding complexity to the scoring.
 
+## Prior Art & Novelty
+
+We could have patented this. Instead we put it on-chain and gave it to everyone.
+
+Independent prior art research (2026-04-02) confirmed:
+
+- **The Agentic Fairness Protocol (AFP) is genuinely novel.** No prior art found for: on-chain project lineage registration + cascading royalties to weighted contributor pools + fork-triggered obligation. ERC-2981 does single-level NFT royalties to one wallet. Nobody has built a cross-project cascade to contributor pools.
+- **The Agentic Fairness system is partially novel.** SourceCred uses PageRank (different algorithm). Gitcoin uses sqrt for matching pools (different application). Nobody combines AI-governed bounded parameter tuning + sqrt×decay scoring + automatic real-money atomic multi-output splits from live revenue.
+- **The zero-friction identity with on-chain key migration** is partially novel. KERI covers key rotation chains, but contribution history following key migrations via OP_RETURN chain resolution is new.
+
+The on-chain timestamps on BSV prove everything — every post, every boot, every split payment is timestamped immutably. Our prior art is on the blockchain, permanently, verifiable by anyone.
+
 ## Open Questions
 
 - **Boot price**: Fixed (e.g., 10,000 sats) or dynamic (increases the longer someone holds the spot)?
