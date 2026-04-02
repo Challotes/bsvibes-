@@ -68,20 +68,23 @@ Early thinking on how revenue could flow between parent and child projects.
 - Level 3: ~14 sats (barely)
 - Level 4: dust — practical limit is 2-3 levels for micro-transactions
 
-## Agent Concepts
+## Patterns We've Noticed
 
-7 agent concepts identified from the BSVibes codebase. None built yet.
+The codebase has started doing things we didn't fully plan. A few pieces have grown complex enough that they could live on their own.
 
-**Top 2 (most valuable):**
-1. **Fairness Oracle Agent** — AI governs revenue distribution, adjusts config knobs within bounded ranges, detects gaming. Most novel concept. The config surface exists at `services/fairness/config.ts` but the AI governance part is unbuilt.
-2. **Trustless Split Payment SDK** — `client-boot.ts` (650 lines) is nearly self-contained. Closest to extractable as a standalone npm package.
+**Revenue distribution that governs itself.** The fairness logic has tunable parameters, scoring weights, and decay curves. The obvious next step is letting an AI watch the numbers and adjust those knobs — tighten the gaming resistance when someone's exploiting it, widen the grants when the platform's healthy. We built the surface. We haven't built the watcher yet.
 
-**Other concepts:**
-- **Zero-Friction Identity Agent** — drop-in crypto identity without wallet install for any app
-- **UTXO Health Agent** — monitors wallet fragmentation, auto-consolidates, reports cost trends
-- **Contribution Scoring Agent** — fair weight calculation for open source projects, DAOs, co-ops
-- **Platform Economy Agent** — BSVibes as an autonomous economy (adjusts pricing, grants, moderation)
-- **On-Chain Audit Agent** — reads the chain, produces transparency reports, detects DB/chain discrepancies
+**Trustless split payments.** The boot payment flow is browser-native and zero-custody. The browser builds the transaction, the browser broadcasts it, the server never touches the money. That turned out to be a useful pattern independent of BSVibes — any situation where you want to split a payment across contributors without a middleman holding funds.
+
+**Crypto identity without the crypto part.** Sign-in here requires no wallet, no app install, no seed phrase. A key is generated on arrival. Most people never know it happened. That pattern is reusable anywhere you want signed, attributable actions without asking people to "get into crypto" first.
+
+**Wallet health as a background concern.** UTXOs fragment. Fees creep up. The wallet quietly monitors and consolidates. That kind of low-level maintenance could report upward — cost trends, fragmentation alerts, fee anomalies. Right now it just acts. It could also explain.
+
+**Scoring without a committee.** Contribution weight is calculated from behavior: post frequency, engagement, recency, chain depth. No one votes. No one decides. It just runs. That model applies anywhere you're trying to fairly compensate a group without central control — open source projects, co-ops, DAOs.
+
+**The chain as the audit log.** Every post has an on-chain fingerprint. In theory you can cross-reference the database against the chain and find discrepancies. Nobody's built that check yet. It's just waiting there.
+
+None of this is roadmap. It's what the code is quietly becoming.
 
 ## Security Upgrades (Deferred)
 
