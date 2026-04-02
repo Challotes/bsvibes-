@@ -44,7 +44,7 @@ BSVibes is the first project built on this model — the proof that it works bef
 **What's coming:**
 - Phase 1 (now): Fairness rewards posts and boots. Proves the mechanics work. Rules are being refined.
 - Phase 2: Fairness starts tracking real contributions — code that ships, ideas that get built, bugs that get fixed. The AI agent evaluates actual impact, not just activity.
-- Phase 3: Fully agentic — the AI adjusts its own parameters within bounded ranges. Community governs through boot signals (economic votes, not free clicks).
+- Phase 3: The AI adjusts its own parameters within bounded ranges. Boot signals are one input into governance alongside project owners and human oversight. The balance between agentic and human control will evolve.
 
 **Important for contributors:**
 - The existing fairness splits are a working prototype, not the final system
