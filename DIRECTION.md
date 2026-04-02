@@ -10,6 +10,26 @@ Start with literally nothing — just a board for posting ideas. Every post is l
 
 The platform is not built then launched. It is planted as a seed and grown with the community. Every person who posts an idea, suggests a feature, or helps shape direction becomes a contributor with on-chain proof of participation. Contributions are tracked from post #1.
 
+## Who This Is For
+
+Everyone. Not just developers.
+
+The person in Lagos with a brilliant idea but no money for a patent. The ex-Google architect who disagrees with how things are built but has no platform to prove it. The graphic designer browsing spawned projects at midnight, offering their eye for UI. The attorney who spots a legal gap. The music artist who wants fair royalties. The marketer who knows how to make things spread. The property owner with an idea for how rentals should work. The teenager with vibes and nothing else.
+
+**BSVibes doesn't care who you are. It cares what you did.**
+
+Every contribution is timestamped on-chain. An anonymous user posting as `anon_k` gets the same credit as anyone else. No resumes, no interviews, no gatekeepers. You contribute, you're credited, you earn. The poorest person with the best idea earns the same as the richest person with the same idea.
+
+This is a permissionless global workforce:
+- The idea people who can't code but know exactly what should exist
+- The coders who can build it
+- The designers who make it usable
+- The marketers who make it spread
+- The users who just have vibes — and vibes are signal too
+- The experts who flip through 10 spawned projects a day offering their skills anonymously
+
+You don't apply. You don't interview. You just show up, contribute, and the system tracks it forever.
+
 ## The North Star
 
 The endgame isn't one platform. It's a universal system where **whoever contributes first, gets credit — provably, permanently, across every project that uses their work.**
