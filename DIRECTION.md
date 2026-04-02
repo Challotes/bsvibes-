@@ -35,6 +35,25 @@ This works across forks. BSVibes is open source. Anyone can fork it, improve it,
 
 **What comes next:** Cross-project contribution tracking, code-commit linking to on-chain identity, a shared protocol for forks to recognise each other's contributors. Phase 7 (the recursive model) is the first step toward this.
 
+## Where We Are Now
+
+BSVibes is the first project built on this model — the proof that it works before anyone else uses it.
+
+**The fairness system is live but in trial mode.** Right now it rewards posting and boot activity. This is the working proof of concept — real money flows, real payments split, real on-chain records. But it's Phase 1.
+
+**What's coming:**
+- Phase 1 (now): Fairness rewards posts and boots. Proves the mechanics work. Rules are being refined.
+- Phase 2: Fairness starts tracking real contributions — code that ships, ideas that get built, bugs that get fixed. The AI agent evaluates actual impact, not just activity.
+- Phase 3: Fully agentic — the AI adjusts its own parameters within bounded ranges. Community governs through boot signals (economic votes, not free clicks).
+
+**Important for contributors:**
+- The existing fairness splits are a working prototype, not the final system
+- Contribution scores will evolve as the scoring model matures
+- Some or all existing parameters may be updated or refined
+- Everything is work in progress — that's the point. The platform builds itself.
+
+Once this model is proven on BSVibes, any idea posted here can spawn its own project using the same fairness system. BSVibes is the seed. The vision is the forest.
+
 ## The Core Loop
 
 1. User posts idea
