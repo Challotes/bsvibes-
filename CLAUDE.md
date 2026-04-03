@@ -110,11 +110,16 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 ## Security Notes
 
 - Private keys stored in localStorage (acceptable for idea board phase, no real money yet)
-- Server should verify signatures (TODO — currently decorative)
-- Rate limiting needed (TODO)
+- Server-side ECDSA signature verification on all posts and migrations
+- Rate limiting on all API routes (sliding window, IP-keyed)
+- boot-confirm hardened: replay protection, on-chain output verification, rate limiting
 - CSP headers configured in next.config.ts (Content-Security-Policy, HSTS, Permissions-Policy)
 - Node polyfills shimmed via next.config.ts for browser compatibility (empty-module.mjs)
-- See DECISIONS.md for full security findings and upgrade plan
+- See SECURITY_AUDIT.md for full audit findings and fix status
+
+## Deployment Notes
+
+- **Rate limiting uses `x-forwarded-for` header** for IP identification. This header is client-supplied — behind a reverse proxy (Railway, Vercel, Cloudflare), the proxy sets it from the real client IP and it's trustworthy. If self-hosting without a proxy, attackers can spoof this header to bypass rate limits. Check your platform's docs for the correct trusted IP header (e.g. Vercel uses `x-real-ip`). All rate limit IP extraction is in the individual API route files (`src/app/api/*/route.ts`).
 
 ## Development
 
@@ -122,6 +127,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 npm run dev      # Start dev server
 npm run build    # Production build
 npm run start    # Start production server
+npm run test     # Run tests (vitest)
 npm run lint     # Biome linting
 npm run format   # Biome formatting
 ```
