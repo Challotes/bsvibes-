@@ -32,6 +32,7 @@ export function useBsvPrice(): number {
   useEffect(() => {
     async function fetchPrice() {
       if (fetchingRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       fetchingRef.current = true;
       try {
         const res = await fetch('https://api.whatsonchain.com/v1/bsv/main/exchangerate');

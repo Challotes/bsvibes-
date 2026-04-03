@@ -1,8 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -29,12 +27,13 @@
     }
   },
   "files": {
-    "ignore": [
-      ".next/**",
-      "out/**",
-      "build/**",
-      "node_modules/**",
-      "next-env.d.ts"
+    "includes": [
+      "**",
+      "!**/.next/**",
+      "!**/out/**",
+      "!**/build/**",
+      "!**/node_modules/**",
+      "!**/next-env.d.ts"
     ]
   }
 }

@@ -364,8 +364,6 @@ async function _clientSideBootInner(
       );
       return { status: 'insufficient_funds', balance };
     }
-    const { estimatedFee } = selection;
-
     // ── Fetch source transactions (parallel) ────────────────
     // For 0-conf chained UTXOs, sourceTransaction is already attached — skip the fetch
     const sourceTxPromises = selection.selected.map(async (utxo) => {

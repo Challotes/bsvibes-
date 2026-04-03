@@ -401,3 +401,31 @@ export function generateBackupHtml(data: BackupData): string {
     '</html>'
   );
 }
+
+/**
+ * Download a backup as a self-contained HTML file.
+ */
+export function downloadBackup(data: BackupData, filename: string): void {
+  const html = generateBackupHtml(data);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Read the stored passphrase hint from encrypted identity storage.
+ */
+export function getStoredHint(): string | undefined {
+  try {
+    const raw = localStorage.getItem('bfn_keypair_enc');
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { hint?: string };
+    return parsed.hint || undefined;
+  } catch {
+    return undefined;
+  }
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { calculateWeights } from './weights';
+import { PrivateKey } from '@bsv/sdk';
+import { calculateWeights, _clearWeightsCache } from './weights';
 
 function createTestDb() {
   const db = new Database(':memory:');
@@ -44,102 +45,159 @@ function createTestDb() {
   return db;
 }
 
+function makeKey() {
+  const priv = PrivateKey.fromRandom();
+  return {
+    pubkey: priv.toPublicKey().toString(),
+    address: priv.toPublicKey().toAddress().toString(),
+  };
+}
+
 function addPost(db: ReturnType<typeof Database>, pubkey: string, minutesAgo = 0) {
-  const created = new Date(Date.now() - minutesAgo * 60_000).toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
-  db.prepare('INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)').run(
-    'test post', 'anon_test', pubkey, created
-  );
+  const created = new Date(Date.now() - minutesAgo * 60_000)
+    .toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+  db.prepare(
+    'INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)'
+  ).run('test post', 'anon_test', pubkey, created);
 }
 
 function addMigration(db: ReturnType<typeof Database>, from: string, to: string) {
-  db.prepare('INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)').run(from, to, 'sig');
+  db.prepare(
+    'INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
+  ).run(from, to, 'sig');
+}
+
+function addBoot(db: ReturnType<typeof Database>, postId: number) {
+  db.prepare('INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)').run(postId, 'someone');
 }
 
 describe('calculateWeights', () => {
   let db: ReturnType<typeof Database>;
 
   beforeEach(() => {
+    _clearWeightsCache();
     db = createTestDb();
   });
 
   it('returns empty array for empty DB', () => {
-    const weights = calculateWeights(db);
-    expect(weights).toHaveLength(0);
+    expect(calculateWeights(db)).toHaveLength(0);
   });
 
   it('returns empty for unsigned posts only', () => {
     db.prepare('INSERT INTO posts (content, author_name) VALUES (?, ?)').run('unsigned', 'anon');
-    const weights = calculateWeights(db);
-    expect(weights).toHaveLength(0);
+    expect(calculateWeights(db)).toHaveLength(0);
   });
 
-  it('calculates weight for a single contributor', () => {
-    // Use a real BSV pubkey format that PublicKey.fromString can parse
-    // Since we can't use real pubkeys without BSV SDK in test, we test that
-    // contributors with invalid pubkeys are filtered out (address = '')
-    addPost(db, 'invalidpubkey');
+  it('returns one contributor for a single signed post', () => {
+    const key = makeKey();
+    addPost(db, key.pubkey);
     const weights = calculateWeights(db);
-    // Invalid pubkey -> empty address -> filtered out
-    expect(weights).toHaveLength(0);
+
+    expect(weights).toHaveLength(1);
+    expect(weights[0].pubkey).toBe(key.pubkey);
+    expect(weights[0].address).toBe(key.address);
+    expect(weights[0].weight).toBeGreaterThan(0);
+    expect(weights[0].postCount).toBe(1);
+    expect(weights[0].totalBoots).toBe(0);
   });
 
   it('aggregates multiple posts from same contributor', () => {
-    // Two posts from same pubkey — weight should be summed
-    addPost(db, 'pubA', 0);
-    addPost(db, 'pubA', 5);
+    const key = makeKey();
+    addPost(db, key.pubkey, 0);
+    addPost(db, key.pubkey, 5);
     const weights = calculateWeights(db);
-    // Both posts have invalid pubkey format -> filtered
-    // But internally they would be aggregated (postCount = 2)
-    expect(weights).toHaveLength(0); // filtered due to invalid pubkey
+
+    expect(weights).toHaveLength(1);
+    expect(weights[0].postCount).toBe(2);
+    // Two posts should produce higher total weight than one
+    expect(weights[0].weight).toBeGreaterThan(1);
+  });
+
+  it('separates different contributors', () => {
+    const keyA = makeKey();
+    const keyB = makeKey();
+    addPost(db, keyA.pubkey, 0);
+    addPost(db, keyB.pubkey, 0);
+    const weights = calculateWeights(db);
+
+    expect(weights).toHaveLength(2);
+    const pubkeys = weights.map(w => w.pubkey);
+    expect(pubkeys).toContain(keyA.pubkey);
+    expect(pubkeys).toContain(keyB.pubkey);
   });
 
   it('resolves simple migration chain A→B', () => {
-    addPost(db, 'oldKey', 0);
-    addMigration(db, 'oldKey', 'newKey');
+    const oldKey = makeKey();
+    const newKey = makeKey();
+    addPost(db, oldKey.pubkey, 10);
+    addMigration(db, oldKey.pubkey, newKey.pubkey);
     const weights = calculateWeights(db);
-    // oldKey posts should be attributed to newKey
-    // Both are invalid pubkey format -> filtered, but the resolution logic is tested
-    // by checking no entry for oldKey exists
-    const oldEntry = weights.find(w => w.pubkey === 'oldKey');
-    expect(oldEntry).toBeUndefined();
+
+    // Old key's posts should be attributed to new key
+    expect(weights).toHaveLength(1);
+    expect(weights[0].pubkey).toBe(newKey.pubkey);
+    expect(weights[0].address).toBe(newKey.address);
+    expect(weights[0].postCount).toBe(1);
   });
 
   it('resolves multi-hop migration chain A→B→C', () => {
-    addPost(db, 'keyA', 0);
-    addPost(db, 'keyB', 0);
-    addMigration(db, 'keyA', 'keyB');
-    addMigration(db, 'keyB', 'keyC');
+    const keyA = makeKey();
+    const keyB = makeKey();
+    const keyC = makeKey();
+    addPost(db, keyA.pubkey, 20);
+    addPost(db, keyB.pubkey, 10);
+    addMigration(db, keyA.pubkey, keyB.pubkey);
+    addMigration(db, keyB.pubkey, keyC.pubkey);
     const weights = calculateWeights(db);
-    // Both A and B posts should resolve to keyC
-    const aEntry = weights.find(w => w.pubkey === 'keyA');
-    const bEntry = weights.find(w => w.pubkey === 'keyB');
-    expect(aEntry).toBeUndefined();
-    expect(bEntry).toBeUndefined();
-    // keyC should have 2 posts worth of weight (if it had a valid address)
+
+    // Both A and B posts should resolve to C
+    expect(weights).toHaveLength(1);
+    expect(weights[0].pubkey).toBe(keyC.pubkey);
+    expect(weights[0].postCount).toBe(2);
   });
 
-  it('handles boot engagement multiplier', () => {
-    addPost(db, 'pubX', 0);
+  it('boots increase weight via engagement multiplier', () => {
+    const key = makeKey();
+    addPost(db, key.pubkey, 0);
     const postId = (db.prepare('SELECT id FROM posts ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
-    // Add 3 boots to this post
-    for (let i = 0; i < 3; i++) {
-      db.prepare('INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)').run(postId, 'someone');
-    }
-    const weights = calculateWeights(db);
-    // Post with boots should have higher weight than without
-    // Can't verify exact value since pubkey is invalid, but the query runs without error
-    expect(weights).toHaveLength(0); // filtered due to invalid pubkey format
+
+    const weightBefore = calculateWeights(db)[0].weight;
+
+    // Add 3 boots and clear cache to force recalc
+    addBoot(db, postId);
+    addBoot(db, postId);
+    addBoot(db, postId);
+    _clearWeightsCache();
+
+    const weightsAfter = calculateWeights(db);
+    expect(weightsAfter[0].weight).toBeGreaterThan(weightBefore);
+    expect(weightsAfter[0].totalBoots).toBe(3);
   });
 
-  it('does not produce NaN weights from SQLite datetime format', () => {
-    // This is the fix from the audit — ensure space-separated datetime doesn't cause NaN
+  it('older posts have lower weight (time decay)', () => {
+    const key = makeKey();
+    // One recent post and one 30-day old post from the same contributor
+    addPost(db, key.pubkey, 0);           // recent — high decay
+    addPost(db, key.pubkey, 30 * 24 * 60); // 30 days — half-life decay
+
+    const weights = calculateWeights(db);
+    expect(weights).toHaveLength(1);
+    // With half-life = 30 days, recent post contributes ~1.0, old post ~0.5
+    // Total should be ~1.5, proving the old post decayed (not equal to recent)
+    expect(weights[0].weight).toBeGreaterThan(1);
+    expect(weights[0].weight).toBeLessThan(2); // would be 2 if no decay
+  });
+
+  it('does not produce NaN from SQLite datetime format', () => {
+    const key = makeKey();
+    // Insert with SQLite's native datetime() which produces space-separated format
     db.prepare(
       "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, datetime('now'))"
-    ).run('test', 'anon', 'testpub');
+    ).run('test', 'anon', key.pubkey);
 
-    // Should not throw or produce NaN internally
     const weights = calculateWeights(db);
-    // All entries filtered (invalid pubkey), but no NaN crash
-    expect(weights).toHaveLength(0);
+    expect(weights).toHaveLength(1);
+    expect(weights[0].weight).toBeGreaterThan(0);
+    expect(Number.isNaN(weights[0].weight)).toBe(false);
   });
 });

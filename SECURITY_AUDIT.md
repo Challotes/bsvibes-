@@ -25,25 +25,25 @@
 **Risk:** User told "old key is in backup file" but backup contains new key. Stranded funds unrecoverable.
 **Fix:** Include old WIF in backup when transfer fails, or don't remove plaintext key until transfer succeeds.
 
-### C5: Free boot consumes grant even when broadcast fails
+### C5: Free boot consumes grant even when broadcast fails — FIXED
 **File:** src/services/fairness/boot-orchestrator.ts lines 92-150
 **Risk:** User loses free boot but nobody gets paid. Boot appears successful but no on-chain payment.
-**Fix:** Only update bootboard and consume grant when broadcast succeeds.
+**Fix:** (2026-03-28) Grant consumed only after successful broadcast.
 
 ### C6: Interrupted upgrade locks user out
 **File:** src/services/bsv/identity.ts lines 366-372
 **Risk:** Power failure between setItem(encrypted) and removeItem(plaintext) = both keys exist. System only checks encrypted, user locked out despite plaintext key being present.
 **Fix:** getIdentity() should prefer plaintext key when both exist (upgrade was interrupted).
 
-### C7: Double-upgrade from same key orphans intermediate posts
+### C7: Double-upgrade from same key orphans intermediate posts — FIXED
 **File:** src/app/actions.ts + src/services/fairness/weights.ts
 **Risk:** INSERT OR REPLACE deletes A→B migration when A→C is inserted. Posts made with key B have no migration chain, are permanently orphaned.
-**Fix:** Before replacing migration, check if old to_pubkey has posts. If so, insert B→C migration.
+**Fix:** (2026-03-28) Before replacing migration, check if old to_pubkey has posts. If so, insert B→C bridging migration.
 
-### C8: cleanupMigrations has no authentication
+### C8: cleanupMigrations has no authentication — FIXED
 **File:** src/app/actions.ts lines 229-243
 **Risk:** Anyone who knows a pubkey can delete that user's migration records via the server action. Targeted payout redirection attack.
-**Fix:** Require signed challenge proving ownership of the private key.
+**Fix:** (2026-03-28) Requires signed challenge with 5-minute timestamp replay protection.
 
 ### C9: Backup warning dot clears on dropdown OPEN, not on actual backup
 **File:** src/app/IdentityBar.tsx lines 110-115
@@ -52,9 +52,9 @@
 
 ## HIGH (7 findings — fix this sprint)
 
-### H1: Rate limiting keyed on client-supplied author name
+### H1: Rate limiting keyed on client-supplied author name — FIXED
 **File:** src/app/actions.ts line 24
-**Fix:** Key on IP address or verified pubkey.
+**Fix:** (2026-03-28) Now keyed on verified pubkey.
 
 ### H2: /api/boot-shares exposes all contributor addresses unauthenticated
 **File:** src/app/api/boot-shares/route.ts
@@ -72,9 +72,9 @@
 **File:** src/app/actions.ts lines 27-43
 **Fix:** Require pubkey on all posts. Reject or flag unsigned.
 
-### H6: /api/tx-hex is an open proxy with no rate limiting
+### H6: /api/tx-hex is an open proxy with no rate limiting — FIXED
 **File:** src/app/api/tx-hex/route.ts
-**Fix:** Add IP-keyed rate limiting (60 req/min).
+**Fix:** (2026-03-31) Added 500/min/IP rate limit.
 
 ### H7: Migration registration after local key storage — FIXED
 **File:** src/services/bsv/identity.ts + src/app/IdentityBar.tsx
@@ -100,7 +100,7 @@
 - M4: Rate limiter is in-memory, resets on restart
 - M5: /api/earnings exposes full financial history unauthenticated
 - M6: WIF reveal has no auto-hide timeout
-- M7: /api/boot-shares triggers full weight calc with no cache
+- M7: /api/boot-shares triggers full weight calc with no cache — FIXED (30s TTL cache added)
 - M8: Posts during upgrade window may be unsigned
 
 ## LOW (6 findings — track as debt)

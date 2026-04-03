@@ -33,7 +33,21 @@ Refactors (completed):
 - Decomposed IdentityBar.tsx: 1,632→1,150 lines (PassphrasePrompt, UpgradeModal, ChangePassphraseModal → src/components/)
 - Bootboard break-all → break-words consistency
 
-Remaining: x-forwarded-for (deploy concern), zero test coverage
+Test suite added:
+- Vitest configured with path aliases, 27 tests across 4 files
+- calculateSplit: 8 tests (money math, rounding, creator dedup, edge cases)
+- calculateBootPrice: 5 tests (floor/ceiling, scaling)
+- rateLimit: 4 tests (allow/block, isolation)
+- calculateWeights: 10 tests (real BSV pubkeys, migration chains, engagement, time decay, NaN prevention)
+
+Second re-audit (post-fix):
+- All fixes verified correct by 5 agents
+- Deduplicated downloadBackup/getStoredHint into shared module
+- Removed dead state vars, unused imports/destructures from extraction leftovers
+- Rewrote weights tests with real BSV pubkeys (6 were false positives)
+- Updated SECURITY_AUDIT.md: 6 additional fixes marked as FIXED
+
+Remaining: x-forwarded-for (deploy concern)
 
 ## 2026-04-02/03 — GitHub Launch Preparation
 

@@ -3,31 +3,9 @@
 import { useState } from 'react';
 import { upgradeIdentity, commitUpgrade, unlockIdentity } from '@/services/bsv/identity';
 import { encryptWif } from '@/services/bsv/crypto';
-import { generateBackupHtml, type BackupData } from '@/services/bsv/backup-template';
+import { type BackupData, downloadBackup, getStoredHint } from '@/services/bsv/backup-template';
 import { migrateIdentity } from '@/app/actions';
 import type { Identity } from '@/types';
-
-function getStoredHint(): string | undefined {
-  try {
-    const raw = localStorage.getItem('bfn_keypair_enc');
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as { hint?: string };
-    return parsed.hint || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function downloadBackup(data: BackupData, filename: string): void {
-  const html = generateBackupHtml(data);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 interface ChangePassphraseModalProps {
   isOpen: boolean;

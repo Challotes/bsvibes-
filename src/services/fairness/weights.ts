@@ -15,6 +15,12 @@ const WEIGHTS_CACHE_TTL_MS = 30_000;
 let _cachedWeights: ContributorWeight[] | null = null;
 let _weightsCachedAt = 0;
 
+/** Clear the weight cache. Exported for tests only. */
+export function _clearWeightsCache(): void {
+  _cachedWeights = null;
+  _weightsCachedAt = 0;
+}
+
 export interface ContributorWeight {
   pubkey: string;
   address: string;

@@ -9,7 +9,7 @@ import {
   signPost,
 } from '@/services/bsv/identity';
 import { encryptWif, decryptWif } from '@/services/bsv/crypto';
-import { generateBackupHtml, type BackupData } from '@/services/bsv/backup-template';
+import { type BackupData, downloadBackup, getStoredHint } from '@/services/bsv/backup-template';
 import { cleanupMigrations } from './actions';
 import { AnimatedBalance } from '@/components/AnimatedBalance';
 import { PassphrasePrompt } from '@/components/PassphrasePrompt';
@@ -19,33 +19,8 @@ import { useBsvPrice, satsToDollars } from '@/hooks/useBsvPrice';
 import { useCurrencyMode } from '@/hooks/useCurrencyMode';
 import { EarningsSparkline } from '@/components/EarningsSparkline';
 import { FundAddress } from './FundAddress';
-import type { Identity } from '@/types';
 
 const BACKED_UP_KEY = 'bsvibes_identity_backed_up';
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function getStoredHint(): string | undefined {
-  try {
-    const raw = localStorage.getItem('bfn_keypair_enc');
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as { hint?: string };
-    return parsed.hint || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function downloadBackup(data: BackupData, filename: string): void {
-  const html = generateBackupHtml(data);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
@@ -71,10 +46,6 @@ export function IdentityChip(): React.JSX.Element | null {
 
   // Save recovery file state
   const [downloading, setDownloading] = useState(false);
-  // For protected users: prompt passphrase before saving
-  const [showSavePassphrase, setShowSavePassphrase] = useState(false);
-  const [saveError, setSaveError] = useState('');
-  const [savingEncrypted, setSavingEncrypted] = useState(false);
 
   // Re-auth grace window (for actions that need passphrase confirmation)
   const [reAuthTime, setReAuthTime] = useState(0);
@@ -208,8 +179,6 @@ export function IdentityChip(): React.JSX.Element | null {
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function resetManageState() {
-    setShowSavePassphrase(false);
-    setSaveError('');
     setReAuthAction(null);
     setReAuthError('');
     setShowAdvanced(false);
@@ -399,14 +368,6 @@ export function IdentityChip(): React.JSX.Element | null {
     setPendingRestoreName(undefined);
     setShowPasteKey(false);
     setPasteKeyValue('');
-  }
-
-  function handleShowImport(): void {
-    requireReAuth(() => {
-      setShowImport(true);
-      // B5 fix: close upgrade modal when import opens
-      setShowUpgradeModal(false);
-    });
   }
 
   // B5 fix: close import when upgrade modal opens

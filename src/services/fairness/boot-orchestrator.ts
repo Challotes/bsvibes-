@@ -44,7 +44,7 @@ export async function executeBoot(
   const platformAddress = getServerAddress();
 
   // 3. Get dynamic price and check free boot eligibility
-  const { price, isFree, freeRemaining } = getBootPriceForUser(db, booterPubkey);
+  const { price, isFree } = getBootPriceForUser(db, booterPubkey);
   const actualPrice = isFree ? getBootPrice(db) : price; // Free boots still cost the server the dynamic price
 
   // 4. Calculate contribution weights (with migration chain resolution)

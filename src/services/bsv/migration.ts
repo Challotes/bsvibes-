@@ -3,8 +3,6 @@
  * When a user upgrades security, old key signs a migration to new key.
  */
 
-import { logPostOnChain } from './onchain';
-
 interface MigrationData {
   oldPubkey: string;
   newPubkey: string;

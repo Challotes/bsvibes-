@@ -177,6 +177,9 @@
 - [x] Dead code removal + tidiness cleanup (11 items)
 - [x] IdentityBar.tsx decomposition (1,632→1,150 lines — PassphrasePrompt, UpgradeModal, ChangePassphraseModal extracted)
 - [x] Extract shared useBoot hook (deduplicates boot flow, adds consolidation to Bootboard reboots)
+- [x] Unit test suite (Vitest: 27 tests — split, pricing, weights, rate-limit)
+- [x] Deduplicated shared utilities (downloadBackup, getStoredHint)
+- [x] Post-fix re-audit: all fixes verified, dead code cleaned, false-positive tests rewritten
 
 ## Phase 6.5: UX Polish — PLANNED
 

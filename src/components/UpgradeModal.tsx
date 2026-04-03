@@ -3,21 +3,10 @@
 import { useState } from 'react';
 import { upgradeIdentity, commitUpgrade } from '@/services/bsv/identity';
 import { encryptWif } from '@/services/bsv/crypto';
-import { generateBackupHtml, type BackupData } from '@/services/bsv/backup-template';
+import { type BackupData, downloadBackup } from '@/services/bsv/backup-template';
 import { migrateIdentity } from '@/app/actions';
 import { useCurrencyMode } from '@/hooks/useCurrencyMode';
 import type { Identity } from '@/types';
-
-function downloadBackup(data: BackupData, filename: string): void {
-  const html = generateBackupHtml(data);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 interface UpgradeModalProps {
   isOpen: boolean;
