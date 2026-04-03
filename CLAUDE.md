@@ -24,58 +24,85 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 ## Key Files
 
-- `src/app/page.tsx` — Main entry (server component, fetches posts + bootboard, 10s ISR)
-- `src/app/Feed.tsx` — Client orchestrator: real-time polling, optimistic posts, pagination state, composes all feed components
-- `src/app/Header.tsx` — Top bar with BSVibes logo, genesis navigation, identity chip
-- `src/app/PostList.tsx` — Pure rendering component for posts, BootButton, Genesis anchor, "Load earlier posts" button
-- `src/app/PostForm.tsx` — Compose box with enter-to-post, voice-to-text mic, agent chat trigger, optimistic post callback
-- `src/app/IdentityBar.tsx` — Identity chip with dropdown, WIF masked with reveal toggle, amber warning dot until first backup
-- `src/app/Bootboard.tsx` — Bootboard spotlight: pay-to-feature post, live timer, shake/glow animations
-- `src/app/Manifesto.tsx` — Vision TLDR block above Genesis (amber accent, "Chat with the agent" link)
-- `src/app/Genesis.tsx` — Manifesto + founding conversation (always visible at top of feed, NOT collapsible by design)
-- `src/app/AgentChat.tsx` — AI-powered Q&A agent (modal, streaming via /api/agent, highlight-on-demand)
-- `src/data/agent-prompt.ts` — Dynamic agent prompt builder (loads project MDs at request time based on question classification)
-- `src/app/api/agent/route.ts` — Streaming agent chat endpoint (SSE, rate-limited)
-- `src/app/api/posts/route.ts` — Feed polling endpoint (GET, supports ?since_id for incremental polling)
-- `src/app/api/boot-shares/route.ts` — Returns contributor shares + boot price for client-side tx building
-- `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (audit trail + bootboard update)
-- `src/app/api/earnings/route.ts` — Returns total earned, activity feed (in/out), earnings history for chart
-- `src/app/api/tx-hex/route.ts` — Proxy for WhatsOnChain /tx/hex (avoids CORS for client-side tx building)
-- `src/app/api/boot-status/route.ts` — Returns free boots remaining + boot price for a user address
+### API Routes
+
+- `src/app/api/posts/route.ts` — Feed polling (GET, ?since_id for incremental updates)
+- `src/app/api/boot-shares/route.ts` — Contributor shares + boot price for client-side tx building
+- `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (replay protection, output verification, rate limiting)
+- `src/app/api/boot-status/route.ts` — Free boots remaining + boot price for a user
+- `src/app/api/earnings/route.ts` — Total earned, activity feed, earnings history for chart
+- `src/app/api/agent/route.ts` — Streaming agent chat (SSE, rate-limited)
+- `src/app/api/tx-hex/route.ts` — WhatsOnChain proxy (avoids CORS for client tx building)
+
+### Server Actions & Data
+
+- `src/app/actions.ts` — createPost (sig verification), getPosts, getBootboard, bootPost, migrateIdentity, cleanupMigrations
+- `src/lib/db.ts` — SQLite setup (WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
-- `src/app/actions.ts` — Server actions (createPost with sig verification, getPosts/getNewPosts/getOlderPosts, getBootboard, bootPost with transaction)
-- `src/app/error.tsx` — Error boundary (dark theme, "Something went wrong" + retry)
-- `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load for all components)
-- `src/hooks/useIdentity.ts` — React hook for identity management (used inside IdentityProvider)
-- `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking, genesis visited state
-- `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s with since_id; pauses on hidden tab; merges incremental updates
-- `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
-- `src/lib/utils.ts` — Shared utilities (cn, generateAnonName, timeAgo)
-- `src/lib/db.ts` — SQLite setup with WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables
-- `src/services/bsv/identity.ts` — BSV keypair generation, signing, encrypted storage, upgrade + unlock
-- `src/services/bsv/crypto.ts` — AES-256-GCM encrypt/decrypt for WIF keys (Web Crypto API)
-- `src/services/bsv/migration.ts` — Key rotation with on-chain migration via OP_RETURN
-- `src/services/bsv/client-boot.ts` — Client-side trustless boot tx builder (browser → contributors directly, zero custody, smallest-first UTXO consolidation, auto-consolidation via WoC, localStorage spent persistence)
-- `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (mutex, spent-blacklist, 0-conf chaining, double-spend self-healing)
-- `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget, returns txid)
-- `src/services/fairness/config.ts` — Tunable fairness parameters (governance surface for AI agent)
-- `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached)
-- `src/services/fairness/weights.ts` — Contribution scoring (sqrt × decay × engagement, migration chain)
-- `src/services/fairness/split.ts` — No-custody payout split (every sat out in same tx)
-- `src/services/fairness/boot-payment.ts` — Multi-output BSV split transaction builder
-- `src/services/fairness/boot-orchestrator.ts` — Full boot workflow (validate → price → score → split → broadcast → record)
-- `src/app/FundAddress.tsx` — Deposit address panel (QR/copy for users who exhaust free boots)
-- `src/data/genesis.ts` — Genesis conversation data (founding messages)
-- `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash, Agentic fairness label)
-- `src/components/EarningsSparkline.tsx` — Step-function area chart for cumulative earnings (pure SVG)
-- `src/hooks/useBsvPrice.ts` — BSV/USD price from WhatsOnChain (cached 5 min)
-- `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle (localStorage persist)
-- `src/components/icons/BootIcon.tsx` — Boot emoji icon component
+- `src/data/agent-prompt.ts` — Dynamic agent prompt builder (loads MDs at request time)
+- `src/data/genesis.ts` — Genesis conversation data
+
+### Pages & Components
+
+- `src/app/page.tsx` — Main entry (server component, 10s ISR)
+- `src/app/Feed.tsx` — Client orchestrator: polling, optimistic posts, pagination
+- `src/app/Header.tsx` — Top bar with logo, genesis nav, identity chip
+- `src/app/PostList.tsx` — Post rendering, BootButton, Genesis anchor
+- `src/app/PostForm.tsx` — Compose box (enter-to-post, voice-to-text, agent chat trigger)
+- `src/app/IdentityBar.tsx` — Identity chip + manage modal (balance, earnings, backup, import)
+- `src/app/Bootboard.tsx` — Pay-to-feature spotlight (live timer, shake/glow animations)
+- `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
+- `src/app/Genesis.tsx` — Founding conversation (always visible, NOT collapsible)
+- `src/app/AgentChat.tsx` — AI Q&A modal (streaming via /api/agent)
+- `src/app/FundAddress.tsx` — Deposit address panel (QR/copy)
+- `src/app/error.tsx` — Error boundary
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
 - `src/components/UpgradeModal.tsx` — Security upgrade modal (passphrase encryption + migration)
 - `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
-- `src/hooks/useBoot.ts` — Shared boot logic hook (free → server, paid → client trustless, consolidation)
-- `src/types/speech.d.ts` — SpeechRecognition API TypeScript types
+- `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
+- `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
+- `src/components/icons/BootIcon.tsx` — Boot emoji icon
+
+### BSV Services
+
+- `src/services/bsv/identity.ts` — Keypair generation, signing, encrypted storage, upgrade + unlock
+- `src/services/bsv/crypto.ts` — AES-256-GCM encrypt/decrypt for WIF keys (Web Crypto API)
+- `src/services/bsv/backup-template.ts` — Self-contained HTML recovery file generator + downloadBackup/getStoredHint utilities
+- `src/services/bsv/migration.ts` — Key rotation with on-chain migration via OP_RETURN
+- `src/services/bsv/client-boot.ts` — Client-side trustless boot tx builder (browser → contributors, zero custody)
+- `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (mutex, spent-blacklist, 0-conf chaining)
+- `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget)
+
+### Fairness Pipeline
+
+- `src/services/fairness/config.ts` — Tunable parameters (governance surface)
+- `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached)
+- `src/services/fairness/weights.ts` — Contribution scoring (sqrt × decay × engagement, migration chain resolution)
+- `src/services/fairness/split.ts` — No-custody payout split (every sat out in same tx)
+- `src/services/fairness/boot-payment.ts` — Multi-output BSV split transaction builder
+- `src/services/fairness/boot-orchestrator.ts` — Full boot workflow (validate → price → score → split → broadcast → record)
+
+### Hooks & Context
+
+- `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load)
+- `src/hooks/useIdentity.ts` — React hook for identity management
+- `src/hooks/useBoot.ts` — Shared boot logic (free → server, paid → client trustless, consolidation)
+- `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s (pauses on hidden tab)
+- `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking
+- `src/hooks/useBsvPrice.ts` — BSV/USD price (cached 5 min)
+- `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle
+- `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
+
+## Request Flows
+
+**Post creation:**
+PostForm → signPost (ECDSA) → createPost server action → verify signature → insert DB → logPostOnChain (fire-and-forget OP_RETURN) → return post ID → optimistic UI update → Feed polls for confirmation
+
+**Boot payment (paid):**
+BootButton/useBoot → bootPost server action (checks free quota) → requiresPayment response → fetch /api/boot-shares (split calculation) → clientSideBoot (browser builds multi-output BSV tx) → broadcast via ARC → POST /api/boot-confirm (verify on-chain outputs match split, replay protection, record payouts) → Feed polls for bootboard update
+
+**Boot payment (free):**
+BootButton/useBoot → bootPost server action → server wallet builds split tx via boot-orchestrator → broadcast → consume free boot grant → return success
 
 ## Coding Standards
 
@@ -143,6 +170,33 @@ Read these to understand the full picture:
 - **ROADMAP.md** — What's done, what's next, what's planned
 - **FUTURE.md** — Ideas and explorations not yet built (handles, AFP protocol, agents, boot signals)
 - **SESSION_LOG.md** — What happened in each working session
+
+## Hard Rules
+
+These are non-negotiable. Do not bend them without explicit approval from Nige.
+
+1. **Read DECISIONS.md before proposing changes to identity, security, or fairness.** If a relevant decision exists, acknowledge it before proceeding. Do not relitigate settled decisions — if you want to challenge one, quote the original rationale, state what has changed, and ask first.
+2. **No file deletes without confirmation.** Before deleting any file (not in node_modules/.next/build), state what will be deleted and why, and wait for explicit confirmation.
+3. **Flag security regressions explicitly.** If a change weakens a control marked FIXED in SECURITY_AUDIT.md (removing rate limiting, relaxing signature verification, etc.), flag it as a security regression and require confirmation.
+4. **Every session that modifies code must end with a git commit.** SESSION_LOG entry written, then commit. No leaving modified files uncommitted at session end.
+5. **Update DECISIONS.md immediately when a decision is made**, not at session end. Decisions made mid-session affect subsequent work.
+
+## Context Management
+
+When you estimate you are above 70% of context capacity during a working session:
+
+1. **At 70%**: Write a checkpoint — update SESSION_LOG.md with current state, what's done, what's next, what was ruled out. Continue working.
+2. **At 80%**: Finish the current atomic unit of work (don't stop mid-edit). Commit all changes. Update ROADMAP.md and DECISIONS.md if anything changed.
+3. **At 85%**: Stop new work. Tell Nige: "Context is getting full — I've saved state. Start a new session to continue."
+
+**SESSION_LOG entries must include:**
+- What category of work was done (feature, security, refactor, etc.)
+- Specific files changed and why
+- What was explicitly ruled out or deferred
+- What is still broken or incomplete
+- The next step if the session ended mid-task
+
+**Restart read order for new sessions:** CLAUDE.md → ROADMAP.md → DECISIONS.md → SESSION_LOG.md (last entry)
 
 ## AI Contribution Protocol
 
