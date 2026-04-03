@@ -28,11 +28,12 @@ Tidiness cleanup (11/11):
 - Fixed operator precedence bug in useBsvPrice.ts, added missing semicolons
 - Cleaned CLAUDE.md (duplicate entry, dead file reference)
 
-Remaining (deferred — larger refactors):
-- IdentityBar.tsx decomposition (1,630 lines → 5 files)
-- Extract shared useBoot hook (deduplicate boot logic)
-- x-forwarded-for hardening (deploy/docs concern)
+Refactors (completed):
+- Extracted shared useBoot hook — deduplicates boot flow, adds consolidation to Bootboard reboots
+- Decomposed IdentityBar.tsx: 1,632→1,150 lines (PassphrasePrompt, UpgradeModal, ChangePassphraseModal → src/components/)
 - Bootboard break-all → break-words consistency
+
+Remaining: x-forwarded-for (deploy concern), zero test coverage
 
 ## 2026-04-02/03 — GitHub Launch Preparation
 

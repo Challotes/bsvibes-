@@ -175,8 +175,8 @@
 - [x] Dynamic @bsv/sdk import in server actions
 - [x] Migration message structural validation
 - [x] Dead code removal + tidiness cleanup (11 items)
-- [ ] IdentityBar.tsx decomposition (1,630 lines — deferred, large refactor)
-- [ ] Extract shared useBoot hook (deferred, large refactor)
+- [x] IdentityBar.tsx decomposition (1,632→1,150 lines — PassphrasePrompt, UpgradeModal, ChangePassphraseModal extracted)
+- [x] Extract shared useBoot hook (deduplicates boot flow, adds consolidation to Bootboard reboots)
 
 ## Phase 6.5: UX Polish — PLANNED
 

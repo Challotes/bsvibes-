@@ -71,6 +71,10 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/hooks/useBsvPrice.ts` — BSV/USD price from WhatsOnChain (cached 5 min)
 - `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle (localStorage persist)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon component
+- `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
+- `src/components/UpgradeModal.tsx` — Security upgrade modal (passphrase encryption + migration)
+- `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
+- `src/hooks/useBoot.ts` — Shared boot logic hook (free → server, paid → client trustless, consolidation)
 - `src/types/speech.d.ts` — SpeechRecognition API TypeScript types
 
 ## Coding Standards
