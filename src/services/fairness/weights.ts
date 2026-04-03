@@ -9,6 +9,12 @@ import { PublicKey } from '@bsv/sdk';
 
 const { halfLifeDays, engagementMultiplier, scalingFn } = FAIRNESS_CONFIG;
 
+// Cache weights to avoid full table scan on every boot.
+// Invalidated after 30 seconds — weights only change when posts or boots change.
+const WEIGHTS_CACHE_TTL_MS = 30_000;
+let _cachedWeights: ContributorWeight[] | null = null;
+let _weightsCachedAt = 0;
+
 export interface ContributorWeight {
   pubkey: string;
   address: string;
@@ -93,10 +99,15 @@ function pubkeyToAddress(pubkey: string): string {
 
 /**
  * Calculate contribution weights for all active contributors.
+ * Results are cached for 30 seconds to avoid repeated full table scans.
  */
 export function calculateWeights(db: import('better-sqlite3').Database): ContributorWeight[] {
-  const migrationMap = buildMigrationMap(db);
   const now = Date.now();
+  if (_cachedWeights && now - _weightsCachedAt < WEIGHTS_CACHE_TTL_MS) {
+    return _cachedWeights;
+  }
+
+  const migrationMap = buildMigrationMap(db);
 
   // Get all signed posts with boot counts
   const posts = db.prepare(`
@@ -126,7 +137,7 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
     byPubkey.set(resolvedPubkey, entry);
   }
 
-  return Array.from(byPubkey.entries())
+  const result = Array.from(byPubkey.entries())
     .filter(([, data]) => data.weight > 0)
     .map(([pubkey, data]) => ({
       pubkey,
@@ -136,4 +147,8 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
       totalBoots: data.boots,
     }))
     .filter((c) => c.address !== ''); // Exclude invalid pubkeys
+
+  _cachedWeights = result;
+  _weightsCachedAt = now;
+  return result;
 }

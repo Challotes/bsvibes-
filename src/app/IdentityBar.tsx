@@ -630,6 +630,7 @@ export function IdentityChip(): React.JSX.Element | null {
   useEffect(() => {
     if (!identity?.address) return;
     function fetchLiveBalance() {
+      if (document.visibilityState !== 'visible') return;
       fetch(`https://api.whatsonchain.com/v1/bsv/main/address/${identity!.address}/unspent`)
         .then((res) => res.json())
         .then((utxos) => {
@@ -659,6 +660,7 @@ export function IdentityChip(): React.JSX.Element | null {
   useEffect(() => {
     if (!identity?.address) return;
     const poll = () => {
+      if (document.visibilityState !== 'visible') return;
       fetch(`/api/earnings?address=${encodeURIComponent(identity.address)}&summary=1`)
         .then((res) => res.json())
         .then((data) => {

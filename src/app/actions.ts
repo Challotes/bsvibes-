@@ -3,7 +3,10 @@
 import { db } from '@/lib/db';
 import { generateAnonName } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
-import { PublicKey, Signature } from '@bsv/sdk';
+async function getBsvSdk() {
+  const { PublicKey, Signature } = await import('@bsv/sdk');
+  return { PublicKey, Signature };
+}
 import { logPostOnChain } from '@/services/bsv/onchain';
 import { postMigrationOnChain } from '@/services/bsv/migration';
 import { executeBoot } from '@/services/fairness/boot-orchestrator';
@@ -35,6 +38,7 @@ export async function createPost(formData: FormData): Promise<CreatePostResult> 
 
   if (typeof signature !== 'string') return { ok: false, reason: 'invalid_signature' };
   try {
+    const { PublicKey, Signature } = await getBsvSdk();
     const messageBytes = Array.from(new TextEncoder().encode(content.trim()));
     const verified = PublicKey.fromString(pubkey).verify(
       messageBytes,
@@ -257,6 +261,7 @@ export async function cleanupMigrations(
 
   const message = `cleanup:${pubkey.trim()}:${timestamp}`;
   try {
+    const { PublicKey, Signature } = await getBsvSdk();
     const messageBytes = Array.from(new TextEncoder().encode(message));
     const verified = PublicKey.fromString(pubkey.trim()).verify(
       messageBytes,
@@ -311,8 +316,20 @@ export async function migrateIdentity(
   migrationSig: string,
   migrationMessage: string
 ): Promise<{ success: boolean }> {
+  // Validate migration message structure — from_pubkey and to_pubkey must match params
+  try {
+    const parsed = JSON.parse(migrationMessage);
+    if (parsed.from_pubkey !== oldPubkey || parsed.to_pubkey !== newPubkey) {
+      console.warn('[BSVibes] migrateIdentity: message body does not match params');
+      return { success: false };
+    }
+  } catch {
+    return { success: false };
+  }
+
   // Verify the migration signature — old key must have signed the message
   try {
+    const { PublicKey, Signature } = await getBsvSdk();
     const messageBytes = Array.from(new TextEncoder().encode(migrationMessage));
     const verified = PublicKey.fromString(oldPubkey).verify(
       messageBytes,
