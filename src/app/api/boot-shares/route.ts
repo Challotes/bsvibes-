@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { rateLimit } from '@/lib/rate-limit'
 import { getBootPrice, getBootPriceForUser } from '@/services/fairness/pricing'
 import { calculateWeights } from '@/services/fairness/weights'
 import { calculateSplit } from '@/services/fairness/split'
 import { getServerAddress } from '@/services/bsv/wallet'
 
 export async function GET(req: NextRequest) {
+  // Rate limit: 30 requests per minute per IP
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const rl = rateLimit(`boot-shares:${ip}`, { limit: 30, windowMs: 60_000 })
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const { searchParams } = req.nextUrl
   const postIdParam = searchParams.get('postId')
   const pubkey = searchParams.get('pubkey') ?? ''

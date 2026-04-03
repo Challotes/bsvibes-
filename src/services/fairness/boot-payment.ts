@@ -60,13 +60,7 @@ export async function buildSplitTransaction(
     }
   }
 
-  // OP_RETURN audit trail with split hash
-  const splitData = Array.from(outputsByAddress.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([address, sats]) => `${address}:${sats}`)
-    .join(',');
-
-  // Simple hash: use the split data string as-is in the OP_RETURN (compact enough)
+  // OP_RETURN audit trail
   const auditPayload = JSON.stringify({
     app: 'bsvibes',
     action: 'boot_split',

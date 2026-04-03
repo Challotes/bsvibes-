@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,13 @@ function resolveAllAddresses(address: string): string[] {
 }
 
 export async function GET(request: Request) {
+  // Rate limit: 20 requests per minute per IP
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const rl = rateLimit(`earnings:${ip}`, { limit: 20, windowMs: 60_000 });
+  if (!rl.success) {
+    return Response.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
 

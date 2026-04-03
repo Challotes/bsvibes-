@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { rateLimit } from '@/lib/rate-limit'
 import { getBootPriceForUser, getBootPrice } from '@/services/fairness/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,13 @@ export const dynamic = 'force-dynamic'
  * Used by Feed.tsx to initialise client-side state on first load.
  */
 export async function GET(req: NextRequest) {
+  // Rate limit: 30 requests per minute per IP
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const rl = rateLimit(`boot-status:${ip}`, { limit: 30, windowMs: 60_000 })
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const pubkey = req.nextUrl.searchParams.get('pubkey') ?? ''
 
   if (!pubkey || pubkey.trim().length === 0) {

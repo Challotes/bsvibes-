@@ -75,6 +75,3 @@ export function buildAgentPrompt(latestQuestion: string): string {
   const context = selectContext(latestQuestion);
   return `${PERSONALITY}\n\n## Project Context\n${context}`;
 }
-
-// Legacy export for backwards compatibility (uses full context)
-export const AGENT_SYSTEM_PROMPT = `${PERSONALITY}\n\n## Project Context\n${loadMd('CLAUDE.md')}`;

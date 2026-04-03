@@ -37,7 +37,7 @@ export function useBsvPrice(): number {
         const res = await fetch('https://api.whatsonchain.com/v1/bsv/main/exchangerate');
         if (!res.ok) return;
         const data = await res.json();
-        const usd = data?.rate ?? data?.currency === 'USD' ? data.rate : null;
+        const usd = data?.rate ?? null;
         if (usd && typeof usd === 'number' && usd > 0) {
           setPrice(usd);
           localStorage.setItem(CACHE_KEY, JSON.stringify({ usd, ts: Date.now() }));

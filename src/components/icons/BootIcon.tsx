@@ -3,7 +3,6 @@ export function BootIcon({
   className = '',
 }: {
   size?: number;
-  filled?: boolean;
   className?: string;
 }) {
   return (

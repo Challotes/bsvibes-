@@ -141,7 +141,7 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
           {/* Meta line — label + author + timer + expand toggle */}
           <div className="flex flex-wrap items-center justify-between text-xs text-zinc-500 mb-1.5 gap-y-1">
             <div className="flex items-center gap-1.5 min-w-0">
-              <BootIcon size={14} filled className="text-amber-400 shrink-0" />
+              <BootIcon size={14} className="text-amber-400 shrink-0" />
               <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide shrink-0">Bootboard</span>
               <span className="text-zinc-700 shrink-0">·</span>
               <span className="font-medium text-amber-300 truncate">{current.author_name}</span>
@@ -192,7 +192,7 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
         </div>
       ) : (
         <div className="flex items-center gap-2 text-xs">
-          <BootIcon size={14} filled className="text-amber-400" />
+          <BootIcon size={14} className="text-amber-400" />
           <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
           <span className="text-zinc-700">·</span>
           <span className="text-zinc-600">Boost any post to claim the spotlight</span>

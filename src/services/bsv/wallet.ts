@@ -5,7 +5,7 @@
  * concurrent operations (post logging, boot splits, migrations).
  */
 
-import { PrivateKey, Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
+import { PrivateKey, Transaction, P2PKH, SatoshisPerKilobyte, type LockingScript } from '@bsv/sdk';
 
 let _serverKey: PrivateKey | null = null;
 
@@ -190,7 +190,7 @@ async function getSourceTransaction(utxo: UTXO): Promise<Transaction | null> {
  * Uses a mutex to prevent concurrent calls from grabbing the same UTXOs.
  */
 export async function buildAndBroadcast(
-  outputs: Array<{ lockingScript: any; satoshis: number }>
+  outputs: Array<{ lockingScript: LockingScript; satoshis: number }>
 ): Promise<BroadcastResult> {
   const key = getServerKey();
   if (!key) {
@@ -213,7 +213,7 @@ export async function buildAndBroadcast(
  */
 async function _buildAndBroadcastInner(
   key: PrivateKey,
-  outputs: Array<{ lockingScript: any; satoshis: number }>,
+  outputs: Array<{ lockingScript: LockingScript; satoshis: number }>,
   retryCount = 0
 ): Promise<BroadcastResult> {
   const totalNeeded = outputs.reduce((sum, o) => sum + o.satoshis, 0) + 500; // +500 for estimated fee
