@@ -97,11 +97,11 @@
 - [ ] Device sync via QR code (faster identity import between devices) — future
 - [ ] PBKDF2 increase to 600k iterations — future (when real funds flow)
 
-## Phase 5: Self-Funded Posting — PLANNED
+## Phase 5: Self-Funded Posting — IN PROGRESS
 
-- [ ] UTXO check via WhatsOnChain API
-- [ ] Client-side transaction building with change output
-- [ ] Silent switch between server-funded and self-funded
+- [x] UTXO check via WhatsOnChain API (built in client-boot.ts)
+- [x] Client-side transaction building with change output (built in client-boot.ts)
+- [x] Silent switch between server-funded and self-funded (free → paid auto-switch)
 - [ ] Daily posting limits (5 free/day)
 - [ ] QR code funding when limit reached
 
@@ -176,9 +176,9 @@
 - [ ] Template system for new instances
 - [ ] Yours Wallet integration via @1sat/connect for power users
 
-## Open Source — PLANNED
+## Open Source — IN PROGRESS
 
-- [ ] Clean up repo for public release
-- [ ] Ensure AI context files are comprehensive
-- [ ] Choose license (considering contribution-tracking implications)
+- [x] Clean up repo for public release
+- [x] Ensure AI context files are comprehensive
+- [x] Choose license — MIT
 - [ ] GitHub public release
