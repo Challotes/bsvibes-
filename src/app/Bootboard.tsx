@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef, useTransition } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { BootIcon } from '@/components/icons/BootIcon';
-import { bootPost } from './actions';
-import { clientSideBoot } from '@/services/bsv/client-boot';
 import { useIdentityContext } from '@/contexts/IdentityContext';
+import { useBoot } from '@/hooks/useBoot';
 import type { BootboardData } from '@/types';
 
 function formatDuration(seconds: number): string {
@@ -33,62 +32,22 @@ function LiveTimer({ since }: { since: string }) {
 
 function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['history'][0]; onBooted?: () => void; onFundNeeded?: (address: string, balance?: number) => void }) {
   const { identity } = useIdentityContext();
-  const [isPending, startTransition] = useTransition();
+  const { boot, isBooting } = useBoot({ onBooted, onFundNeeded });
 
   function handleReboot() {
     if (!identity) return;
-    startTransition(async () => {
-      const result = await bootPost(entry.post_id, identity.address, identity.name);
-
-      if (result.requiresPayment) {
-        // Paid boot: client builds trustless tx
-        const sharesRes = await fetch(`/api/boot-shares?postId=${entry.post_id}&pubkey=${encodeURIComponent(identity.address)}`);
-        if (!sharesRes.ok) return;
-        const sharesData = await sharesRes.json();
-
-        const bootResult = await clientSideBoot(
-          identity.wif,
-          identity.address,
-          entry.post_id,
-          sharesData.shares,
-          sharesData.bootPrice,
-        );
-
-        if (bootResult.status === 'insufficient_funds') {
-          console.warn('[HistoryRow] clientSideBoot insufficient_funds, balance:', bootResult.balance, 'address:', identity.address);
-          onFundNeeded?.(identity.address, bootResult.balance);
-          return;
-        }
-
-        if (bootResult.status === 'error' || bootResult.status === 'broadcast_failed') {
-          console.error('[HistoryRow] clientSideBoot failed:', bootResult.status, bootResult.error);
-          return;
-        }
-
-        if (bootResult.status === 'success' && bootResult.txid) {
-          await fetch('/api/boot-confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId: entry.post_id, txid: bootResult.txid, booterPubkey: identity.address, booterName: identity.name }),
-          });
-        } else {
-          return;
-        }
-      }
-
-      onBooted?.();
-    });
+    boot(entry.post_id, identity);
   }
 
   return (
     <div className="flex items-center gap-2 text-[11px] text-zinc-600 py-0.5">
       <button
         onClick={handleReboot}
-        disabled={isPending || !identity}
+        disabled={isBooting || !identity}
         className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50`}
         title="Reboot this post"
       >
-        {isPending ? <span className="text-[10px]">...</span> : <BootIcon size={11} />}
+        {isBooting ? <span className="text-[10px]">...</span> : <BootIcon size={11} />}
       </button>
       <span className="text-zinc-500 shrink-0">{entry.author_name}</span>
       <span className="shrink-0">·</span>
@@ -170,7 +129,7 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
           </div>
 
           {/* Content */}
-          <p className="text-sm leading-snug text-zinc-100 whitespace-pre-wrap break-all">
+          <p className="text-sm leading-snug text-zinc-100 whitespace-pre-wrap break-words">
             {current.content}
           </p>
 

@@ -3,9 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Post } from '@/types';
 import { BootIcon } from '@/components/icons/BootIcon';
-import { bootPost } from './actions';
-import { clientSideBoot, consolidateUtxos } from '@/services/bsv/client-boot';
 import { useIdentityContext } from '@/contexts/IdentityContext';
+import { useBoot } from '@/hooks/useBoot';
 import { Genesis } from './Genesis';
 import { timeAgo } from '@/lib/utils';
 
@@ -22,8 +21,7 @@ interface BootButtonProps {
 
 function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded, onFreeBootUsed }: BootButtonProps) {
   const { identity } = useIdentityContext();
-  const [isBooting, setIsBooting] = useState(false);
-  const [bootPhase, setBootPhase] = useState<'idle' | 'preparing' | 'booting'>('idle');
+  const { boot, isBooting, bootPhase } = useBoot({ onBooted, onFundNeeded, onFreeBootUsed });
   const [optimisticBoots, setOptimisticBoots] = useState(0);
 
   useEffect(() => {
@@ -36,97 +34,10 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
   async function handleBoot() {
     if (!identity || !postPubkey || isBooting) return;
 
-    setIsBooting(true);
     setOptimisticBoots((prev) => prev + 1);
-
-    try {
-      // Try server-side boot first (handles free boots).
-      const result = await bootPost(postId, identity.address, identity.name);
-
-      if (result.error) {
-        setOptimisticBoots((prev) => Math.max(0, prev - 1));
-        return;
-      }
-
-      if (result.success && result.isFree) {
-        // Successful free boot — decrement the parent counter immediately so the
-        // FREE badge disappears on this render, not after a round-trip.
-        onFreeBootUsed?.();
-        onBooted?.();
-        return;
-      }
-
-      if (result.requiresPayment) {
-        // Server says free quota is exhausted — sync client state immediately.
-        onFreeBootUsed?.();
-
-        // Paid boot — client builds trustless tx.
-        setBootPhase('booting');
-        const sharesRes = await fetch(`/api/boot-shares?postId=${postId}&pubkey=${encodeURIComponent(identity.address)}`);
-        if (!sharesRes.ok) {
-          setOptimisticBoots((prev) => Math.max(0, prev - 1));
-          return;
-        }
-        const sharesData = await sharesRes.json();
-
-        let bootResult = await clientSideBoot(
-          identity.wif,
-          identity.address,
-          postId,
-          sharesData.shares,
-          sharesData.bootPrice,
-        );
-
-        // Wallet too fragmented — consolidate first, then retry boot
-        if (bootResult.status === 'needs_consolidation') {
-          setBootPhase('preparing');
-          const consolidateResult = await consolidateUtxos(identity.wif, identity.address);
-          if (consolidateResult.status !== 'success') {
-            console.error('[BootButton] consolidation failed:', consolidateResult.error);
-            setOptimisticBoots((prev) => Math.max(0, prev - 1));
-            return;
-          }
-          // Retry boot with consolidated UTXO (0-conf chained)
-          setBootPhase('booting');
-          bootResult = await clientSideBoot(
-            identity.wif,
-            identity.address,
-            postId,
-            sharesData.shares,
-            sharesData.bootPrice,
-          );
-        }
-
-        if (bootResult.status === 'insufficient_funds') {
-          setOptimisticBoots((prev) => Math.max(0, prev - 1));
-          onFundNeeded?.(identity.address, bootResult.balance);
-          return;
-        }
-
-        if (bootResult.status === 'error' || bootResult.status === 'broadcast_failed') {
-          console.error('[BootButton] clientSideBoot failed:', bootResult.status, bootResult.error);
-          setOptimisticBoots((prev) => Math.max(0, prev - 1));
-          return;
-        }
-
-        if (bootResult.status === 'success' && bootResult.txid) {
-          // Confirm on server for audit trail.
-          await fetch('/api/boot-confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId, txid: bootResult.txid, booterPubkey: identity.address, booterName: identity.name }),
-          });
-          onBooted?.();
-        } else {
-          setOptimisticBoots((prev) => Math.max(0, prev - 1));
-        }
-        return;
-      }
-
-      onBooted?.();
-    } finally {
-      setIsBooting(false);
-      setBootPhase('idle');
+    const result = await boot(postId, identity);
+    if (!result.success) {
+      setOptimisticBoots((prev) => Math.max(0, prev - 1));
     }
   }
 
