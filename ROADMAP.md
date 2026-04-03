@@ -162,6 +162,22 @@
 - [x] Server wallet self-healing: DOUBLE_SPEND_ATTEMPTED → blacklist competing inputs → auto-retry
 - [x] TimeAgo timestamps refresh every 60s without page reload
 
+## Phase 6.1: Second Audit (2026-04-03) — COMPLETE
+
+- [x] 5-agent parallel audit (architecture, security, performance, tidiness, correctness)
+- [x] boot-confirm: replay protection, rate limiting, on-chain output verification
+- [x] NaN weight cascade fix (SQLite datetime parsing)
+- [x] Server wallet retry limit (was unbounded recursion)
+- [x] SQL parameterization in pricing query
+- [x] Rate limiting on all API routes (boot-shares, boot-status, earnings)
+- [x] calculateWeights() 30s TTL cache
+- [x] Tab visibility checks on balance/earnings polling
+- [x] Dynamic @bsv/sdk import in server actions
+- [x] Migration message structural validation
+- [x] Dead code removal + tidiness cleanup (11 items)
+- [ ] IdentityBar.tsx decomposition (1,630 lines — deferred, large refactor)
+- [ ] Extract shared useBoot hook (deferred, large refactor)
+
 ## Phase 6.5: UX Polish — PLANNED
 
 - [ ] Notification system (bell icon — "anon_x7f2 featured your post", daily earnings summary)

@@ -2,15 +2,37 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
-## 2026-04-03 — Full Repo Audit + Critical Fixes
+## 2026-04-03 — Full Repo Audit + Fixes (21 of 26 findings resolved)
 
 5-agent parallel audit (architecture, security, performance, tidiness, correctness):
+
+Critical fixes (5/5):
 - boot-confirm hardened: replay protection (txid dedup + UNIQUE index), rate limiting, on-chain output verification
 - Fixed NaN cascade in weights.ts: SQLite datetime parsing now uses valid ISO 8601
 - Server wallet double-spend retry capped at 3 attempts (was unbounded recursion)
 - SQL injection prevention: parameterized activeWindowDays in pricing query
 - Added missing payouts.recipient_address index for earnings query performance
-- 26 total findings catalogued — 5 critical fixed, working through important + tidiness next
+
+Important fixes (6/10):
+- Rate limiting added to /api/boot-shares, /api/boot-status, /api/earnings
+- calculateWeights() cached with 30s TTL (avoids full table scan per boot)
+- Balance + earnings polls skip when tab is hidden
+- @bsv/sdk converted to dynamic import in actions.ts (lighter server action bundle)
+- Migration message structural validation (from_pubkey/to_pubkey must match params)
+- lockingScript typed properly (removed only `any` in codebase)
+
+Tidiness cleanup (11/11):
+- Deleted dead agent-knowledge.ts + removed dead AGENT_SYSTEM_PROMPT export
+- Removed unused splitData, unused BootIcon filled prop
+- Updated biome.json schema, cleaned globals.css, fixed apple-touch-icon to PNG
+- Fixed operator precedence bug in useBsvPrice.ts, added missing semicolons
+- Cleaned CLAUDE.md (duplicate entry, dead file reference)
+
+Remaining (deferred — larger refactors):
+- IdentityBar.tsx decomposition (1,630 lines → 5 files)
+- Extract shared useBoot hook (deduplicate boot logic)
+- x-forwarded-for hardening (deploy/docs concern)
+- Bootboard break-all → break-words consistency
 
 ## 2026-04-02/03 — GitHub Launch Preparation
 
