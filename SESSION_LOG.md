@@ -2,6 +2,23 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-02/03 — GitHub Launch Preparation
+
+Pre-launch cleanup and documentation:
+- Deleted Untitled file (contained API key in plaintext)
+- Removed 7 stale HTML docs from Build From Nothing era + public/recover.html
+- Removed 5 Next.js boilerplate SVGs from public/
+- Generated missing PWA icons (192px + 512px) from icon.svg
+- Wrote full README.md — vision, features, quick start, AI-native repo explanation
+- Added MIT license (BSVibes contributors)
+- Created FUTURE.md — handle system, boot signals, AFP protocol, patterns noticed, gaming detection
+- Added prior art section to FAIRNESS.md — "blocked patents, gave it to everyone"
+- Expanded DIRECTION.md — "Who This Is For", recursive model examples, "Yeah we pump real value", Phase 1 framing, governance softened
+- Rewrote agent concepts as "Patterns We've Noticed" (casual observations, not pitch deck)
+- Renamed package.json from bopen.ai to bsvibes
+- License decision: MIT (revised from Apache 2.0 after deeper analysis — on-chain prior art makes patent clause redundant)
+- Full memory-to-repo transfer: shareable vision moved into project docs, sensitive content stayed private
+
 ## 2026-04-01 — Agent Chat Dynamic Context + Vision Updates
 
 - Agent chat now reads project MDs dynamically instead of stale hardcoded prompt
