@@ -47,6 +47,14 @@ Second re-audit (post-fix):
 - Rewrote weights tests with real BSV pubkeys (6 were false positives)
 - Updated SECURITY_AUDIT.md: 6 additional fixes marked as FIXED
 
+Process improvements:
+- Added Hard Rules to CLAUDE.md (DECISIONS-first, no silent deletes, security regression flags, mandatory commits, no personal info in repo)
+- Added Context Management protocol (70/80/85% graduated save)
+- Added Request Flows to CLAUDE.md (post creation + boot payment paths)
+- Grouped Key Files section by category (API, Components, BSV, Fairness, Hooks)
+- Cleaned 12 stale memory files (duplicated content now in repo MDs)
+- Agent chat: max_tokens 300→800, added rule against price hallucination
+
 Remaining: x-forwarded-for (deploy concern)
 
 ## 2026-04-02/03 — GitHub Launch Preparation
