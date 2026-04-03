@@ -173,13 +173,14 @@ Read these to understand the full picture:
 
 ## Hard Rules
 
-These are non-negotiable. Do not bend them without explicit approval from Nige.
+These are non-negotiable. Do not bend them without explicit approval from the user.
 
 1. **Read DECISIONS.md before proposing changes to identity, security, or fairness.** If a relevant decision exists, acknowledge it before proceeding. Do not relitigate settled decisions — if you want to challenge one, quote the original rationale, state what has changed, and ask first.
 2. **No file deletes without confirmation.** Before deleting any file (not in node_modules/.next/build), state what will be deleted and why, and wait for explicit confirmation.
 3. **Flag security regressions explicitly.** If a change weakens a control marked FIXED in SECURITY_AUDIT.md (removing rate limiting, relaxing signature verification, etc.), flag it as a security regression and require confirmation.
 4. **Every session that modifies code must end with a git commit.** SESSION_LOG entry written, then commit. No leaving modified files uncommitted at session end.
 5. **Update DECISIONS.md immediately when a decision is made**, not at session end. Decisions made mid-session affect subsequent work.
+6. **No personal information in repo files.** Never write names, emails, usernames, or other identifying information into any committed file. Repo files are public — personal details belong only in memory files (which are local and not committed).
 
 ## Context Management
 
@@ -187,7 +188,7 @@ When you estimate you are above 70% of context capacity during a working session
 
 1. **At 70%**: Write a checkpoint — update SESSION_LOG.md with current state, what's done, what's next, what was ruled out. Continue working.
 2. **At 80%**: Finish the current atomic unit of work (don't stop mid-edit). Commit all changes. Update ROADMAP.md and DECISIONS.md if anything changed.
-3. **At 85%**: Stop new work. Tell Nige: "Context is getting full — I've saved state. Start a new session to continue."
+3. **At 85%**: Stop new work. Tell the user: "Context is getting full — I've saved state. Start a new session to continue."
 
 **SESSION_LOG entries must include:**
 - What category of work was done (feature, security, refactor, etc.)
