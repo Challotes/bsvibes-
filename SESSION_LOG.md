@@ -2,6 +2,16 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-03 — Full Repo Audit + Critical Fixes
+
+5-agent parallel audit (architecture, security, performance, tidiness, correctness):
+- boot-confirm hardened: replay protection (txid dedup + UNIQUE index), rate limiting, on-chain output verification
+- Fixed NaN cascade in weights.ts: SQLite datetime parsing now uses valid ISO 8601
+- Server wallet double-spend retry capped at 3 attempts (was unbounded recursion)
+- SQL injection prevention: parameterized activeWindowDays in pricing query
+- Added missing payouts.recipient_address index for earnings query performance
+- 26 total findings catalogued — 5 critical fixed, working through important + tidiness next
+
 ## 2026-04-02/03 — GitHub Launch Preparation
 
 Pre-launch cleanup and documentation:

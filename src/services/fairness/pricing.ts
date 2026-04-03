@@ -21,8 +21,8 @@ export function getBootPrice(db: import('better-sqlite3').Database): number {
       `SELECT COUNT(DISTINCT pubkey) as count
        FROM posts
        WHERE pubkey IS NOT NULL
-       AND created_at > datetime('now', '-${activeWindowDays} days')`
-    ).get() as { count: number };
+       AND created_at > datetime('now', '-' || ? || ' days')`
+    ).get(activeWindowDays) as { count: number };
     cachedCount = Math.max(1, row.count);
     cachedAt = now;
   }

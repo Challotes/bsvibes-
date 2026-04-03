@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { rateLimit } from '@/lib/rate-limit'
 import { calculateWeights } from '@/services/fairness/weights'
 import { calculateSplit } from '@/services/fairness/split'
 import { getBootPrice } from '@/services/fairness/pricing'
@@ -34,14 +35,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid txid format' }, { status: 400 })
   }
 
-  // Verify the transaction exists on-chain via WhatsOnChain
-  // Note: recently broadcast txs may not be indexed yet — retry once after 2s
+  // Rate limit: 10 confirmations per minute per IP
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const rl = rateLimit(`boot-confirm:${ip}`, { limit: 10, windowMs: 60_000 })
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  // Replay protection: reject if this txid was already recorded
+  const existingPayout = db.prepare(
+    'SELECT id FROM payouts WHERE txid = ? LIMIT 1'
+  ).get(txid.trim()) as { id: number } | undefined
+  if (existingPayout) {
+    return NextResponse.json({ error: 'Transaction already recorded' }, { status: 409 })
+  }
+
+  // Verify the transaction exists on-chain and its outputs match the expected split.
+  // Recently broadcast txs may not be indexed yet — retry once after 2s.
+  interface WocVout {
+    value: number // BSV (not sats)
+    scriptPubKey?: { addresses?: string[] }
+  }
+  let txVouts: WocVout[] = []
   try {
     let wocRes = await fetch(
       `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
       { headers: { 'Accept': 'application/json' } }
     )
-    // If not found, wait 2s and retry (tx may still be propagating)
     if (!wocRes.ok) {
       await new Promise(r => setTimeout(r, 2000))
       wocRes = await fetch(
@@ -56,7 +76,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    // Transaction exists — we could optionally verify outputs contain expected addresses here
+    const txData = await wocRes.json() as { vout?: WocVout[] }
+    txVouts = txData.vout ?? []
   } catch (err) {
     console.error('[BSVibes] boot-confirm: WhatsOnChain verification failed', err)
     return NextResponse.json(
@@ -109,6 +130,43 @@ export async function POST(req: NextRequest) {
     platformAddress,
     weights,
   )
+
+  // Verify on-chain outputs match the expected split.
+  // Build a map of expected address → sats from the split.
+  const expectedOutputs = new Map<string, number>()
+  if (split.platform.sats > 0) {
+    expectedOutputs.set(split.platform.address, (expectedOutputs.get(split.platform.address) ?? 0) + split.platform.sats)
+  }
+  if (split.creatorBonus.sats > 0) {
+    expectedOutputs.set(split.creatorBonus.address, (expectedOutputs.get(split.creatorBonus.address) ?? 0) + split.creatorBonus.sats)
+  }
+  for (const r of split.pool) {
+    if (r.sats > 0) {
+      expectedOutputs.set(r.address, (expectedOutputs.get(r.address) ?? 0) + r.sats)
+    }
+  }
+
+  // Check that each expected recipient appears in the tx outputs with at least the expected sats.
+  // Allow 2 sat tolerance per output for fee rounding differences.
+  const onChainByAddr = new Map<string, number>()
+  for (const vout of txVouts) {
+    const addr = vout.scriptPubKey?.addresses?.[0]
+    if (addr) {
+      const sats = Math.round(vout.value * 1e8)
+      onChainByAddr.set(addr, (onChainByAddr.get(addr) ?? 0) + sats)
+    }
+  }
+
+  for (const [addr, expectedSats] of expectedOutputs) {
+    const actualSats = onChainByAddr.get(addr) ?? 0
+    if (actualSats < expectedSats - 2) {
+      console.warn(`[BSVibes] boot-confirm: output mismatch for ${addr} — expected ${expectedSats}, got ${actualSats}`)
+      return NextResponse.json(
+        { error: 'Transaction outputs do not match expected split' },
+        { status: 400 }
+      )
+    }
+  }
 
   // All SQLite writes wrapped in a single transaction
   db.transaction(() => {

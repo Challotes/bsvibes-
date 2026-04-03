@@ -213,7 +213,8 @@ export async function buildAndBroadcast(
  */
 async function _buildAndBroadcastInner(
   key: PrivateKey,
-  outputs: Array<{ lockingScript: any; satoshis: number }>
+  outputs: Array<{ lockingScript: any; satoshis: number }>,
+  retryCount = 0
 ): Promise<BroadcastResult> {
   const totalNeeded = outputs.reduce((sum, o) => sum + o.satoshis, 0) + 500; // +500 for estimated fee
   const utxos = await reserveUtxos(totalNeeded);
@@ -312,10 +313,10 @@ async function _buildAndBroadcastInner(
       return { status: 'success', txid };
     }
 
-    // Self-heal on double-spend: blacklist the competing tx's inputs and retry once
+    // Self-heal on double-spend: blacklist the competing tx's inputs and retry (max 3 attempts)
     const dsResult = broadcastResult as { code?: string; more?: { competingTxs?: string[] } };
-    if (dsResult.code === 'DOUBLE_SPEND_ATTEMPTED' && dsResult.more?.competingTxs?.length) {
-      console.warn('BSVibes wallet: double-spend detected, blacklisting competing UTXOs and retrying');
+    if (dsResult.code === 'DOUBLE_SPEND_ATTEMPTED' && dsResult.more?.competingTxs?.length && retryCount < 3) {
+      console.warn(`BSVibes wallet: double-spend detected, blacklisting competing UTXOs and retrying (attempt ${retryCount + 1}/3)`);
       for (const competingTxid of dsResult.more.competingTxs) {
         try {
           const txRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${competingTxid}`);
@@ -328,7 +329,7 @@ async function _buildAndBroadcastInner(
         } catch { /* best effort */ }
       }
       releaseUtxos(utxos);
-      return _buildAndBroadcastInner(key, outputs);
+      return _buildAndBroadcastInner(key, outputs, retryCount + 1);
     }
 
     releaseUtxos(utxos);

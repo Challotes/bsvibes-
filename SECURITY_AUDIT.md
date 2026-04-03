@@ -15,10 +15,10 @@
 **Risk:** `_cachedWif` and `_sessionIdentity.wif` in memory for entire session. Any script can read.
 **Fix:** Cache CryptoKey object instead of WIF string where possible. Accepted risk for plaintext path.
 
-### C3: /api/boot-confirm accepts any txid without verification
+### C3: /api/boot-confirm accepts any txid without verification — FIXED
 **File:** src/app/api/boot-confirm/route.ts
 **Risk:** Attacker can fake boot confirmations, inflate contribution weight, game fairness system at zero cost.
-**Fix:** Server must verify txid on-chain before recording. Fetch tx from WoC, confirm outputs match expected split.
+**Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + UNIQUE DB index), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance).
 
 ### C4: Auto-download backup only has NEW key when fund transfer fails
 **File:** src/app/IdentityBar.tsx lines 171-185

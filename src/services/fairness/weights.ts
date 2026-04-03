@@ -114,7 +114,7 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
     // Resolve migration: use the latest pubkey in the chain
     const resolvedPubkey = migrationMap.get(post.pubkey) ?? post.pubkey;
 
-    const ageDays = (now - new Date(post.created_at + 'Z').getTime()) / 86_400_000;
+    const ageDays = (now - new Date(post.created_at.replace(' ', 'T') + 'Z').getTime()) / 86_400_000;
     const decay = Math.pow(0.5, ageDays / halfLifeDays);
     const engagement = 1 + (post.boot_count * engagementMultiplier);
     const postWeight = scalingFn(engagement) * decay;

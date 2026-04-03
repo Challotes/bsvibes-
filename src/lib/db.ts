@@ -113,6 +113,8 @@ try {
   db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pubkey ON posts(pubkey)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_boot ON payouts(boot_event_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_recipient ON payouts(recipient_pubkey)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_address ON payouts(recipient_address)');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_txid ON payouts(txid, recipient_address)');
 } catch (err) {
   throw new Error(`BSVibes DB: failed during schema init — ${err instanceof Error ? err.message : String(err)}`);
 }
