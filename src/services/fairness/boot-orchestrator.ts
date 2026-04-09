@@ -5,7 +5,8 @@
  */
 
 import type BetterSqlite3 from 'better-sqlite3';
-import { getBootPrice, getBootPriceForUser } from './pricing';
+import { getBootPriceForUser } from './pricing';
+import { FAIRNESS_CONFIG } from './config';
 import { calculateWeights } from './weights';
 import { calculateSplit } from './split';
 import { buildSplitTransaction } from './boot-payment';
@@ -45,7 +46,10 @@ export async function executeBoot(
 
   // 3. Get dynamic price and check free boot eligibility
   const { price, isFree } = getBootPriceForUser(db, booterPubkey);
-  const actualPrice = isFree ? getBootPrice(db) : price; // Free boots still cost the server the dynamic price
+  // Free boots pay the floor (1,000 sats), not the dynamic price.
+  // Bounds per-user server subsidy at ~15,690 sats regardless of platform scale.
+  // See DECISIONS.md "Free boots pay floor only (settled 2026-04-09)".
+  const actualPrice = isFree ? FAIRNESS_CONFIG.bootPriceFloor : price;
 
   // 4. Calculate contribution weights (with migration chain resolution)
   const weights = calculateWeights(db);

@@ -35,7 +35,7 @@ User's share = their weight / total weight of all contributors
 | Time decay half-life | 30 days | How fast old posts lose weight | 7-90 days |
 | Engagement multiplier | 1.5x per boot | How much boots amplify a post's weight | 1-3x |
 | Scaling function | sqrt | Diminishing returns on quantity | sqrt or cbrt |
-| Minimum payout | 100 sats | Below this, balance accumulates until next boot | 10-500 sats |
+| Minimum payout | 1 sat | Every non-zero share is paid in the same tx — no accumulation, no IOUs | N/A |
 
 All parameters are exposed for the fairness agent to adjust in later phases. They are the governance surface — the agent tunes knobs, it doesn't rewrite the formula.
 
@@ -48,6 +48,26 @@ All parameters are exposed for the fairness agent to adjust in later phases. The
 | Contributor pool | 80% | 8,000 | All contributors by weight |
 
 The boosted creator also gets their normal pool share on top of the bonus.
+
+### Free vs Paid Boots
+
+Free boots and paid boots run through the same split mechanism, but at different price points.
+
+**Paid boot:** user pays the current dynamic price (`max(1000, min(250000, contributors × 156))`). The 156-sats-per-contributor formula ensures each contributor's pool share lands around ~125 sats regardless of how many contributors are active. Real money, real payouts.
+
+**Free boot:** server wallet pays the floor price (1,000 sats), regardless of the current dynamic price. This keeps the platform's per-user subsidy cost bounded at ~15,690 sats (15 free boots × ~1,046) forever, independent of contributor count or platform scale.
+
+On a 1,000 sat free boot:
+
+| Bucket | % | Sats | Goes to |
+|--------|---|------|---------|
+| Platform | 5% | 50 | Server wallet |
+| Boosted creator bonus | 15% | 150 | Post author |
+| Contributor pool | 80% | 800 | All contributors by weight |
+
+Because the pool is 800 sats instead of ~8,000+, pool shares on free boots are proportionally smaller. The sqrt × decay weight curve naturally concentrates these smaller amounts on top contributors — tail contributors may receive 1-sat shares, which is intentional. Free boots are a symbolic acknowledgment of participation, not a full economic event. Real value flows on paid boots.
+
+**Why floor-only?** Cost predictability. If free boots paid the dynamic price, the platform's subsidy cost would grow linearly with contributor count — a 100-contributor platform would cost 10x more to onboard a user than a 10-contributor platform. Flat floor means the onboarding gift has the same cost to the platform forever. Decided 2026-04-09 — see DECISIONS.md.
 
 ## Payout Flow
 
@@ -95,14 +115,18 @@ This makes every split publicly verifiable on-chain. Anyone can look up the tran
 
 ## Scaling
 
-| Contributors | Per-user share (if equal) | Outputs per tx | Tx fee |
-|-------------|--------------------------|----------------|--------|
-| 5 | 1,600 sats | 7 | ~400 sats |
-| 50 | 160 sats | 52 | ~2,100 sats |
-| 500 | 16 sats | ~95 above threshold | ~4,200 sats |
-| 5,000 | 1.6 sats | ~2 above threshold | ~250 sats |
+Paid boot at 10,000 sats, actual fee rate 100 sat/kb, no minimum-payout threshold (split.ts:49 pays any share > 0):
 
-True no-custody: every contributor gets their share in the same transaction, even if it's 1 sat. No database balances, no accumulation, no IOUs. At high contributor counts with small shares, users receive tiny UTXOs — that's their money in their address, not the platform's problem.
+| Contributors | Per-user share (if equal) | Outputs per tx | Tx fee @ 100 sat/kb |
+|---|---|---|---|
+| 5 | ~1,600 sats | 8 | ~62 sats |
+| 50 | ~160 sats | 53 | ~214 sats |
+| 500 | ~16 sats | ~503 | ~1,741 sats |
+| 5,000 | ~1.6 sats | ~5,003 | ~17,211 sats |
+
+Formula: `fee ≈ (10 + 148 + 34 × outputs + 50) × 0.1` sats. Outputs = N pool recipients + platform + creator + OP_RETURN.
+
+True no-custody: every contributor gets their share in the same transaction, even if it's 1 sat. No database balances, no accumulation, no IOUs. At high contributor counts, pool shares become very small — that is the cost of everyone being paid in the same atomic transaction. At extreme N (5,000+), tx fee can exceed a 10,000-sat paid boot — the platform hits a natural fee wall that a future miner fee partnership (reducing the sat/kb rate) or a design change in a later phase would be needed to address. For current scale (tens to low hundreds of contributors) the math works.
 
 ## Phase Progression
 

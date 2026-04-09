@@ -2,6 +2,36 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-09 — Free Boot Cost Model: Floor-Only Fix + Fee Rate Drift Correction
+
+Category: fairness economics + docs drift
+
+Built a full cost model for onboarding a new user who burns their entire 15-free-boot quota. Original brainstorm assumed ~1 sat/tx; actual cost was dominated by the server paying the full dynamic boot price on free boots (`boot-orchestrator.ts:48`), scaling linearly with contributor count. A 100-contributor platform would have cost ~234,000 sats per new user under the old behavior.
+
+Modeled three alternatives with CFO (Milton) + architecture-reviewer (Kayle) agent reviews:
+- **Tapering free-boot count with contributor growth** — rejected. Violated the settled "15 free boots, never reset" decision (DECISIONS.md:134), had a Sybil attack surface via contributor-count inflation, created race conditions at tier boundaries, caused UX unfairness between launch-day and later users, and broke Phase 2 agent governance by making `freeBootsPerUser` non-constant.
+- **Top-K concentration** — rejected. Unnecessary because the sqrt × decay curve already concentrates naturally.
+- **Batched sub-dust payouts** — rejected. Breaks the trustless no-custody model.
+
+**Chosen fix:** free boots always pay the floor price (1,000 sats) regardless of dynamic price. One-line change in `boot-orchestrator.ts:48` — `getBootPrice(db)` → `FAIRNESS_CONFIG.bootPriceFloor`. Bounds per-user server subsidy at ~15,690 sats forever, independent of platform scale. At BSV $25 that is ~$0.004/user; at BSV $100, ~$0.016/user — within the $50/month operator budget across all realistic BSV price ranges.
+
+Discovered a fee-rate drift during drafting: DECISIONS.md:169 claimed `SatoshisPerKilobyte(500)` with rationale, but all code (`wallet.ts:260`, `client-boot.ts:439`) has always used 100 sat/kb. Line 173's arithmetic (1,480 sats at 500 sat/kb) was also internally inconsistent with the stated "stays under 1,000 sats minimum" claim. Code was authoritative per user call; docs corrected to match.
+
+Files changed:
+- `DECISIONS.md` — edited line 127 (free boots pay floor), line 169 (fee rate 100 sat/kb not 500), line 173 (arithmetic fix: 296 sats at 100 sat/kb), added new dated entry "Free boots pay floor only (settled 2026-04-09)" with full rationale + rejected alternatives
+- `FAIRNESS.md` — fixed minimum payout row (line 38: 1 sat not 100 sats, no accumulation — matched split.ts:49 reality), added new "Free vs Paid Boots" subsection after "Payout Split", replaced Scaling table with 100 sat/kb fee math and removed aspirational "above threshold" numbers
+- `src/services/fairness/boot-orchestrator.ts` — removed unused `getBootPrice` import, added `FAIRNESS_CONFIG` import, changed free-boot price from dynamic to floor with DECISIONS.md reference comment
+
+Verification: `npx tsc --noEmit` clean, all 27 vitest tests pass.
+
+Explicitly ruled out this session:
+- Kill-switch for monthly subsidy budget (Milton's recommendation) — user called it unnecessary given the ~12,700 user/month budget headroom with floor pricing; revisit when real traction data exists
+- BSV reserve pre-funding — operational task, not code
+- Fixing the FAIRNESS.md scaling table output counts to show the fee wall more dramatically — existing numbers are now accurate at the real fee rate
+- GorillaPool miner fee deal — pursued separately as optional optimization, not a dependency of this fix
+
+Still broken or incomplete: none. Fix is complete and tested.
+
 ## 2026-04-03 — Full Repo Audit + Fixes (21 of 26 findings resolved)
 
 5-agent parallel audit (architecture, security, performance, tidiness, correctness):
