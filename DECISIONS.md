@@ -172,6 +172,8 @@
 - **No server custody:** Options A/C/D (server consolidation, held payouts, threshold batching) were all rejected — they require server custody or break the trustless model.
 - **Dust threshold:** During UTXO selection, once boot + fee is covered, additional inputs are only included if their value exceeds the marginal fee cost of adding one more input (~74 sats). Absolute dust is never swept.
 - **MAX_CONSOLIDATION_INPUTS = 20:** 20 P2PKH inputs ≈ 2,960 bytes ≈ 296 sats at 100 sat/kb. Stays well under the boot price floor (1,000 sats minimum), leaving room for the payout in the same transaction. Tunable constant in `client-boot.ts`.
+- **DUST_THRESHOLD = 2 sats (settled 2026-04-10).** Minimum UTXO value worth sweeping during consolidation. At 10 sat/kb consolidation fee rate, each P2PKH input costs ~1.5 sats. Was previously 10, which trapped UTXOs of 3–9 sats permanently. MAX_CONSOLIDATION_SWEEP = 200 caps pathological inputs.
+- **Optimistic UTXO blacklisting (settled 2026-04-10).** Client marks inputs as spent BEFORE calling broadcast(). Only un-blacklists on network exception (tx bytes never left browser). All miner responses (ORPHAN, conflict, success) keep inputs blacklisted. Prevents the "state poisoning" bug where failed broadcasts left UTXOs in a "spent by network, available to client" state causing cascading mempool conflicts on subsequent boots/consolidations.
 
 ## Wallet Integration (future)
 

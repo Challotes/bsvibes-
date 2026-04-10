@@ -453,45 +453,57 @@ async function _clientSideBootInner(
       hasChangeOutput = false;
     }
 
+    // ── Optimistic blacklist: assume inputs are spent ──────
+    // Once we call broadcast(), the tx will likely reach at least one node.
+    // Blacklist inputs NOW to prevent double-spend on next boot/consolidation.
+    // Only un-blacklist if broadcast() throws (network never reached).
+    const spentKeys = new Set(selection.selected.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+    for (const sk of spentKeys) {
+      _spent.add(sk);
+    }
+    // Remove from pending change (they're being consumed)
+    for (let i = _pendingChange.length - 1; i >= 0; i--) {
+      const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+      if (spentKeys.has(pendingKey)) {
+        _pendingChange.splice(i, 1);
+      }
+    }
+
     // ── Broadcast (with retry for 0-conf chain propagation) ──
     // ARC returns SEEN_IN_ORPHAN_MEMPOOL when a parent tx is queued but not
-    // yet validated. This happens during rapid consecutive boots where the
-    // change output from boot N is spent by boot N+1 before ARC processes N.
-    // Retry up to 3 times with 1.5s delay — parent typically processes within 1-3s.
-    let broadcastResult = await tx.broadcast();
-    let retries = 0;
-    while (
-      retries < 3 &&
-      broadcastResult.status !== "success" &&
-      "description" in broadcastResult &&
-      ((broadcastResult as { description?: string }).description
-        ?.toUpperCase()
-        .includes("ORPHAN") ||
-        (broadcastResult as { code?: string }).code?.toUpperCase().includes("ORPHAN"))
-    ) {
-      retries++;
-      console.log(`[clientSideBoot] Parent in orphan mempool — retry ${retries}/3 in 1.5s`);
-      await new Promise((r) => setTimeout(r, 1500));
+    // yet validated. Retry up to 3 times with 1.5s delay.
+    let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
+    try {
       broadcastResult = await tx.broadcast();
+      let retries = 0;
+      while (
+        retries < 3 &&
+        broadcastResult.status !== "success" &&
+        "description" in broadcastResult &&
+        ((broadcastResult as { description?: string }).description
+          ?.toUpperCase()
+          .includes("ORPHAN") ||
+          (broadcastResult as { code?: string }).code?.toUpperCase().includes("ORPHAN"))
+      ) {
+        retries++;
+        console.log(`[clientSideBoot] Parent in orphan mempool — retry ${retries}/3 in 1.5s`);
+        await new Promise((r) => setTimeout(r, 1500));
+        broadcastResult = await tx.broadcast();
+      }
+    } catch (networkError) {
+      // Tx bytes never left the browser — safe to un-blacklist
+      for (const sk of spentKeys) {
+        _spent.delete(sk);
+      }
+      saveSpentSet(_spent);
+      return {
+        status: "broadcast_failed",
+        error: `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
+      };
     }
 
     if (broadcastResult.status === "success") {
       const txid = tx.id("hex") as string;
-
-      // ── Track spent UTXOs ─────────────────────────────────
-      // Blacklist consumed inputs so stale WoC responses don't resurrect them
-      const spentKeys = new Set(selection.selected.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
-      for (const sk of spentKeys) {
-        _spent.add(sk);
-      }
-
-      // Remove consumed UTXOs from pending change
-      for (let i = _pendingChange.length - 1; i >= 0; i--) {
-        const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
-        if (spentKeys.has(pendingKey)) {
-          _pendingChange.splice(i, 1);
-        }
-      }
 
       // ── 0-conf chain: register change as immediately spendable ─
       if (hasChangeOutput) {
@@ -501,7 +513,7 @@ async function _clientSideBootInner(
             tx_hash: txid,
             tx_pos: changeOutputIndex,
             value: changeSats,
-            sourceTransaction: tx, // Keep tx object for signing next time
+            sourceTransaction: tx,
           });
 
           // Cap queues to avoid unbounded growth
@@ -514,9 +526,13 @@ async function _clientSideBootInner(
       }
 
       saveSpentSet(_spent);
-
       return { status: "success", txid };
     }
+
+    // Broadcast returned non-success ARC response. The tx likely reached the
+    // network (ORPHAN, CONFLICT, SEEN_ON_NETWORK all mean "in mempool").
+    // Inputs stay blacklisted (optimistic lock holds).
+    saveSpentSet(_spent);
 
     return {
       status: "broadcast_failed",
@@ -631,23 +647,37 @@ export async function consolidateUtxos(
     await tx.fee(new SatoshisPerKilobyte(10));
     await tx.sign();
 
+    // ── Optimistic blacklist: assume inputs are spent ──────
+    for (const utxo of spendable) {
+      _spent.add(utxoKey(utxo.tx_hash, utxo.tx_pos));
+    }
+    // Remove any pending change being consumed
+    for (let i = _pendingChange.length - 1; i >= 0; i--) {
+      const key = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+      if (_spent.has(key)) _pendingChange.splice(i, 1);
+    }
+
     // Broadcast via WhatsOnChain — relays to miners who accept 10 sat/kb
     const woc = new WhatsOnChainBroadcaster("main");
-    const broadcastResult = await tx.broadcast(woc);
+    let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
+    try {
+      broadcastResult = await tx.broadcast(woc);
+    } catch (networkError) {
+      // Tx never left the browser — safe to un-blacklist
+      for (const utxo of spendable) {
+        _spent.delete(utxoKey(utxo.tx_hash, utxo.tx_pos));
+      }
+      saveSpentSet(_spent);
+      return {
+        status: "broadcast_failed",
+        error: `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
+      };
+    }
 
     if (broadcastResult.status === "success") {
       const txid = tx.id("hex") as string;
       console.log(`[consolidateUtxos] Success: ${spendable.length} UTXOs → 1, txid=${txid}`);
 
-      // Track spent UTXOs
-      for (const utxo of spendable) {
-        _spent.add(utxoKey(utxo.tx_hash, utxo.tx_pos));
-      }
-      // Remove any pending change that was consumed
-      for (let i = _pendingChange.length - 1; i >= 0; i--) {
-        const key = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
-        if (_spent.has(key)) _pendingChange.splice(i, 1);
-      }
       // Register consolidated output as pending change for 0-conf chaining
       const changeSats = tx.outputs[0]?.satoshis;
       if (changeSats && changeSats > 0) {
@@ -670,7 +700,11 @@ export async function consolidateUtxos(
       return { status: "success", txid };
     }
 
+    // Broadcast returned non-success. Tx likely reached the network.
+    // Inputs stay blacklisted (optimistic lock holds).
     console.error("[consolidateUtxos] Broadcast failed:", broadcastResult);
+    saveSpentSet(_spent);
+
     return {
       status: "broadcast_failed",
       error:
