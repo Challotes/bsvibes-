@@ -18,7 +18,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 - **Framework:** Next.js 16 (App Router) + React 19.2 + TypeScript + Tailwind CSS v4
 - **Build:** Turbopack (dev + prod), React Compiler enabled (`reactCompiler: true` in `next.config.ts`)
-- **Linter/Formatter:** Biome (`biome.jsonc`) — replaced ESLint 2026-03-25
+- **Linter/Formatter:** Biome (`biome.json`) — replaced ESLint 2026-03-25. Full auto-format pass applied 2026-04-10 (0 lint errors across 69 files).
 - **Database:** SQLite (better-sqlite3) for local dev, file: `local.db`
 - **Blockchain:** BSV via `@bsv/sdk` — keypair generation, signing, on-chain logging
 - **Identity:** Auto-generated BSV keypair stored in browser localStorage

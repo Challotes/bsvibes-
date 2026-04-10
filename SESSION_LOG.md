@@ -32,6 +32,12 @@ Deferred to Wave 3 (housekeeping, not urgent):
 
 Audit wins: zero dead file references in CLAUDE.md, zero security regressions, zero DECISIONS.md contradictions, all ROADMAP done items verified as actually done, all fairness parameters verified against code.
 
+Additional work in same session:
+- Full Biome lint + format pass: 203 errors + 18 warnings → 0 errors across 69 files (42 files reformatted)
+- Semantic lint fixes: added `type="button"` to ~30 buttons, `aria-hidden="true"` to decorative SVGs, keyboard handlers on interactive divs, stable React keys replacing array indices, renamed `Error` → `ErrorPage` in error.tsx, removed unused biome-ignore suppressions
+- Auto-formatting: standardized double quotes, semicolons, import ordering per biome.json config
+- Verified: TypeScript clean, 27/27 tests pass, `npx biome check .` reports 0 errors, production build clean
+
 ## 2026-04-09 — Free Boot Cost Model: Floor-Only Fix + Fee Rate Drift Correction
 
 Category: fairness economics + docs drift
