@@ -658,15 +658,11 @@ export async function consolidateUtxos(
     await tx.fee(new SatoshisPerKilobyte(10));
     await tx.sign();
 
-    // ── Optimistic blacklist: assume inputs are spent ──────
-    for (const utxo of spendable) {
-      _spent.add(utxoKey(utxo.tx_hash, utxo.tx_pos));
-    }
-    // Remove any pending change being consumed
-    for (let i = _pendingChange.length - 1; i >= 0; i--) {
-      const key = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
-      if (_spent.has(key)) _pendingChange.splice(i, 1);
-    }
+    // NOTE: No optimistic blacklisting for consolidation. Unlike clientSideBoot
+    // (1-5 inputs, all critical), consolidation sweeps many UTXOs (potentially 100+).
+    // If some conflict due to prior pending txs, blacklisting ALL would lock the
+    // entire wallet. Only blacklist on success — on failure, user retries once
+    // conflicting txs confirm and WoC stops returning them.
 
     // Broadcast via WhatsOnChain — relays to miners who accept 10 sat/kb
     const woc = new WhatsOnChainBroadcaster("main");
@@ -674,11 +670,6 @@ export async function consolidateUtxos(
     try {
       broadcastResult = await tx.broadcast(woc);
     } catch (networkError) {
-      // Tx never left the browser — safe to un-blacklist
-      for (const utxo of spendable) {
-        _spent.delete(utxoKey(utxo.tx_hash, utxo.tx_pos));
-      }
-      saveSpentSet(_spent);
       return {
         status: "broadcast_failed",
         error: `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
@@ -689,6 +680,15 @@ export async function consolidateUtxos(
       const txid = tx.id("hex") as string;
       console.log(`[consolidateUtxos] Success: ${spendable.length} UTXOs → 1, txid=${txid}`);
 
+      // Only blacklist on success — safe because the tx is confirmed in mempool
+      for (const utxo of spendable) {
+        _spent.add(utxoKey(utxo.tx_hash, utxo.tx_pos));
+      }
+      // Remove any pending change that was consumed
+      for (let i = _pendingChange.length - 1; i >= 0; i--) {
+        const key = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+        if (_spent.has(key)) _pendingChange.splice(i, 1);
+      }
       // Register consolidated output as pending change for 0-conf chaining
       const changeSats = tx.outputs[0]?.satoshis;
       if (changeSats && changeSats > 0) {
@@ -711,10 +711,9 @@ export async function consolidateUtxos(
       return { status: "success", txid };
     }
 
-    // Broadcast returned non-success. Tx likely reached the network.
-    // Inputs stay blacklisted (optimistic lock holds).
+    // Consolidation failed — do NOT blacklist inputs (would lock entire wallet).
+    // User should wait for conflicting txs to confirm, then retry.
     console.error("[consolidateUtxos] Broadcast failed:", broadcastResult);
-    saveSpentSet(_spent);
 
     return {
       status: "broadcast_failed",
