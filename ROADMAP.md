@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-04-03
+> Last updated: 2026-04-10
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -97,13 +97,13 @@
 - [ ] Device sync via QR code (faster identity import between devices) — future
 - [ ] PBKDF2 increase to 600k iterations — future (when real funds flow)
 
-## Phase 5: Self-Funded Posting — IN PROGRESS
+## Phase 5: Self-Funded Posting — PARTIAL
 
 - [x] UTXO check via WhatsOnChain API (built in client-boot.ts)
 - [x] Client-side transaction building with change output (built in client-boot.ts)
 - [x] Silent switch between server-funded and self-funded (free → paid auto-switch)
-- [ ] Daily posting limits (5 free/day)
-- [ ] QR code funding when limit reached
+- [ ] Daily posting limits (5 free/day) — deferred. Current spam defense is 10/min rate limit only. See FAIRNESS.md Gaming Analysis.
+- [ ] QR code funding when limit reached — depends on daily limits above
 
 ## Phase 6: Fairness & Revenue — COMPLETE
 
@@ -169,7 +169,7 @@
 - [x] NaN weight cascade fix (SQLite datetime parsing)
 - [x] Server wallet retry limit (was unbounded recursion)
 - [x] SQL parameterization in pricing query
-- [x] Rate limiting on all API routes (boot-shares, boot-status, earnings)
+- [x] Rate limiting on all API routes (boot-shares, boot-status, earnings, posts 120/min)
 - [x] calculateWeights() 30s TTL cache
 - [x] Tab visibility checks on balance/earnings polling
 - [x] Dynamic @bsv/sdk import in server actions
@@ -180,6 +180,17 @@
 - [x] Unit test suite (Vitest: 27 tests — split, pricing, weights, rate-limit)
 - [x] Deduplicated shared utilities (downloadBackup, getStoredHint)
 - [x] Post-fix re-audit: all fixes verified, dead code cleaned, false-positive tests rewritten
+
+## Phase 6.2: Cost Model & Documentation Audit (2026-04-09/10) — COMPLETE
+
+- [x] Free boots pay floor price only (1,000 sats) — bounds per-user subsidy at ~15,690 sats regardless of scale
+- [x] Fee rate documentation corrected (100 sat/kb, not 500 — code was always 100, docs were wrong)
+- [x] FAIRNESS.md corrected: Gaming Analysis (no 5-post daily cap — was aspirational), OP_RETURN spec (removed phantom fields), scaling table (actual fee math), minimum payout (1 sat not 100)
+- [x] 4-agent forensic audit: cross-referenced CLAUDE.md, DECISIONS.md, FAIRNESS.md, SECURITY_AUDIT.md against code
+- [x] CLAUDE.md updated: Architecture (React 19.2, Turbopack, React Compiler, Biome), Key Files (layout.tsx, utils.ts), Identity (all localStorage keys), UX rule softened, Security Notes corrected
+- [x] SECURITY_AUDIT.md: C9 promoted to FIXED, H2 to PARTIAL, C3 index description corrected, M2 corrected to PARTIAL
+- [x] Rate limit added to /api/posts (120/min/IP — was the only unprotected route)
+- [x] ROADMAP.md, FAIRNESS.md, DECISIONS.md dates updated
 
 ## Phase 6.5: UX Polish — PLANNED
 

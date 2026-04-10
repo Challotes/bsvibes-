@@ -77,6 +77,19 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/services/bsv/wallet.ts` — Server wallet with UTXO manager (mutex, spent-blacklist, 0-conf chaining)
 - `src/services/bsv/onchain.ts` — OP_RETURN post logging (fire-and-forget)
 
+### OP_RETURN Formats (On-Chain Audit Trail)
+
+All on-chain payloads are JSON inside OP_FALSE OP_RETURN outputs:
+
+**Post logging** (`onchain.ts` — every new post):
+`{ app, type: "post", content, author, sig, pubkey, ts }` — sig/pubkey are null for unsigned posts.
+
+**Boot split** (`boot-payment.ts` — every boot payout):
+`{ app, action: "boot_split", post_id, total, recipients, formula_version, ts }` — see FAIRNESS.md for details.
+
+**Key migration** (`migration.ts` — on security upgrade):
+`{ app, type: "migration", from_pubkey, to_pubkey, signature, message, ts }`
+
 ### Fairness Pipeline
 
 - `src/services/fairness/config.ts` — Tunable parameters (governance surface)
