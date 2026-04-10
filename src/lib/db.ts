@@ -1,17 +1,19 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import path from "node:path";
+import Database from "better-sqlite3";
 
 let db: ReturnType<typeof Database>;
 
 try {
-  db = new Database(process.env.DATABASE_PATH || path.join(process.cwd(), 'local.db'));
+  db = new Database(process.env.DATABASE_PATH || path.join(process.cwd(), "local.db"));
 } catch (err) {
-  throw new Error(`BSVibes DB: failed to open local.db — ${err instanceof Error ? err.message : String(err)}`);
+  throw new Error(
+    `BSVibes DB: failed to open local.db — ${err instanceof Error ? err.message : String(err)}`
+  );
 }
 
 try {
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS posts (
@@ -40,9 +42,9 @@ try {
   // boosted_by now stores the BSV address (stable ID for queries),
   // boosted_by_name stores the display name (anon_XXXX).
   const bootboardCols = db.prepare("PRAGMA table_info(bootboard)").all() as { name: string }[];
-  const bootboardColNames = bootboardCols.map(c => c.name);
-  if (!bootboardColNames.includes('boosted_by_name')) {
-    db.exec('ALTER TABLE bootboard ADD COLUMN boosted_by_name TEXT');
+  const bootboardColNames = bootboardCols.map((c) => c.name);
+  if (!bootboardColNames.includes("boosted_by_name")) {
+    db.exec("ALTER TABLE bootboard ADD COLUMN boosted_by_name TEXT");
     // Back-fill: existing rows stored the display name in boosted_by,
     // so copy it to boosted_by_name (address unknown for old rows).
     db.exec("UPDATE bootboard SET boosted_by_name = boosted_by WHERE boosted_by_name IS NULL");
@@ -51,19 +53,19 @@ try {
   // is_free = 1 means the server paid for this boot (user used a free boot grant).
   // is_free = 0 means the user paid out of their own wallet.
   // Back-fill: existing rows pre-date this column, treat as paid (conservative — avoids hiding real costs).
-  if (!bootboardColNames.includes('is_free')) {
-    db.exec('ALTER TABLE bootboard ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0');
+  if (!bootboardColNames.includes("is_free")) {
+    db.exec("ALTER TABLE bootboard ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0");
   }
 
   // Migrate: add columns if they don't exist yet
   const columns = db.prepare("PRAGMA table_info(posts)").all() as { name: string }[];
-  const columnNames = columns.map(c => c.name);
+  const columnNames = columns.map((c) => c.name);
 
-  if (!columnNames.includes('signature')) {
-    db.exec('ALTER TABLE posts ADD COLUMN signature TEXT');
+  if (!columnNames.includes("signature")) {
+    db.exec("ALTER TABLE posts ADD COLUMN signature TEXT");
   }
-  if (!columnNames.includes('pubkey')) {
-    db.exec('ALTER TABLE posts ADD COLUMN pubkey TEXT');
+  if (!columnNames.includes("pubkey")) {
+    db.exec("ALTER TABLE posts ADD COLUMN pubkey TEXT");
   }
 
   // Migrations table — tracks key rotations
@@ -102,21 +104,25 @@ try {
   `);
 
   // Indexes for query performance
-  db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_post_id ON bootboard(post_id)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_bootboard_held_until ON bootboard(held_until)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_migrations_to ON migrations(to_pubkey)');
+  db.exec("CREATE INDEX IF NOT EXISTS idx_bootboard_post_id ON bootboard(post_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_bootboard_held_until ON bootboard(held_until)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_migrations_to ON migrations(to_pubkey)");
   // Unique index on from_pubkey: only one active migration per source key.
   // If a user upgrades twice from the same old key (duplicate migration), upsert
   // the existing row rather than inserting a duplicate. This replaces the old
   // non-unique idx_migrations_from index.
-  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_migrations_from_unique ON migrations(from_pubkey)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pubkey ON posts(pubkey)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_boot ON payouts(boot_event_id)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_recipient ON payouts(recipient_pubkey)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_address ON payouts(recipient_address)');
-  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_txid ON payouts(txid, recipient_address)');
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_migrations_from_unique ON migrations(from_pubkey)"
+  );
+  db.exec("CREATE INDEX IF NOT EXISTS idx_posts_pubkey ON posts(pubkey)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_payouts_boot ON payouts(boot_event_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_payouts_recipient ON payouts(recipient_pubkey)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_payouts_address ON payouts(recipient_address)");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_txid ON payouts(txid, recipient_address)");
 } catch (err) {
-  throw new Error(`BSVibes DB: failed during schema init — ${err instanceof Error ? err.message : String(err)}`);
+  throw new Error(
+    `BSVibes DB: failed during schema init — ${err instanceof Error ? err.message : String(err)}`
+  );
 }
 
 export { db };

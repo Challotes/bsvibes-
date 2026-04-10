@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { satsToDollars } from '@/hooks/useBsvPrice';
+import { useEffect, useRef, useState } from "react";
+import { satsToDollars } from "@/hooks/useBsvPrice";
 
 interface AnimatedBalanceProps {
   sats: number;
@@ -17,7 +17,13 @@ interface AnimatedBalanceProps {
   flashTrigger?: number;
 }
 
-export function AnimatedBalance({ sats, bsvPrice = 50, isGoat = true, className = '', flashTrigger }: AnimatedBalanceProps) {
+export function AnimatedBalance({
+  sats,
+  bsvPrice = 50,
+  isGoat = true,
+  className = "",
+  flashTrigger,
+}: AnimatedBalanceProps) {
   const [displayed, setDisplayed] = useState(sats);
   const [flash, setFlash] = useState(false);
   const [label, setLabel] = useState<string | null>(null);
@@ -52,7 +58,7 @@ export function AnimatedBalance({ sats, bsvPrice = 50, isGoat = true, className 
     function step(now: number) {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased = 1 - (1 - progress) ** 3;
       setDisplayed(Math.round(prev + (next - prev) * eased));
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(step);
@@ -97,10 +103,10 @@ export function AnimatedBalance({ sats, bsvPrice = 50, isGoat = true, className 
       <span
         className={`
           font-medium tabular-nums transition-all duration-300
-          ${flash ? 'text-emerald-300 scale-110' : 'text-emerald-400 scale-100'}
+          ${flash ? "text-emerald-300 scale-110" : "text-emerald-400 scale-100"}
           ${className}
         `}
-        style={{ display: 'inline-block', transformOrigin: 'center' }}
+        style={{ display: "inline-block", transformOrigin: "center" }}
       >
         {formattedValue}
       </span>

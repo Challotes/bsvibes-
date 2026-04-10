@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from "react";
 
-export type CurrencyMode = 'noob' | 'goat';
+export type CurrencyMode = "noob" | "goat";
 
-const STORAGE_KEY = 'bsvibes_currency_mode';
+const STORAGE_KEY = "bsvibes_currency_mode";
 
 /**
  * Toggle between Noob Mode (dollars) and Goat Mode (sats).
@@ -16,17 +16,17 @@ export function useCurrencyMode(): {
   isGoat: boolean;
 } {
   const [mode, setMode] = useState<CurrencyMode>(() => {
-    if (typeof window === 'undefined') return 'noob';
-    return (localStorage.getItem(STORAGE_KEY) as CurrencyMode) || 'noob';
+    if (typeof window === "undefined") return "noob";
+    return (localStorage.getItem(STORAGE_KEY) as CurrencyMode) || "noob";
   });
 
   const toggle = useCallback(() => {
     setMode((prev) => {
-      const next = prev === 'noob' ? 'goat' : 'noob';
+      const next = prev === "noob" ? "goat" : "noob";
       localStorage.setItem(STORAGE_KEY, next);
       return next;
     });
   }, []);
 
-  return { mode, toggle, isGoat: mode === 'goat' };
+  return { mode, toggle, isGoat: mode === "goat" };
 }

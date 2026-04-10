@@ -4,11 +4,11 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {
     resolveAlias: {
-      crypto: { browser: './empty-module.mjs' },
-      https: { browser: './empty-module.mjs' },
-      http: { browser: './empty-module.mjs' },
-      stream: { browser: './empty-module.mjs' },
-      buffer: { browser: './empty-module.mjs' },
+      crypto: { browser: "./empty-module.mjs" },
+      https: { browser: "./empty-module.mjs" },
+      http: { browser: "./empty-module.mjs" },
+      stream: { browser: "./empty-module.mjs" },
+      buffer: { browser: "./empty-module.mjs" },
     },
   },
   webpack: (config, { isServer }) => {
@@ -28,10 +28,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
           {
-            key: 'Content-Security-Policy',
+            key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
@@ -40,19 +40,19 @@ const nextConfig: NextConfig = {
               "connect-src 'self' https://api.whatsonchain.com https://arc.taal.com https://arc.gorillapool.io",
               "font-src 'self'",
               "frame-ancestors 'none'",
-            ].join('; '),
+            ].join("; "),
           },
           {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
           },
           {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(self), geolocation=()',
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(self), geolocation=()",
           },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
     ];

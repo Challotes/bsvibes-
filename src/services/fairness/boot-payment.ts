@@ -3,11 +3,11 @@
  * Single transaction: payer → all contributors + platform + OP_RETURN.
  */
 
-import { Script, OP, P2PKH } from '@bsv/sdk';
-import type { LockingScript } from '@bsv/sdk';
-import { buildAndBroadcast, type BroadcastResult } from '@/services/bsv/wallet';
-import { FAIRNESS_CONFIG } from './config';
-import type { SplitResult } from './split';
+import type { LockingScript } from "@bsv/sdk";
+import { OP, P2PKH, Script } from "@bsv/sdk";
+import { type BroadcastResult, buildAndBroadcast } from "@/services/bsv/wallet";
+import { FAIRNESS_CONFIG } from "./config";
+import type { SplitResult } from "./split";
 
 /**
  * Build and broadcast the split transaction for a boot.
@@ -62,8 +62,8 @@ export async function buildSplitTransaction(
 
   // OP_RETURN audit trail
   const auditPayload = JSON.stringify({
-    app: 'bsvibes',
-    action: 'boot_split',
+    app: "bsvibes",
+    action: "boot_split",
     post_id: postId,
     total: split.totalDistributed,
     recipients: outputsByAddress.size,
@@ -82,12 +82,15 @@ export async function buildSplitTransaction(
   });
 
   const result = await buildAndBroadcast(outputs);
-  if (result.status === 'success') return result;
+  if (result.status === "success") return result;
 
   // First attempt failed — wait 1s and retry once with fresh UTXO state.
   // The mutex ensures the retry waits for any in-flight transaction to finish.
   // Common cause: stale WoC data returned an already-spent UTXO.
-  console.warn(`BSVibes: boot split first attempt failed for post ${postId}, retrying in 1s...`, result);
+  console.warn(
+    `BSVibes: boot split first attempt failed for post ${postId}, retrying in 1s...`,
+    result
+  );
   await new Promise((resolve) => setTimeout(resolve, 1000));
   return buildAndBroadcast(outputs);
 }

@@ -18,12 +18,12 @@ interface MigrationData {
 export async function postMigrationOnChain(migration: MigrationData): Promise<string | null> {
   try {
     // Reuse the onchain service but with migration-specific payload
-    const { Script, OP } = await import('@bsv/sdk');
-    const { buildAndBroadcast } = await import('./wallet');
+    const { Script, OP } = await import("@bsv/sdk");
+    const { buildAndBroadcast } = await import("./wallet");
 
     const payload = JSON.stringify({
-      app: 'bsvibes',
-      type: 'migration',
+      app: "bsvibes",
+      type: "migration",
       from_pubkey: migration.oldPubkey,
       to_pubkey: migration.newPubkey,
       signature: migration.migrationSignature,
@@ -38,14 +38,14 @@ export async function postMigrationOnChain(migration: MigrationData): Promise<st
 
     const result = await buildAndBroadcast([
       {
-        lockingScript: opReturnScript as import('@bsv/sdk').LockingScript,
+        lockingScript: opReturnScript as import("@bsv/sdk").LockingScript,
         satoshis: 0,
       },
     ]);
 
-    return result.status === 'success' ? result.txid : null;
+    return result.status === "success" ? result.txid : null;
   } catch (e) {
-    console.error('BSVibes: migration on-chain logging failed', e);
+    console.error("BSVibes: migration on-chain logging failed", e);
     return null;
   }
 }

@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Minimal personality prompt — who the agent is and how it behaves.
@@ -28,11 +28,20 @@ Rules:
  * CLAUDE.md is always included as the base context.
  */
 const MD_ROUTES: Array<{ pattern: RegExp; files: string[] }> = [
-  { pattern: /fair|earn|boot|pay|split|money|revenue|sat|price|contribut/i, files: ['FAIRNESS.md'] },
-  { pattern: /road|next|plan|future|coming|when|phase|todo/i, files: ['ROADMAP.md'] },
-  { pattern: /secur|safe|key|backup|encrypt|password|protect|lock|recover/i, files: ['SECURITY_AUDIT.md'] },
-  { pattern: /why|vision|mission|differ|compet|north.star|direction|purpose/i, files: ['DIRECTION.md'] },
-  { pattern: /decid|chose|why did|technic|architect|how does|design/i, files: ['DECISIONS.md'] },
+  {
+    pattern: /fair|earn|boot|pay|split|money|revenue|sat|price|contribut/i,
+    files: ["FAIRNESS.md"],
+  },
+  { pattern: /road|next|plan|future|coming|when|phase|todo/i, files: ["ROADMAP.md"] },
+  {
+    pattern: /secur|safe|key|backup|encrypt|password|protect|lock|recover/i,
+    files: ["SECURITY_AUDIT.md"],
+  },
+  {
+    pattern: /why|vision|mission|differ|compet|north.star|direction|purpose/i,
+    files: ["DIRECTION.md"],
+  },
+  { pattern: /decid|chose|why did|technic|architect|how does|design/i, files: ["DECISIONS.md"] },
 ];
 
 /**
@@ -40,9 +49,9 @@ const MD_ROUTES: Array<{ pattern: RegExp; files: string[] }> = [
  */
 function loadMd(filename: string): string {
   try {
-    return readFileSync(join(process.cwd(), filename), 'utf-8');
+    return readFileSync(join(process.cwd(), filename), "utf-8");
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -51,7 +60,7 @@ function loadMd(filename: string): string {
  * Always includes CLAUDE.md (base context). Adds up to 2 topic-specific MDs.
  */
 function selectContext(question: string): string {
-  const files = new Set<string>(['CLAUDE.md']);
+  const files = new Set<string>(["CLAUDE.md"]);
 
   for (const route of MD_ROUTES) {
     if (route.pattern.test(question)) {
@@ -62,10 +71,10 @@ function selectContext(question: string): string {
 
   const sections = [...files].map((f) => {
     const content = loadMd(f);
-    return content ? `\n--- ${f} ---\n${content}` : '';
+    return content ? `\n--- ${f} ---\n${content}` : "";
   });
 
-  return sections.join('\n');
+  return sections.join("\n");
 }
 
 /**

@@ -7,31 +7,31 @@
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
-const ENCRYPTED_PREFIX = 'enc:';
+const ENCRYPTED_PREFIX = "enc:";
 
 /**
  * Derive an AES-256 key from a passphrase and salt using PBKDF2.
  */
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     new TextEncoder().encode(passphrase) as BufferSource,
-    'PBKDF2',
+    "PBKDF2",
     false,
-    ['deriveKey']
+    ["deriveKey"]
   );
 
   return crypto.subtle.deriveKey(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt: salt.buffer as ArrayBuffer,
       iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
+      hash: "SHA-256",
     },
     keyMaterial,
-    { name: 'AES-GCM', length: 256 },
+    { name: "AES-GCM", length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ["encrypt", "decrypt"]
   );
 }
 
@@ -45,7 +45,7 @@ export async function encryptWif(wif: string, passphrase: string): Promise<strin
   const key = await deriveKey(passphrase, salt);
 
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
+    { name: "AES-GCM", iv: iv.buffer as ArrayBuffer },
     key,
     new TextEncoder().encode(wif) as BufferSource
   );
@@ -77,7 +77,7 @@ export async function decryptWif(encrypted: string, passphrase: string): Promise
     const key = await deriveKey(passphrase, salt);
 
     const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
+      { name: "AES-GCM", iv: iv.buffer as ArrayBuffer },
       key,
       ciphertext.buffer as ArrayBuffer
     );

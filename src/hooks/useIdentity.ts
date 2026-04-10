@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { getIdentity, isIdentityEncrypted, signPost, type Identity } from '@/services/bsv/identity';
+import { useCallback, useEffect, useState } from "react";
+import { getIdentity, type Identity, isIdentityEncrypted, signPost } from "@/services/bsv/identity";
 
 interface UseIdentityReturn {
   identity: Identity | null;
@@ -26,7 +26,7 @@ export function useIdentity(): UseIdentityReturn {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error('BSVibes: failed to load identity (BSV SDK may not have loaded)', err);
+        console.error("BSVibes: failed to load identity (BSV SDK may not have loaded)", err);
         setIsLoading(false);
       });
   }, []);

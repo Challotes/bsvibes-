@@ -4,13 +4,13 @@
  * SQLite bootboard only updates AFTER successful BSV broadcast.
  */
 
-import type BetterSqlite3 from 'better-sqlite3';
-import { getBootPriceForUser } from './pricing';
-import { FAIRNESS_CONFIG } from './config';
-import { calculateWeights } from './weights';
-import { calculateSplit } from './split';
-import { buildSplitTransaction } from './boot-payment';
-import { getServerAddress } from '@/services/bsv/wallet';
+import type BetterSqlite3 from "better-sqlite3";
+import { getServerAddress } from "@/services/bsv/wallet";
+import { buildSplitTransaction } from "./boot-payment";
+import { FAIRNESS_CONFIG } from "./config";
+import { getBootPriceForUser } from "./pricing";
+import { calculateSplit } from "./split";
+import { calculateWeights } from "./weights";
 
 export interface BootResult {
   success: boolean;
@@ -31,15 +31,23 @@ export async function executeBoot(
   db: BetterSqlite3.Database,
   postId: number,
   booterPubkey: string,
-  booterName: string,
+  booterName: string
 ): Promise<BootResult> {
   // 1. Validate the post exists and is boostable (has pubkey)
-  const post = db.prepare(
-    'SELECT id, pubkey, author_name FROM posts WHERE id = ?'
-  ).get(postId) as { id: number; pubkey: string | null; author_name: string } | undefined;
+  const post = db.prepare("SELECT id, pubkey, author_name FROM posts WHERE id = ?").get(postId) as
+    | { id: number; pubkey: string | null; author_name: string }
+    | undefined;
 
-  if (!post) return { success: false, price: 0, recipients: 0, error: 'Post not found', isFree: false };
-  if (!post.pubkey) return { success: false, price: 0, recipients: 0, error: 'Post is unsigned — cannot be booted', isFree: false };
+  if (!post)
+    return { success: false, price: 0, recipients: 0, error: "Post not found", isFree: false };
+  if (!post.pubkey)
+    return {
+      success: false,
+      price: 0,
+      recipients: 0,
+      error: "Post is unsigned — cannot be booted",
+      isFree: false,
+    };
 
   // 2. Check server wallet — if not configured, do SQLite-only boot (no on-chain split)
   const platformAddress = getServerAddress();
@@ -57,10 +65,16 @@ export async function executeBoot(
   // 5. Derive boosted post creator's address from their pubkey
   let creatorAddress: string;
   try {
-    const { PublicKey } = await import('@bsv/sdk');
+    const { PublicKey } = await import("@bsv/sdk");
     creatorAddress = PublicKey.fromString(post.pubkey).toAddress().toString();
   } catch {
-    return { success: false, price: actualPrice, recipients: 0, error: 'Invalid creator pubkey', isFree };
+    return {
+      success: false,
+      price: actualPrice,
+      recipients: 0,
+      error: "Invalid creator pubkey",
+      isFree,
+    };
   }
 
   // 6. Calculate the split
@@ -69,28 +83,26 @@ export async function executeBoot(
   let split: ReturnType<typeof calculateSplit> | null = null;
 
   if (platformAddress) {
-    split = calculateSplit(
-      actualPrice,
-      post.pubkey,
-      creatorAddress,
-      platformAddress,
-      weights
-    );
+    split = calculateSplit(actualPrice, post.pubkey, creatorAddress, platformAddress, weights);
     recipientCount = split.recipientCount;
 
     // 7. Build and broadcast the BSV split transaction
     const result = await buildSplitTransaction(split, postId);
 
-    if (result.status === 'success') {
+    if (result.status === "success") {
       txid = result.txid;
     } else {
       // Log the failure — broadcast did not succeed, do not consume the grant.
-      const errorDetail = result.status === 'broadcast_failed' ? result.error : result.status;
-      console.error(
-        `BSVibes: boot split broadcast FAILED for post ${postId}: ${errorDetail}`,
-      );
+      const errorDetail = result.status === "broadcast_failed" ? result.error : result.status;
+      console.error(`BSVibes: boot split broadcast FAILED for post ${postId}: ${errorDetail}`);
       // C5 fix: grant must NOT be consumed when broadcast fails.
-      return { success: false, price: actualPrice, recipients: 0, error: `Broadcast failed: ${errorDetail}`, isFree };
+      return {
+        success: false,
+        price: actualPrice,
+        recipients: 0,
+        error: `Broadcast failed: ${errorDetail}`,
+        isFree,
+      };
     }
   }
 
@@ -108,27 +120,39 @@ export async function executeBoot(
     // boosted_by = BSV address (used for activity feed queries by address)
     // boosted_by_name = human-readable display name (anon_XXXX)
     // is_free = 1 when the server wallet paid (user had a free boot grant)
-    const bootboardInsert = db.prepare(`
+    const bootboardInsert = db
+      .prepare(`
       INSERT INTO bootboard (post_id, boosted_by, boosted_by_name, is_free) VALUES (?, ?, ?, ?)
-    `).run(postId, booterPubkey, booterName, isFree ? 1 : 0);
+    `)
+      .run(postId, booterPubkey, booterName, isFree ? 1 : 0);
 
     // Use the unique bootboard row ID as bootEventId so multiple boots on the
     // same post each get their own payout set — prevents double-counting in earnings.
     const bootEventId = bootboardInsert.lastInsertRowid as number;
 
     // Update free boot grants
-    const existing = db.prepare('SELECT pubkey FROM boot_grants WHERE pubkey = ?').get(booterPubkey);
+    const existing = db
+      .prepare("SELECT pubkey FROM boot_grants WHERE pubkey = ?")
+      .get(booterPubkey);
     if (isFree) {
       if (existing) {
-        db.prepare('UPDATE boot_grants SET free_boots_used = free_boots_used + 1, total_boots = total_boots + 1 WHERE pubkey = ?').run(booterPubkey);
+        db.prepare(
+          "UPDATE boot_grants SET free_boots_used = free_boots_used + 1, total_boots = total_boots + 1 WHERE pubkey = ?"
+        ).run(booterPubkey);
       } else {
-        db.prepare('INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 1, 1)').run(booterPubkey);
+        db.prepare(
+          "INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 1, 1)"
+        ).run(booterPubkey);
       }
     } else {
       if (existing) {
-        db.prepare('UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?').run(booterPubkey);
+        db.prepare("UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?").run(
+          booterPubkey
+        );
       } else {
-        db.prepare('INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)').run(booterPubkey);
+        db.prepare(
+          "INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)"
+        ).run(booterPubkey);
       }
     }
 
@@ -136,21 +160,42 @@ export async function executeBoot(
     if (split && txid) {
       if (split.platform.sats > 0) {
         db.prepare(
-          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-        ).run(bootEventId, 'platform', split.platform.address, split.platform.sats, 'platform', txid);
+          "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+        ).run(
+          bootEventId,
+          "platform",
+          split.platform.address,
+          split.platform.sats,
+          "platform",
+          txid
+        );
       }
 
       if (split.creatorBonus.sats > 0) {
         db.prepare(
-          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-        ).run(bootEventId, split.creatorBonus.pubkey, split.creatorBonus.address, split.creatorBonus.sats, 'boost_bonus', txid);
+          "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+        ).run(
+          bootEventId,
+          split.creatorBonus.pubkey,
+          split.creatorBonus.address,
+          split.creatorBonus.sats,
+          "boost_bonus",
+          txid
+        );
       }
 
       for (const recipient of split.pool) {
         if (recipient.sats > 0) {
           db.prepare(
-            'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-          ).run(bootEventId, recipient.pubkey, recipient.address, recipient.sats, 'pool_share', txid);
+            "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+          ).run(
+            bootEventId,
+            recipient.pubkey,
+            recipient.address,
+            recipient.sats,
+            "pool_share",
+            txid
+          );
         }
       }
     }

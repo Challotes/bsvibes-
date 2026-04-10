@@ -3,9 +3,9 @@
  * Each post gets an OP_FALSE OP_RETURN transaction with its data.
  */
 
-import { Script, OP } from '@bsv/sdk';
-import type { LockingScript } from '@bsv/sdk';
-import { buildAndBroadcast } from './wallet';
+import type { LockingScript } from "@bsv/sdk";
+import { OP, Script } from "@bsv/sdk";
+import { buildAndBroadcast } from "./wallet";
 
 interface PostData {
   content: string;
@@ -23,8 +23,8 @@ interface PostData {
 export async function logPostOnChain(postData: PostData): Promise<string | null> {
   const attempt = async (): Promise<string | null> => {
     const payload = JSON.stringify({
-      app: 'bsvibes',
-      type: 'post',
+      app: "bsvibes",
+      type: "post",
       content: postData.content,
       author: postData.author,
       sig: postData.signature,
@@ -45,7 +45,7 @@ export async function logPostOnChain(postData: PostData): Promise<string | null>
       },
     ]);
 
-    return result.status === 'success' ? result.txid : null;
+    return result.status === "success" ? result.txid : null;
   };
 
   try {
@@ -57,7 +57,7 @@ export async function logPostOnChain(postData: PostData): Promise<string | null>
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return await attempt();
   } catch (e) {
-    console.error('BSVibes: on-chain logging failed', e);
+    console.error("BSVibes: on-chain logging failed", e);
     return null;
   }
 }

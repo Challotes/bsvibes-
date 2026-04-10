@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseScrollTrackerOptions {
   postCount: number;
@@ -21,7 +21,10 @@ interface UseScrollTrackerReturn {
   scrollToGenesis: () => void;
 }
 
-export function useScrollTracker({ postCount, postIds }: UseScrollTrackerOptions): UseScrollTrackerReturn {
+export function useScrollTracker({
+  postCount,
+  postIds,
+}: UseScrollTrackerOptions): UseScrollTrackerReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const genesisRef = useRef<HTMLDivElement>(null);
@@ -37,18 +40,18 @@ export function useScrollTracker({ postCount, postIds }: UseScrollTrackerOptions
   const unreadIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (localStorage.getItem('bsvibes_genesis_visited') === '1') {
+    if (localStorage.getItem("bsvibes_genesis_visited") === "1") {
       setGenesisVisited(true);
     }
     setGenesisHydrated(true);
   }, []);
 
   const scrollToGenesis = useCallback(() => {
-    genesisRef.current?.scrollIntoView({ behavior: 'smooth' });
+    genesisRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     setUnreadCount(0);
   }, []);
 
@@ -64,13 +67,13 @@ export function useScrollTracker({ postCount, postIds }: UseScrollTrackerOptions
       setIsAtTop(atTop);
       if (atTop && !genesisVisited) {
         setGenesisVisited(true);
-        localStorage.setItem('bsvibes_genesis_visited', '1');
+        localStorage.setItem("bsvibes_genesis_visited", "1");
       }
       if (atBottom) setUnreadCount(0);
     }
 
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, [genesisVisited]);
 
   useEffect(() => {
@@ -82,7 +85,7 @@ export function useScrollTracker({ postCount, postIds }: UseScrollTrackerOptions
         let changed = false;
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            const id = Number(entry.target.getAttribute('data-post-id'));
+            const id = Number(entry.target.getAttribute("data-post-id"));
             if (unreadIdsRef.current.has(id)) {
               unreadIdsRef.current.delete(id);
               changed = true;

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
-const CACHE_KEY = 'bsvibes_bsv_price';
+const CACHE_KEY = "bsvibes_bsv_price";
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CachedPrice {
@@ -16,7 +16,7 @@ interface CachedPrice {
  */
 export function useBsvPrice(): number {
   const [price, setPrice] = useState<number>(() => {
-    if (typeof window === 'undefined') return 50;
+    if (typeof window === "undefined") return 50;
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
@@ -32,14 +32,14 @@ export function useBsvPrice(): number {
   useEffect(() => {
     async function fetchPrice() {
       if (fetchingRef.current) return;
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       fetchingRef.current = true;
       try {
-        const res = await fetch('https://api.whatsonchain.com/v1/bsv/main/exchangerate');
+        const res = await fetch("https://api.whatsonchain.com/v1/bsv/main/exchangerate");
         if (!res.ok) return;
         const data = await res.json();
         const usd = data?.rate ?? null;
-        if (usd && typeof usd === 'number' && usd > 0) {
+        if (usd && typeof usd === "number" && usd > 0) {
           setPrice(usd);
           localStorage.setItem(CACHE_KEY, JSON.stringify({ usd, ts: Date.now() }));
         }
@@ -74,5 +74,5 @@ export function satsToDollars(sats: number, bsvPrice: number): string {
   if (usd >= 0.01) return `$${usd.toFixed(4)}`;
   if (usd >= 0.0001) return `$${usd.toFixed(6)}`;
   if (usd > 0) return `$${usd.toFixed(8)}`;
-  return '$0.00';
+  return "$0.00";
 }

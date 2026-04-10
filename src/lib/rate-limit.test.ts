@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { rateLimit } from './rate-limit';
+import { describe, expect, it } from "vitest";
+import { rateLimit } from "./rate-limit";
 
-describe('rateLimit', () => {
-  it('allows requests within the limit', () => {
+describe("rateLimit", () => {
+  it("allows requests within the limit", () => {
     const key = `test-allow-${Date.now()}`;
     const config = { limit: 3, windowMs: 60_000 };
 
@@ -11,7 +11,7 @@ describe('rateLimit', () => {
     expect(rateLimit(key, config).success).toBe(true);
   });
 
-  it('blocks requests exceeding the limit', () => {
+  it("blocks requests exceeding the limit", () => {
     const key = `test-block-${Date.now()}`;
     const config = { limit: 2, windowMs: 60_000 };
 
@@ -24,7 +24,7 @@ describe('rateLimit', () => {
     expect(result.resetMs).toBeGreaterThan(0);
   });
 
-  it('tracks remaining count correctly', () => {
+  it("tracks remaining count correctly", () => {
     const key = `test-remaining-${Date.now()}`;
     const config = { limit: 3, windowMs: 60_000 };
 
@@ -33,7 +33,7 @@ describe('rateLimit', () => {
     expect(rateLimit(key, config).remaining).toBe(0);
   });
 
-  it('isolates different keys', () => {
+  it("isolates different keys", () => {
     const config = { limit: 1, windowMs: 60_000 };
     const keyA = `test-iso-a-${Date.now()}`;
     const keyB = `test-iso-b-${Date.now()}`;

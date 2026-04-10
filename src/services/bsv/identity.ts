@@ -5,9 +5,9 @@
  * Private key never leaves the browser.
  */
 
-const STORAGE_KEY = 'bfn_keypair';
-const OLD_IDENTITY_KEY = 'bfn_identity';
-const ENCRYPTED_KEY = 'bfn_keypair_enc';
+const STORAGE_KEY = "bfn_keypair";
+const OLD_IDENTITY_KEY = "bfn_identity";
+const ENCRYPTED_KEY = "bfn_keypair_enc";
 
 interface StoredIdentity {
   wif: string;
@@ -15,20 +15,21 @@ interface StoredIdentity {
   address: string;
 }
 
-import type { Identity } from '@/types';
+import type { Identity } from "@/types";
+
 export type { Identity };
 
-import { generateAnonName } from '@/lib/utils';
-import { encryptWif, decryptWif, isEncrypted } from './crypto';
+import { generateAnonName } from "@/lib/utils";
+import { decryptWif, encryptWif, isEncrypted } from "./crypto";
 
 /**
  * Cached BSV SDK module promise — imported once, reused everywhere.
  */
-let _bsvSdkPromise: Promise<typeof import('@bsv/sdk')> | null = null;
+let _bsvSdkPromise: Promise<typeof import("@bsv/sdk")> | null = null;
 
-function getBsvSdk(): Promise<typeof import('@bsv/sdk')> {
+function getBsvSdk(): Promise<typeof import("@bsv/sdk")> {
   if (!_bsvSdkPromise) {
-    _bsvSdkPromise = import('@bsv/sdk');
+    _bsvSdkPromise = import("@bsv/sdk");
   }
   return _bsvSdkPromise;
 }
@@ -37,7 +38,7 @@ function getBsvSdk(): Promise<typeof import('@bsv/sdk')> {
  * Cached PrivateKey — WIF never changes for a session, so parse it once.
  */
 let _cachedWif: string | null = null;
-let _cachedPrivateKey: import('@bsv/sdk').PrivateKey | null = null;
+let _cachedPrivateKey: import("@bsv/sdk").PrivateKey | null = null;
 
 /**
  * Session-cached identity for encrypted mode — decrypted once per session.
@@ -46,7 +47,7 @@ let _sessionIdentity: Identity | null = null;
 
 /** Get existing identity from storage (plaintext only). */
 function getStoredIdentity(): StoredIdentity | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   let parsed: StoredIdentity;
@@ -61,7 +62,7 @@ function getStoredIdentity(): StoredIdentity | null {
 
 /** Check if the identity is stored in encrypted format. */
 export function isIdentityEncrypted(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   const raw = localStorage.getItem(ENCRYPTED_KEY);
   if (raw === null) return false;
   // The encrypted store is a JSON wrapper: { encrypted: "enc:...", name, address }.
@@ -69,7 +70,7 @@ export function isIdentityEncrypted(): boolean {
   // not the raw JSON string (which starts with "{").
   try {
     const parsed = JSON.parse(raw) as { encrypted?: string };
-    if (typeof parsed.encrypted === 'string') {
+    if (typeof parsed.encrypted === "string") {
       return isEncrypted(parsed.encrypted);
     }
   } catch {
@@ -81,7 +82,7 @@ export function isIdentityEncrypted(): boolean {
 
 /** Check for old identity format (just a name string, no keypair). */
 function getOldIdentityName(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   const oldName = localStorage.getItem(OLD_IDENTITY_KEY);
   if (oldName && /^anon_[a-z0-9]{4}$/.test(oldName)) return oldName;
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -99,7 +100,7 @@ function getOldIdentityName(): string | null {
 
 /** Get or create the user's identity. Returns null if encrypted (needs unlock). */
 export async function getIdentity(): Promise<Identity | null> {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
   // If session has a decrypted identity, use it
   if (_sessionIdentity) return _sessionIdentity;
@@ -110,8 +111,8 @@ export async function getIdentity(): Promise<Identity | null> {
     const plaintext = getStoredIdentity();
     if (plaintext) {
       console.warn(
-        '[BSVibes] getIdentity: encrypted key exists but plaintext key also present — ' +
-        'likely an interrupted upgrade. Using plaintext identity.'
+        "[BSVibes] getIdentity: encrypted key exists but plaintext key also present — " +
+          "likely an interrupted upgrade. Using plaintext identity."
       );
       getBsvSdk();
       return { name: plaintext.name, address: plaintext.address, wif: plaintext.wif };
@@ -124,7 +125,9 @@ export async function getIdentity(): Promise<Identity | null> {
     // Double-check: if an encrypted key ALSO exists, this plaintext is stale (from a race).
     // Remove it and return null so the unlock prompt appears.
     if (isIdentityEncrypted()) {
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
       return null;
     }
     getBsvSdk();
@@ -154,7 +157,7 @@ export async function getIdentity(): Promise<Identity | null> {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch (err) {
-    console.warn('BSVibes: could not persist identity to localStorage', err);
+    console.warn("BSVibes: could not persist identity to localStorage", err);
   }
 
   if (oldName) {
@@ -174,7 +177,7 @@ export async function getIdentity(): Promise<Identity | null> {
  * Caches the decrypted identity in memory for the session.
  */
 export async function unlockIdentity(passphrase: string): Promise<Identity | null> {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
   const enc = localStorage.getItem(ENCRYPTED_KEY);
   if (!enc) return null;
@@ -212,7 +215,7 @@ async function fetchSourceTxsBatched(
   txHashes: string[],
   _wocBase: string,
   batchSize = 10,
-  delayMs = 100,
+  delayMs = 100
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   // Deduplicate: multiple UTXOs can share the same parent tx
@@ -229,7 +232,7 @@ async function fetchSourceTxsBatched(
         }
         const hex = await hexRes.text();
         result.set(txHash, hex);
-      }),
+      })
     );
     // Throttle between batches (skip delay after last batch)
     if (i + batchSize < unique.length) {
@@ -253,9 +256,9 @@ async function fetchSourceTxsBatched(
 async function autoTransferFunds(
   oldWif: string,
   oldAddress: string,
-  newAddress: string,
+  newAddress: string
 ): Promise<{ txid: string | null; transferredSats: number; error?: string }> {
-  const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
+  const WOC_BASE = "https://api.whatsonchain.com/v1/bsv/main";
 
   try {
     console.log(`[BSVibes] autoTransferFunds: fetching UTXOs for ${oldAddress}`);
@@ -270,7 +273,9 @@ async function autoTransferFunds(
 
     const utxoData = await utxoRes.json();
     if (!Array.isArray(utxoData) || utxoData.length === 0) {
-      console.log(`[BSVibes] autoTransferFunds: no UTXOs found at ${oldAddress} — nothing to transfer`);
+      console.log(
+        `[BSVibes] autoTransferFunds: no UTXOs found at ${oldAddress} — nothing to transfer`
+      );
       return { txid: null, transferredSats: 0 }; // No funds — not an error
     }
 
@@ -284,14 +289,18 @@ async function autoTransferFunds(
       return { txid: null, transferredSats: 0 };
     }
 
-    console.log(`[BSVibes] autoTransferFunds: spending ${utxos.length} inputs, total ${totalSats} sats`);
+    console.log(
+      `[BSVibes] autoTransferFunds: spending ${utxos.length} inputs, total ${totalSats} sats`
+    );
 
     const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte } = await getBsvSdk();
     const oldKey = PrivateKey.fromWif(oldWif);
 
     // Fetch source tx hexes in batches to respect WoC rate limit
     const txHashes = utxos.map((u) => u.tx_hash);
-    console.log(`[BSVibes] autoTransferFunds: fetching ${new Set(txHashes).size} unique source txs via proxy`);
+    console.log(
+      `[BSVibes] autoTransferFunds: fetching ${new Set(txHashes).size} unique source txs via proxy`
+    );
     const sourceTxHexMap = await fetchSourceTxsBatched(txHashes, WOC_BASE);
 
     // Build transaction: selected UTXOs → new address
@@ -320,21 +329,24 @@ async function autoTransferFunds(
     console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);
     const broadcastResult = await tx.broadcast();
 
-    if (broadcastResult.status === 'success') {
-      const txid = tx.id('hex') as string;
-      console.log(`[BSVibes] autoTransferFunds: SUCCESS — transferred ${totalSats} sats. txid: ${txid}`);
+    if (broadcastResult.status === "success") {
+      const txid = tx.id("hex") as string;
+      console.log(
+        `[BSVibes] autoTransferFunds: SUCCESS — transferred ${totalSats} sats. txid: ${txid}`
+      );
       return { txid, transferredSats: totalSats };
     }
 
     const broadcastError = `Broadcast failed: ${
-      typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult)
+      typeof broadcastResult === "object"
+        ? JSON.stringify(broadcastResult)
+        : String(broadcastResult)
     }`;
     console.error(`[BSVibes] autoTransferFunds: ${broadcastError}`);
     return { txid: null, transferredSats: 0, error: broadcastError };
-
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[BSVibes] autoTransferFunds: exception —', msg, e);
+    console.error("[BSVibes] autoTransferFunds: exception —", msg, e);
     return { txid: null, transferredSats: 0, error: msg };
   }
 }
@@ -354,7 +366,7 @@ export function commitUpgrade(encStore: string): void {
     localStorage.setItem(ENCRYPTED_KEY, encStore);
     localStorage.removeItem(STORAGE_KEY);
   } catch (err) {
-    console.warn('BSVibes: could not commit upgrade to localStorage', err);
+    console.warn("BSVibes: could not commit upgrade to localStorage", err);
   }
 }
 
@@ -392,8 +404,8 @@ export async function upgradeIdentity(
   const oldAddress = oldKey.toPublicKey().toAddress().toString();
 
   const migrationMessage = JSON.stringify({
-    app: 'bsvibes',
-    type: 'migration',
+    app: "bsvibes",
+    type: "migration",
     from_pubkey: oldPubkey,
     to_pubkey: newPubkey,
     ts: Date.now(),
@@ -401,7 +413,7 @@ export async function upgradeIdentity(
 
   const msgBytes = Array.from(new TextEncoder().encode(migrationMessage));
   const sig = oldKey.sign(msgBytes);
-  const migrationSignature = sig.toDER('hex') as string;
+  const migrationSignature = sig.toDER("hex") as string;
 
   // Auto-transfer funds from old address to new address BEFORE storing new key
   const fundTransfer = await autoTransferFunds(oldWif, oldAddress, newAddress);
@@ -437,8 +449,10 @@ export async function upgradeIdentity(
 }
 
 /** Sign post content. Returns signature + pubkey hex. */
-export async function signPost(content: string): Promise<{ signature: string; pubkey: string } | null> {
-  if (typeof window === 'undefined') return null;
+export async function signPost(
+  content: string
+): Promise<{ signature: string; pubkey: string } | null> {
+  if (typeof window === "undefined") return null;
 
   // Try session identity first (encrypted mode), then stored (plaintext mode)
   const wif = _sessionIdentity?.wif ?? getStoredIdentity()?.wif;
@@ -455,7 +469,7 @@ export async function signPost(content: string): Promise<{ signature: string; pu
   const sig = _cachedPrivateKey.sign(messageBytes);
 
   return {
-    signature: sig.toDER('hex') as string,
+    signature: sig.toDER("hex") as string,
     pubkey: _cachedPrivateKey.toPublicKey().toString(),
   };
 }
@@ -472,26 +486,29 @@ export function preWarmBsvSdk(): void {
  * @param wif    - A Base58-encoded WIF private key string.
  * @param name   - Optional display name. Falls back to generating a new anon name.
  */
-export async function importIdentity(wif: string, name?: string): Promise<Identity & { pubkey: string }> {
-  if (typeof window === 'undefined') {
-    throw new Error('importIdentity can only run in the browser');
+export async function importIdentity(
+  wif: string,
+  name?: string
+): Promise<Identity & { pubkey: string }> {
+  if (typeof window === "undefined") {
+    throw new Error("importIdentity can only run in the browser");
   }
 
   const trimmed = wif.trim();
-  if (!trimmed) throw new Error('WIF is required');
+  if (!trimmed) throw new Error("WIF is required");
 
   const { PrivateKey } = await getBsvSdk();
 
-  let key: import('@bsv/sdk').PrivateKey;
+  let key: import("@bsv/sdk").PrivateKey;
   try {
     key = PrivateKey.fromWif(trimmed);
   } catch {
-    throw new Error('Invalid key — please check and try again');
+    throw new Error("Invalid key — please check and try again");
   }
 
   const pubkey = key.toPublicKey().toString();
   const address = key.toPublicKey().toAddress().toString();
-  const identityName = (name ?? '').trim() || generateAnonName();
+  const identityName = (name ?? "").trim() || generateAnonName();
 
   const store: StoredIdentity = { wif: trimmed, name: identityName, address };
 

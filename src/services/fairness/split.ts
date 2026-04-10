@@ -3,14 +3,14 @@
  * Every sat in = every sat out in the same transaction.
  */
 
-import { FAIRNESS_CONFIG } from './config';
-import type { ContributorWeight } from './weights';
+import { FAIRNESS_CONFIG } from "./config";
+import type { ContributorWeight } from "./weights";
 
 export interface SplitRecipient {
   pubkey: string;
   address: string;
   sats: number;
-  type: 'pool_share' | 'boost_bonus' | 'platform';
+  type: "pool_share" | "boost_bonus" | "platform";
 }
 
 export interface SplitResult {
@@ -51,7 +51,7 @@ export function calculateSplit(
           pubkey: contributor.pubkey,
           address: contributor.address,
           sats: share,
-          type: 'pool_share',
+          type: "pool_share",
         });
         distributedPool += share;
       }
@@ -70,18 +70,23 @@ export function calculateSplit(
   const creatorPoolEntry = pool.find((p) => p.pubkey === boostedPostPubkey);
   if (creatorPoolEntry) {
     creatorPoolEntry.sats += bonusSats + remainder;
-    creatorPoolEntry.type = 'boost_bonus'; // Mark as bonus recipient
+    creatorPoolEntry.type = "boost_bonus"; // Mark as bonus recipient
   }
 
   const creatorBonusEntry: SplitRecipient = creatorPoolEntry
-    ? { pubkey: boostedPostPubkey, address: boostedPostAddress, sats: 0, type: 'boost_bonus' }
-    : { pubkey: boostedPostPubkey, address: boostedPostAddress, sats: creatorTotal, type: 'boost_bonus' };
+    ? { pubkey: boostedPostPubkey, address: boostedPostAddress, sats: 0, type: "boost_bonus" }
+    : {
+        pubkey: boostedPostPubkey,
+        address: boostedPostAddress,
+        sats: creatorTotal,
+        type: "boost_bonus",
+      };
 
   const platformEntry: SplitRecipient = {
-    pubkey: 'platform',
+    pubkey: "platform",
     address: platformAddress,
     sats: platformSats,
-    type: 'platform',
+    type: "platform",
   };
 
   // Build final recipient list (deduplicated — creator might be in pool already)

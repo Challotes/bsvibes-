@@ -1,10 +1,4 @@
-export function BootIcon({
-  size = 16,
-  className = '',
-}: {
-  size?: number;
-  className?: string;
-}) {
+export function BootIcon({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
     <span
       className={className}

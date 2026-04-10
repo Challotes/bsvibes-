@@ -1,5 +1,5 @@
-import { getPosts, getBootboard } from './actions';
-import { Feed } from './Feed';
+import { getBootboard, getPosts } from "./actions";
+import { Feed } from "./Feed";
 
 export const revalidate = 10;
 

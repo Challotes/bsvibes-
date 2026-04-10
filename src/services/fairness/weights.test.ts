@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import Database from 'better-sqlite3';
-import { PrivateKey } from '@bsv/sdk';
-import { calculateWeights, _clearWeightsCache } from './weights';
+import { PrivateKey } from "@bsv/sdk";
+import Database from "better-sqlite3";
+import { beforeEach, describe, expect, it } from "vitest";
+import { _clearWeightsCache, calculateWeights } from "./weights";
 
 function createTestDb() {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE posts (
@@ -40,7 +40,7 @@ function createTestDb() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  db.exec('CREATE UNIQUE INDEX idx_migrations_from_unique ON migrations(from_pubkey)');
+  db.exec("CREATE UNIQUE INDEX idx_migrations_from_unique ON migrations(from_pubkey)");
 
   return db;
 }
@@ -55,23 +55,26 @@ function makeKey() {
 
 function addPost(db: ReturnType<typeof Database>, pubkey: string, minutesAgo = 0) {
   const created = new Date(Date.now() - minutesAgo * 60_000)
-    .toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+    .toISOString()
+    .replace("T", " ")
+    .replace("Z", "")
+    .slice(0, 19);
   db.prepare(
-    'INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)'
-  ).run('test post', 'anon_test', pubkey, created);
+    "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)"
+  ).run("test post", "anon_test", pubkey, created);
 }
 
 function addMigration(db: ReturnType<typeof Database>, from: string, to: string) {
   db.prepare(
-    'INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)'
-  ).run(from, to, 'sig');
+    "INSERT OR REPLACE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)"
+  ).run(from, to, "sig");
 }
 
 function addBoot(db: ReturnType<typeof Database>, postId: number) {
-  db.prepare('INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)').run(postId, 'someone');
+  db.prepare("INSERT INTO bootboard (post_id, boosted_by) VALUES (?, ?)").run(postId, "someone");
 }
 
-describe('calculateWeights', () => {
+describe("calculateWeights", () => {
   let db: ReturnType<typeof Database>;
 
   beforeEach(() => {
@@ -79,16 +82,16 @@ describe('calculateWeights', () => {
     db = createTestDb();
   });
 
-  it('returns empty array for empty DB', () => {
+  it("returns empty array for empty DB", () => {
     expect(calculateWeights(db)).toHaveLength(0);
   });
 
-  it('returns empty for unsigned posts only', () => {
-    db.prepare('INSERT INTO posts (content, author_name) VALUES (?, ?)').run('unsigned', 'anon');
+  it("returns empty for unsigned posts only", () => {
+    db.prepare("INSERT INTO posts (content, author_name) VALUES (?, ?)").run("unsigned", "anon");
     expect(calculateWeights(db)).toHaveLength(0);
   });
 
-  it('returns one contributor for a single signed post', () => {
+  it("returns one contributor for a single signed post", () => {
     const key = makeKey();
     addPost(db, key.pubkey);
     const weights = calculateWeights(db);
@@ -101,7 +104,7 @@ describe('calculateWeights', () => {
     expect(weights[0].totalBoots).toBe(0);
   });
 
-  it('aggregates multiple posts from same contributor', () => {
+  it("aggregates multiple posts from same contributor", () => {
     const key = makeKey();
     addPost(db, key.pubkey, 0);
     addPost(db, key.pubkey, 5);
@@ -113,7 +116,7 @@ describe('calculateWeights', () => {
     expect(weights[0].weight).toBeGreaterThan(1);
   });
 
-  it('separates different contributors', () => {
+  it("separates different contributors", () => {
     const keyA = makeKey();
     const keyB = makeKey();
     addPost(db, keyA.pubkey, 0);
@@ -121,12 +124,12 @@ describe('calculateWeights', () => {
     const weights = calculateWeights(db);
 
     expect(weights).toHaveLength(2);
-    const pubkeys = weights.map(w => w.pubkey);
+    const pubkeys = weights.map((w) => w.pubkey);
     expect(pubkeys).toContain(keyA.pubkey);
     expect(pubkeys).toContain(keyB.pubkey);
   });
 
-  it('resolves simple migration chain A→B', () => {
+  it("resolves simple migration chain A→B", () => {
     const oldKey = makeKey();
     const newKey = makeKey();
     addPost(db, oldKey.pubkey, 10);
@@ -140,7 +143,7 @@ describe('calculateWeights', () => {
     expect(weights[0].postCount).toBe(1);
   });
 
-  it('resolves multi-hop migration chain A→B→C', () => {
+  it("resolves multi-hop migration chain A→B→C", () => {
     const keyA = makeKey();
     const keyB = makeKey();
     const keyC = makeKey();
@@ -156,10 +159,12 @@ describe('calculateWeights', () => {
     expect(weights[0].postCount).toBe(2);
   });
 
-  it('boots increase weight via engagement multiplier', () => {
+  it("boots increase weight via engagement multiplier", () => {
     const key = makeKey();
     addPost(db, key.pubkey, 0);
-    const postId = (db.prepare('SELECT id FROM posts ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
+    const postId = (
+      db.prepare("SELECT id FROM posts ORDER BY id DESC LIMIT 1").get() as { id: number }
+    ).id;
 
     const weightBefore = calculateWeights(db)[0].weight;
 
@@ -174,10 +179,10 @@ describe('calculateWeights', () => {
     expect(weightsAfter[0].totalBoots).toBe(3);
   });
 
-  it('older posts have lower weight (time decay)', () => {
+  it("older posts have lower weight (time decay)", () => {
     const key = makeKey();
     // One recent post and one 30-day old post from the same contributor
-    addPost(db, key.pubkey, 0);           // recent — high decay
+    addPost(db, key.pubkey, 0); // recent — high decay
     addPost(db, key.pubkey, 30 * 24 * 60); // 30 days — half-life decay
 
     const weights = calculateWeights(db);
@@ -188,12 +193,12 @@ describe('calculateWeights', () => {
     expect(weights[0].weight).toBeLessThan(2); // would be 2 if no decay
   });
 
-  it('does not produce NaN from SQLite datetime format', () => {
+  it("does not produce NaN from SQLite datetime format", () => {
     const key = makeKey();
     // Insert with SQLite's native datetime() which produces space-separated format
     db.prepare(
       "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, datetime('now'))"
-    ).run('test', 'anon', key.pubkey);
+    ).run("test", "anon", key.pubkey);
 
     const weights = calculateWeights(db);
     expect(weights).toHaveLength(1);

@@ -5,42 +5,42 @@
  */
 
 interface RateLimitEntry {
-  timestamps: number[]
+  timestamps: number[];
 }
 
-const store = new Map<string, RateLimitEntry>()
+const store = new Map<string, RateLimitEntry>();
 
 // Clean up expired entries every 60 seconds to prevent unbounded memory growth.
-let cleanupScheduled = false
+let cleanupScheduled = false;
 
 function scheduleCleanup(windowMs: number) {
-  if (cleanupScheduled) return
-  cleanupScheduled = true
+  if (cleanupScheduled) return;
+  cleanupScheduled = true;
   setInterval(() => {
-    const cutoff = Date.now() - windowMs
+    const cutoff = Date.now() - windowMs;
     for (const [key, entry] of store) {
-      entry.timestamps = entry.timestamps.filter(ts => ts > cutoff)
+      entry.timestamps = entry.timestamps.filter((ts) => ts > cutoff);
       if (entry.timestamps.length === 0) {
-        store.delete(key)
+        store.delete(key);
       }
     }
-  }, 60_000)
+  }, 60_000);
 }
 
 export interface RateLimitConfig {
   /** Maximum number of requests allowed in the window. */
-  limit: number
+  limit: number;
   /** Sliding window duration in milliseconds. */
-  windowMs: number
+  windowMs: number;
 }
 
 export interface RateLimitResult {
   /** Whether the request is allowed. */
-  success: boolean
+  success: boolean;
   /** Requests remaining in the current window. */
-  remaining: number
+  remaining: number;
   /** Milliseconds until the oldest request in the window expires. */
-  resetMs: number
+  resetMs: number;
 }
 
 /**
@@ -50,39 +50,39 @@ export interface RateLimitResult {
  * @param config  Limit and window configuration.
  */
 export function rateLimit(key: string, config: RateLimitConfig): RateLimitResult {
-  const { limit, windowMs } = config
+  const { limit, windowMs } = config;
 
-  scheduleCleanup(windowMs)
+  scheduleCleanup(windowMs);
 
-  const now = Date.now()
-  const cutoff = now - windowMs
+  const now = Date.now();
+  const cutoff = now - windowMs;
 
-  let entry = store.get(key)
+  let entry = store.get(key);
   if (!entry) {
-    entry = { timestamps: [] }
-    store.set(key, entry)
+    entry = { timestamps: [] };
+    store.set(key, entry);
   }
 
   // Drop timestamps outside the current window.
-  entry.timestamps = entry.timestamps.filter(ts => ts > cutoff)
+  entry.timestamps = entry.timestamps.filter((ts) => ts > cutoff);
 
-  const count = entry.timestamps.length
+  const count = entry.timestamps.length;
 
   if (count >= limit) {
     // Oldest timestamp tells us when the window next frees a slot.
-    const oldest = entry.timestamps[0]
+    const oldest = entry.timestamps[0];
     return {
       success: false,
       remaining: 0,
       resetMs: oldest + windowMs - now,
-    }
+    };
   }
 
-  entry.timestamps.push(now)
+  entry.timestamps.push(now);
 
   return {
     success: true,
     remaining: limit - entry.timestamps.length,
     resetMs: 0,
-  }
+  };
 }

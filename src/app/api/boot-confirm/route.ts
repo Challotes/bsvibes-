@@ -1,170 +1,173 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { rateLimit } from '@/lib/rate-limit'
-import { calculateWeights } from '@/services/fairness/weights'
-import { calculateSplit } from '@/services/fairness/split'
-import { getBootPrice } from '@/services/fairness/pricing'
-import { getServerAddress } from '@/services/bsv/wallet'
+import { type NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { getServerAddress } from "@/services/bsv/wallet";
+import { getBootPrice } from "@/services/fairness/pricing";
+import { calculateSplit } from "@/services/fairness/split";
+import { calculateWeights } from "@/services/fairness/weights";
 
 interface BootConfirmBody {
-  postId: number
-  txid: string
-  booterPubkey: string
-  booterName: string
+  postId: number;
+  txid: string;
+  booterPubkey: string;
+  booterName: string;
 }
 
 export async function POST(req: NextRequest) {
-  let body: BootConfirmBody
+  let body: BootConfirmBody;
   try {
-    body = await req.json()
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { postId, txid, booterPubkey, booterName } = body
+  const { postId, txid, booterPubkey, booterName } = body;
 
   if (!Number.isInteger(postId) || postId <= 0) {
-    return NextResponse.json({ error: 'Invalid postId' }, { status: 400 })
+    return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
   }
-  if (typeof txid !== 'string' || txid.trim().length === 0) {
-    return NextResponse.json({ error: 'Missing txid' }, { status: 400 })
+  if (typeof txid !== "string" || txid.trim().length === 0) {
+    return NextResponse.json({ error: "Missing txid" }, { status: 400 });
   }
 
   // Validate txid format: must be exactly 64 hex characters
   if (!/^[a-fA-F0-9]{64}$/.test(txid.trim())) {
-    return NextResponse.json({ error: 'Invalid txid format' }, { status: 400 })
+    return NextResponse.json({ error: "Invalid txid format" }, { status: 400 });
   }
 
   // Rate limit: 10 confirmations per minute per IP
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const rl = rateLimit(`boot-confirm:${ip}`, { limit: 10, windowMs: 60_000 })
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = rateLimit(`boot-confirm:${ip}`, { limit: 10, windowMs: 60_000 });
   if (!rl.success) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   // Replay protection: reject if this txid was already recorded
-  const existingPayout = db.prepare(
-    'SELECT id FROM payouts WHERE txid = ? LIMIT 1'
-  ).get(txid.trim()) as { id: number } | undefined
+  const existingPayout = db
+    .prepare("SELECT id FROM payouts WHERE txid = ? LIMIT 1")
+    .get(txid.trim()) as { id: number } | undefined;
   if (existingPayout) {
-    return NextResponse.json({ error: 'Transaction already recorded' }, { status: 409 })
+    return NextResponse.json({ error: "Transaction already recorded" }, { status: 409 });
   }
 
   // Verify the transaction exists on-chain and its outputs match the expected split.
   // Recently broadcast txs may not be indexed yet — retry once after 2s.
   interface WocVout {
-    value: number // BSV (not sats)
-    scriptPubKey?: { addresses?: string[] }
+    value: number; // BSV (not sats)
+    scriptPubKey?: { addresses?: string[] };
   }
-  let txVouts: WocVout[] = []
+  let txVouts: WocVout[] = [];
   try {
-    let wocRes = await fetch(
-      `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
-      { headers: { 'Accept': 'application/json' } }
-    )
+    let wocRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`, {
+      headers: { Accept: "application/json" },
+    });
     if (!wocRes.ok) {
-      await new Promise(r => setTimeout(r, 2000))
-      wocRes = await fetch(
-        `https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`,
-        { headers: { 'Accept': 'application/json' } }
-      )
+      await new Promise((r) => setTimeout(r, 2000));
+      wocRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`, {
+        headers: { Accept: "application/json" },
+      });
     }
     if (!wocRes.ok) {
-      console.warn(`[BSVibes] boot-confirm: txid ${txid.slice(0, 16)}… not found on-chain (HTTP ${wocRes.status})`)
+      console.warn(
+        `[BSVibes] boot-confirm: txid ${txid.slice(0, 16)}… not found on-chain (HTTP ${wocRes.status})`
+      );
       return NextResponse.json(
-        { error: 'Transaction not found on-chain — please wait for confirmation and retry' },
+        { error: "Transaction not found on-chain — please wait for confirmation and retry" },
         { status: 400 }
-      )
+      );
     }
-    const txData = await wocRes.json() as { vout?: WocVout[] }
-    txVouts = txData.vout ?? []
+    const txData = (await wocRes.json()) as { vout?: WocVout[] };
+    txVouts = txData.vout ?? [];
   } catch (err) {
-    console.error('[BSVibes] boot-confirm: WhatsOnChain verification failed', err)
+    console.error("[BSVibes] boot-confirm: WhatsOnChain verification failed", err);
     return NextResponse.json(
-      { error: 'Could not verify transaction — please try again' },
+      { error: "Could not verify transaction — please try again" },
       { status: 502 }
-    )
+    );
   }
 
-  if (typeof booterPubkey !== 'string' || booterPubkey.trim().length === 0) {
-    return NextResponse.json({ error: 'Missing booterPubkey' }, { status: 400 })
+  if (typeof booterPubkey !== "string" || booterPubkey.trim().length === 0) {
+    return NextResponse.json({ error: "Missing booterPubkey" }, { status: 400 });
   }
   // booterName defaults to booterPubkey if not provided (backward compat)
-  const displayName = (typeof booterName === 'string' && booterName.trim().length > 0)
-    ? booterName.trim()
-    : booterPubkey
+  const displayName =
+    typeof booterName === "string" && booterName.trim().length > 0
+      ? booterName.trim()
+      : booterPubkey;
 
   // Validate the post exists and has a pubkey (so we can pay the creator)
-  const post = db.prepare(
-    'SELECT id, pubkey FROM posts WHERE id = ?'
-  ).get(postId) as { id: number; pubkey: string | null } | undefined
+  const post = db.prepare("SELECT id, pubkey FROM posts WHERE id = ?").get(postId) as
+    | { id: number; pubkey: string | null }
+    | undefined;
 
   if (!post) {
-    return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    return NextResponse.json({ error: "Post not found" }, { status: 404 });
   }
   if (!post.pubkey) {
-    return NextResponse.json({ error: 'Post is unsigned — cannot be booted' }, { status: 422 })
+    return NextResponse.json({ error: "Post is unsigned — cannot be booted" }, { status: 422 });
   }
 
-  const platformAddress = getServerAddress()
+  const platformAddress = getServerAddress();
   if (!platformAddress) {
-    return NextResponse.json({ error: 'Server wallet not configured' }, { status: 503 })
+    return NextResponse.json({ error: "Server wallet not configured" }, { status: 503 });
   }
 
   // Recalculate the split at current prices so we have accurate payout records
-  const bootPrice = getBootPrice(db)
-  const weights = calculateWeights(db)
+  const bootPrice = getBootPrice(db);
+  const weights = calculateWeights(db);
 
-  let creatorAddress: string
+  let creatorAddress: string;
   try {
-    const { PublicKey } = await import('@bsv/sdk')
-    creatorAddress = PublicKey.fromString(post.pubkey).toAddress().toString()
+    const { PublicKey } = await import("@bsv/sdk");
+    creatorAddress = PublicKey.fromString(post.pubkey).toAddress().toString();
   } catch {
-    return NextResponse.json({ error: 'Invalid creator pubkey' }, { status: 422 })
+    return NextResponse.json({ error: "Invalid creator pubkey" }, { status: 422 });
   }
 
-  const split = calculateSplit(
-    bootPrice,
-    post.pubkey,
-    creatorAddress,
-    platformAddress,
-    weights,
-  )
+  const split = calculateSplit(bootPrice, post.pubkey, creatorAddress, platformAddress, weights);
 
   // Verify on-chain outputs match the expected split.
   // Build a map of expected address → sats from the split.
-  const expectedOutputs = new Map<string, number>()
+  const expectedOutputs = new Map<string, number>();
   if (split.platform.sats > 0) {
-    expectedOutputs.set(split.platform.address, (expectedOutputs.get(split.platform.address) ?? 0) + split.platform.sats)
+    expectedOutputs.set(
+      split.platform.address,
+      (expectedOutputs.get(split.platform.address) ?? 0) + split.platform.sats
+    );
   }
   if (split.creatorBonus.sats > 0) {
-    expectedOutputs.set(split.creatorBonus.address, (expectedOutputs.get(split.creatorBonus.address) ?? 0) + split.creatorBonus.sats)
+    expectedOutputs.set(
+      split.creatorBonus.address,
+      (expectedOutputs.get(split.creatorBonus.address) ?? 0) + split.creatorBonus.sats
+    );
   }
   for (const r of split.pool) {
     if (r.sats > 0) {
-      expectedOutputs.set(r.address, (expectedOutputs.get(r.address) ?? 0) + r.sats)
+      expectedOutputs.set(r.address, (expectedOutputs.get(r.address) ?? 0) + r.sats);
     }
   }
 
   // Check that each expected recipient appears in the tx outputs with at least the expected sats.
   // Allow 2 sat tolerance per output for fee rounding differences.
-  const onChainByAddr = new Map<string, number>()
+  const onChainByAddr = new Map<string, number>();
   for (const vout of txVouts) {
-    const addr = vout.scriptPubKey?.addresses?.[0]
+    const addr = vout.scriptPubKey?.addresses?.[0];
     if (addr) {
-      const sats = Math.round(vout.value * 1e8)
-      onChainByAddr.set(addr, (onChainByAddr.get(addr) ?? 0) + sats)
+      const sats = Math.round(vout.value * 1e8);
+      onChainByAddr.set(addr, (onChainByAddr.get(addr) ?? 0) + sats);
     }
   }
 
   for (const [addr, expectedSats] of expectedOutputs) {
-    const actualSats = onChainByAddr.get(addr) ?? 0
+    const actualSats = onChainByAddr.get(addr) ?? 0;
     if (actualSats < expectedSats - 2) {
-      console.warn(`[BSVibes] boot-confirm: output mismatch for ${addr} — expected ${expectedSats}, got ${actualSats}`)
+      console.warn(
+        `[BSVibes] boot-confirm: output mismatch for ${addr} — expected ${expectedSats}, got ${actualSats}`
+      );
       return NextResponse.json(
-        { error: 'Transaction outputs do not match expected split' },
+        { error: "Transaction outputs do not match expected split" },
         { status: 400 }
-      )
+      );
     }
   }
 
@@ -174,55 +177,64 @@ export async function POST(req: NextRequest) {
     db.prepare(`
       UPDATE bootboard SET held_until = datetime('now')
       WHERE held_until IS NULL
-    `).run()
+    `).run();
 
     // Insert the new bootboard entry.
     // boosted_by = BSV address (used for activity feed queries by address)
     // boosted_by_name = human-readable display name (anon_XXXX)
-    const bootboardInsert = db.prepare(`
+    const bootboardInsert = db
+      .prepare(`
       INSERT INTO bootboard (post_id, boosted_by, boosted_by_name) VALUES (?, ?, ?)
-    `).run(postId, booterPubkey, displayName)
+    `)
+      .run(postId, booterPubkey, displayName);
 
     // Use the unique bootboard row ID as bootEventId so multiple boots on the
     // same post each get their own payout set — prevents double-counting in earnings.
-    const bootEventId = bootboardInsert.lastInsertRowid as number
+    const bootEventId = bootboardInsert.lastInsertRowid as number;
 
     // Update or create boot_grants (paid boot — increment total_boots only)
-    const existing = db.prepare(
-      'SELECT pubkey FROM boot_grants WHERE pubkey = ?'
-    ).get(booterPubkey)
+    const existing = db
+      .prepare("SELECT pubkey FROM boot_grants WHERE pubkey = ?")
+      .get(booterPubkey);
 
     if (existing) {
-      db.prepare(
-        'UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?'
-      ).run(booterPubkey)
+      db.prepare("UPDATE boot_grants SET total_boots = total_boots + 1 WHERE pubkey = ?").run(
+        booterPubkey
+      );
     } else {
       db.prepare(
-        'INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)'
-      ).run(booterPubkey)
+        "INSERT INTO boot_grants (pubkey, free_boots_used, total_boots) VALUES (?, 0, 1)"
+      ).run(booterPubkey);
     }
 
     // Record payouts for the audit trail
     if (split.platform.sats > 0) {
       db.prepare(
-        'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(bootEventId, 'platform', split.platform.address, split.platform.sats, 'platform', txid)
+        "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(bootEventId, "platform", split.platform.address, split.platform.sats, "platform", txid);
     }
 
     if (split.creatorBonus.sats > 0) {
       db.prepare(
-        'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(bootEventId, split.creatorBonus.pubkey, split.creatorBonus.address, split.creatorBonus.sats, 'boost_bonus', txid)
+        "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(
+        bootEventId,
+        split.creatorBonus.pubkey,
+        split.creatorBonus.address,
+        split.creatorBonus.sats,
+        "boost_bonus",
+        txid
+      );
     }
 
     for (const recipient of split.pool) {
       if (recipient.sats > 0) {
         db.prepare(
-          'INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)'
-        ).run(bootEventId, recipient.pubkey, recipient.address, recipient.sats, 'pool_share', txid)
+          "INSERT INTO payouts (boot_event_id, recipient_pubkey, recipient_address, amount_sats, payout_type, txid) VALUES (?, ?, ?, ?, ?, ?)"
+        ).run(bootEventId, recipient.pubkey, recipient.address, recipient.sats, "pool_share", txid);
       }
     }
-  })()
+  })();
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }
