@@ -18,7 +18,7 @@
 ### C3: /api/boot-confirm accepts any txid without verification — FIXED
 **File:** src/app/api/boot-confirm/route.ts
 **Risk:** Attacker can fake boot confirmations, inflate contribution weight, game fairness system at zero cost.
-**Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + UNIQUE DB index), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance).
+**Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + application-level SELECT before insert), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance). DB-level uniqueness is composite `UNIQUE(txid, recipient_address)` at db.ts:117 — replay protection relies on the app-level check, not the index alone.
 
 ### C4: Auto-download backup only has NEW key when fund transfer fails
 **File:** src/app/IdentityBar.tsx lines 171-185
@@ -45,10 +45,10 @@
 **Risk:** Anyone who knows a pubkey can delete that user's migration records via the server action. Targeted payout redirection attack.
 **Fix:** (2026-03-28) Requires signed challenge with 5-minute timestamp replay protection.
 
-### C9: Backup warning dot clears on dropdown OPEN, not on actual backup
+### C9: Backup warning dot clears on dropdown OPEN, not on actual backup — FIXED
 **File:** src/app/IdentityBar.tsx lines 110-115
 **Risk:** User thinks they're backed up after opening dropdown, but never actually copied or downloaded.
-**Fix:** Only set BACKED_UP_KEY after handleDownload() or handleCopy() completes.
+**Fix:** `markBackedUp()` now only fires from `handleDownload()`, `handleSaveEncrypted()`, and `handleCopy()` handlers — no longer on dropdown open. Verified 2026-04-10.
 
 ## HIGH (7 findings — fix this sprint)
 
@@ -56,9 +56,9 @@
 **File:** src/app/actions.ts line 24
 **Fix:** (2026-03-28) Now keyed on verified pubkey.
 
-### H2: /api/boot-shares exposes all contributor addresses unauthenticated
+### H2: /api/boot-shares exposes all contributor addresses unauthenticated — PARTIAL
 **File:** src/app/api/boot-shares/route.ts
-**Fix:** Add rate limiting. Consider signed request for detailed shares.
+**Fix:** Rate limiting added (30/min/IP) at boot-shares/route.ts:12. Signed request for detailed shares still TODO. Updated 2026-04-10.
 
 ### H3: Console logs leak addresses and amounts client-side
 **File:** Multiple (identity.ts, IdentityBar.tsx)
@@ -95,7 +95,7 @@
 ## MEDIUM (8 findings — before public launch)
 
 - M1: PBKDF2 at 100k iterations (increase to 600k)
-- M2: Backup file contains plaintext WIF — FIXED (encrypted with passphrase for protected users)
+- M2: Backup file contains plaintext WIF — PARTIAL (encrypted with passphrase for protected users; unprotected users still get plaintext WIF via doDownloadPlaintext path at IdentityBar.tsx:282-297)
 - M3: Migration signature has no timestamp validation
 - M4: Rate limiter is in-memory, resets on restart
 - M5: /api/earnings exposes full financial history unauthenticated

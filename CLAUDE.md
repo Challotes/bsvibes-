@@ -16,7 +16,9 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 ## Architecture
 
-- **Framework:** Next.js 16 (App Router) + TypeScript + Tailwind CSS v4
+- **Framework:** Next.js 16 (App Router) + React 19.2 + TypeScript + Tailwind CSS v4
+- **Build:** Turbopack (dev + prod), React Compiler enabled (`reactCompiler: true` in `next.config.ts`)
+- **Linter/Formatter:** Biome (`biome.jsonc`) — replaced ESLint 2026-03-25
 - **Database:** SQLite (better-sqlite3) for local dev, file: `local.db`
 - **Blockchain:** BSV via `@bsv/sdk` — keypair generation, signing, on-chain logging
 - **Identity:** Auto-generated BSV keypair stored in browser localStorage
@@ -39,6 +41,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/actions.ts` — createPost (sig verification), getPosts, getBootboard, bootPost, migrateIdentity, cleanupMigrations
 - `src/lib/db.ts` — SQLite setup (WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
+- `src/lib/utils.ts` — Shared utilities (generateAnonName, cn helper)
 - `src/data/agent-prompt.ts` — Dynamic agent prompt builder (loads MDs at request time)
 - `src/data/genesis.ts` — Genesis conversation data
 
@@ -55,6 +58,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Genesis.tsx` — Founding conversation (always visible, NOT collapsible)
 - `src/app/AgentChat.tsx` — AI Q&A modal (streaming via /api/agent)
 - `src/app/FundAddress.tsx` — Deposit address panel (QR/copy)
+- `src/app/layout.tsx` — Root layout (metadata, fonts, IdentityProvider wrapper)
 - `src/app/error.tsx` — Error boundary
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
 - `src/components/UpgradeModal.tsx` — Security upgrade modal (passphrase encryption + migration)
@@ -116,7 +120,7 @@ BootButton/useBoot → bootPost server action → server wallet builds split tx 
 ## Identity System
 
 - BSV keypair auto-generated on first visit via `@bsv/sdk` `PrivateKey.fromRandom()`
-- Stored as WIF in localStorage under key `bfn_keypair`
+- Stored as WIF in localStorage under key `bfn_keypair` (plaintext) or `bfn_keypair_enc` (passphrase-encrypted). Legacy key `bfn_identity` is auto-migrated on load.
 - Anonymous names: `anon_XXXX` format (4 random alphanumeric chars)
 - Posts are cryptographically signed (ECDSA via BSV SDK)
 - Users can copy/download their key for backup
@@ -126,11 +130,12 @@ BootButton/useBoot → bootPost server action → server wallet builds split tx 
 
 ## UX Principles
 
-- **User-facing language matters.** Never say "key", "wallet", "WIF", "private key" in the UI.
+- **User-facing language matters.** Avoid crypto jargon in normal UI copy. Use friendly equivalents:
   - "save your key" → "keep your name"
   - "fund your address" → "deposit slot"
   - "key rotation" → "stronger lock"
   - "PIN" → "passphrase" (minimum 8 chars, not a 4-digit PIN)
+  - **Exception:** Technical recovery artifacts (backup files, passphrase change flows, upgrade modals) may use precise terms like "key" and "WIF" where clarity for recovery outweighs friendliness. The user is already in a technical context at that point.
 - 2-click onboarding: visit site → type idea → click Post. Done.
 - No wallet downloads, no seed phrases, no "buy crypto first"
 
@@ -138,7 +143,7 @@ BootButton/useBoot → bootPost server action → server wallet builds split tx 
 
 - Private keys stored in localStorage (acceptable for idea board phase, no real money yet)
 - Server-side ECDSA signature verification on all posts and migrations
-- Rate limiting on all API routes (sliding window, IP-keyed)
+- Rate limiting on all mutation API routes and agent chat (sliding window). Keyed on IP via `x-forwarded-for` for API routes, on pubkey for server actions (createPost, bootPost). Read-only feed polling (`/api/posts`) is unrate-limited by design (hit every 5s by every client).
 - boot-confirm hardened: replay protection, on-chain output verification, rate limiting
 - CSP headers configured in next.config.ts (Content-Security-Policy, HSTS, Permissions-Policy)
 - Node polyfills shimmed via next.config.ts for browser compatibility (empty-module.mjs)

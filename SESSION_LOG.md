@@ -2,6 +2,36 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-10 — Forensic Cross-Reference Audit: Docs vs Code Reality
+
+Category: documentation accuracy, security audit verification
+
+Dispatched 4 parallel agents (architecture-reviewer, code-auditor, 2× Explore) to cross-reference every MD file against code reality. Motivated by discovering the fee-rate drift (500 vs 100 sat/kb) in the prior session — wanted to find all similar inconsistencies before contributors arrive.
+
+Critical fixes (docs actively lying about platform behavior):
+- FAIRNESS.md Gaming Analysis claimed "5-post daily cap" as current — code has zero daily limit enforcement (only 10/min rate limit). Rewritten to reflect reality and reference ROADMAP Phase 5 where daily limits are planned.
+- FAIRNESS.md OP_RETURN spec showed phantom fields (`distributed`, `deferred`, `agent_version`) that code doesn't emit. Corrected to match actual `boot-payment.ts:64-72` output: `app, action, post_id, total, recipients, formula_version, ts`.
+- CLAUDE.md Security Notes claimed "rate limiting on all API routes" — false, `/api/posts` (read-only polling) has none. Rewritten to accurately describe which routes are rate-limited and which are intentionally not (read-only feed polling hit every 5s by every client).
+
+Major fixes:
+- CLAUDE.md UX Principles banned-word rule ("never say key/wallet/WIF") violated in 4 files (backup-template.ts, IdentityBar.tsx, UpgradeModal.tsx, ChangePassphraseModal.tsx). Rule softened with explicit exception for technical recovery contexts where precision matters.
+- CLAUDE.md Architecture section missing React 19.2, Turbopack, React Compiler, Biome config — all added.
+- CLAUDE.md Key Files missing `layout.tsx`, `utils.ts` (load-bearing, used by actions.ts and identity.ts) — added.
+- CLAUDE.md Identity System only documented `bfn_keypair` localStorage key — added `bfn_keypair_enc` (encrypted) and legacy `bfn_identity` (auto-migrated).
+- SECURITY_AUDIT.md C9 (backup warning dot) promoted to FIXED — `markBackedUp()` now only fires from download/copy handlers.
+- SECURITY_AUDIT.md H2 (boot-shares) updated to PARTIAL — rate limit added (30/min/IP), signed request still TODO.
+- SECURITY_AUDIT.md C3 (boot-confirm index) description corrected — composite `UNIQUE(txid, recipient_address)`, not single-column.
+- SECURITY_AUDIT.md M2 (backup file) corrected from FIXED to PARTIAL — plaintext path still exists for unprotected users.
+
+Files changed: FAIRNESS.md, CLAUDE.md, SECURITY_AUDIT.md, SESSION_LOG.md (no code changes this pass — all docs).
+
+Deferred to Wave 3 (housekeeping, not urgent):
+- DECISIONS.md: document WEIGHTS_CACHE_TTL_MS (30s), boot event atomicity guarantee, free boot grant consumption gate, migration bridging behavior
+- CLAUDE.md: fix IdentityContext wording (SDK cache lives in identity.ts not context), fix "IP-keyed" to "IP or pubkey-keyed", align agent/route.ts x-forwarded-for parsing with other routes
+- SECURITY_AUDIT.md: add 4 new low-severity findings (innerHTML in backup template, 2-sat tolerance batching, cleanupMigrations CPU burn, posts route DoS)
+
+Audit wins: zero dead file references in CLAUDE.md, zero security regressions, zero DECISIONS.md contradictions, all ROADMAP done items verified as actually done, all fairness parameters verified against code.
+
 ## 2026-04-09 — Free Boot Cost Model: Floor-Only Fix + Fee Rate Drift Correction
 
 Category: fairness economics + docs drift

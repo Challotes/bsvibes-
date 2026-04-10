@@ -92,11 +92,9 @@ Every split transaction includes an OP_RETURN with metadata:
   "app": "bsvibes",
   "action": "boot_split",
   "post_id": 42,
-  "agent_version": "0.1.0",
   "total": 10000,
-  "distributed": 9200,
   "recipients": 28,
-  "deferred": 3,
+  "formula_version": "0.1.0",
   "ts": 1711461600000
 }
 ```
@@ -107,9 +105,9 @@ This makes every split publicly verifiable on-chain. Anyone can look up the tran
 
 | Attack | Effective? | Why |
 |--------|-----------|-----|
-| **Spam posts** | No | sqrt scaling + 5-post daily cap + 30-day decay = diminishing returns. 1000 spam posts barely moves the needle |
+| **Spam posts** | No | sqrt scaling + 10/min rate limit + 30-day decay = diminishing returns. 1000 spam posts barely moves the needle. Per-day limits are planned (see ROADMAP Phase 5) but not yet enforced |
 | **Self-boot** | No | Pay 10,000, get back ~3,500 max (your share + bonus). Net loss every time unless you believe in massive future volume |
-| **Sybil (fake identities)** | Weak | Each identity limited to 5 posts/day, sqrt scaling per identity. Expensive to maintain, low reward |
+| **Sybil (fake identities)** | Weak | Each identity has its own rate limit (10/min), sqrt scaling per identity. Expensive to maintain, low reward |
 | **Collusion ring** | Neutral | Two users booting each other's posts spend real money. The rest of the community benefits from their boot payments via the pool |
 | **One great post** | Intended | A single viral post that gets booted 50 times builds significant weight through the engagement multiplier. This is the behavior we WANT |
 
