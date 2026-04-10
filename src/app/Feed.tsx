@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { BootToast } from "@/components/BootToast";
+import { BootProvider, useBootContext } from "@/contexts/BootContext";
 import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
 import { useFeedPolling } from "@/hooks/useFeedPolling";
 import { useScrollTracker } from "@/hooks/useScrollTracker";
@@ -41,6 +43,7 @@ function FeedContent({
   initialBootboard: BootboardData;
 }) {
   const { identity } = useIdentityContext();
+  const { bootError } = useBootContext();
   const {
     posts: serverPosts,
     bootboard,
@@ -309,6 +312,9 @@ function FeedContent({
           }}
         />
       )}
+
+      {/* Boot failure toast */}
+      <BootToast message={bootError} />
     </div>
   );
 }
@@ -321,8 +327,10 @@ export function Feed({
   bootboard: BootboardData;
 }) {
   return (
-    <IdentityProvider>
-      <FeedContent initialPosts={initialPosts} initialBootboard={initialBootboard} />
-    </IdentityProvider>
+    <BootProvider>
+      <IdentityProvider>
+        <FeedContent initialPosts={initialPosts} initialBootboard={initialBootboard} />
+      </IdentityProvider>
+    </BootProvider>
   );
 }

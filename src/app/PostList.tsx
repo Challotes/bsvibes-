@@ -2,11 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
+import { useBootContext } from "@/contexts/BootContext";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import { timeAgo } from "@/lib/utils";
 import type { Post } from "@/types";
 import { Genesis } from "./Genesis";
+
+// ── Inline amber spinner (16px, Tailwind animate-spin) ───────────────────────
+
+function BootSpinner() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className="animate-spin text-amber-400"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// ── Status label map ─────────────────────────────────────────────────────────
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: "",
+  sending: "Sending...",
+  retrying: "Retrying...",
+  preparing: "Preparing...",
+};
+
+// ── Boot button ──────────────────────────────────────────────────────────────
 
 interface BootButtonProps {
   postId: number;
@@ -30,7 +65,8 @@ function BootButton({
   onFreeBootUsed,
 }: BootButtonProps) {
   const { identity } = useIdentityContext();
-  const { boot, isBooting, bootPhase } = useBoot({ onBooted, onFundNeeded, onFreeBootUsed });
+  const { bootingPostId, bootStatus, consolidationWarningDismissed } = useBootContext();
+  const { boot } = useBoot({ onBooted, onFundNeeded, onFreeBootUsed });
   const [optimisticBoots, setOptimisticBoots] = useState(0);
 
   useEffect(() => {
@@ -38,10 +74,24 @@ function BootButton({
   }, []);
 
   const isFree = freeBootsRemaining > 0;
-  const canBoot = identity && postPubkey; // Must be signed post + signed user
+  const canBoot = !!identity && !!postPubkey;
+
+  // Is this specific button currently booting?
+  const isThisBooting = bootingPostId === postId;
+  // Is any boot in progress (including this one)?
+  const anyBooting = bootingPostId !== null;
+  // Should this button be dimmed (another post is booting)?
+  const isDimmed = anyBooting && !isThisBooting;
+
+  const showExtended =
+    isThisBooting &&
+    (bootStatus === "sending" || bootStatus === "retrying" || bootStatus === "preparing");
+
+  const showConsolidationHint =
+    isThisBooting && bootStatus === "preparing" && !consolidationWarningDismissed;
 
   async function handleBoot() {
-    if (!identity || !postPubkey || isBooting) return;
+    if (!identity || !postPubkey || anyBooting) return;
 
     setOptimisticBoots((prev) => prev + 1);
     const result = await boot(postId, identity);
@@ -64,31 +114,53 @@ function BootButton({
       <button
         type="button"
         onClick={handleBoot}
-        disabled={isBooting || !canBoot}
-        className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
-          displayCount > 0
-            ? "text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10"
-            : "text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50"
-        }`}
+        disabled={anyBooting || !canBoot}
+        className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 transition-all border disabled:cursor-not-allowed ${
+          isDimmed
+            ? "opacity-50 text-zinc-600 border-zinc-800"
+            : isThisBooting
+              ? "text-amber-400 border-amber-500/40 bg-amber-500/5"
+              : displayCount > 0
+                ? "text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10"
+                : "text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50"
+        } ${!canBoot && !anyBooting ? "disabled:opacity-30" : ""}`}
         title={title}
       >
-        {bootPhase === "preparing" ? (
-          <span className="text-[9px] text-amber-400 px-1">Preparing...</span>
-        ) : bootPhase === "booting" ? (
-          <span className="text-[9px] text-amber-400 px-1">Booting...</span>
+        {isThisBooting ? (
+          <>
+            <BootSpinner />
+            {showExtended && (
+              <span className="text-[9px] text-amber-400 pr-0.5">
+                {STATUS_LABEL[bootStatus] ?? ""}
+              </span>
+            )}
+          </>
         ) : (
           <BootIcon size={13} className={displayCount > 0 ? "text-amber-500" : ""} />
         )}
       </button>
-      {bootPhase === "idle" && displayCount > 0 && (
+
+      {/* Boot count — hide while actively booting this post */}
+      {!isThisBooting && displayCount > 0 && (
         <span className="text-[9px] text-zinc-600 mt-0.5">{displayCount}</span>
       )}
-      {bootPhase === "idle" && isFree && canBoot && (
+
+      {/* Free label */}
+      {!isThisBooting && isFree && canBoot && (
         <span className="text-[8px] text-emerald-600 mt-0.5">FREE</span>
+      )}
+
+      {/* First-time consolidation hint */}
+      {showConsolidationHint && (
+        <span className="text-[8px] text-amber-600 mt-1 text-center leading-tight max-w-[80px]">
+          Setting up wallet... ~30s
+        </span>
       )}
     </div>
   );
 }
+
+// ── PostList ─────────────────────────────────────────────────────────────────
 
 interface PostListProps {
   posts: Post[];

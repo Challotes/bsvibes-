@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
+import { useBootContext } from "@/contexts/BootContext";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import type { BootboardData } from "@/types";
@@ -40,10 +41,14 @@ function HistoryRow({
   onFundNeeded?: (address: string, balance?: number) => void;
 }) {
   const { identity } = useIdentityContext();
-  const { boot, isBooting } = useBoot({ onBooted, onFundNeeded });
+  const { bootingPostId } = useBootContext();
+  const { boot } = useBoot({ onBooted, onFundNeeded });
+
+  const isThisBooting = bootingPostId === entry.post_id;
+  const anyBooting = bootingPostId !== null;
 
   function handleReboot() {
-    if (!identity) return;
+    if (!identity || anyBooting) return;
     boot(entry.post_id, identity);
   }
 
@@ -52,11 +57,43 @@ function HistoryRow({
       <button
         type="button"
         onClick={handleReboot}
-        disabled={isBooting || !identity}
-        className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50`}
+        disabled={anyBooting || !identity}
+        className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:cursor-not-allowed border ${
+          isThisBooting
+            ? "text-amber-400 border-amber-500/40"
+            : anyBooting
+              ? "opacity-50 text-zinc-600 border-zinc-800"
+              : "text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50 disabled:opacity-30"
+        }`}
         title="Reboot this post"
       >
-        {isBooting ? <span className="text-[10px]">...</span> : <BootIcon size={11} />}
+        {isThisBooting ? (
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            className="animate-spin text-amber-400"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeOpacity="0.25"
+            />
+            <path
+              d="M12 2a10 10 0 0 1 10 10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          <BootIcon size={11} />
+        )}
       </button>
       <span className="text-zinc-500 shrink-0">{entry.author_name}</span>
       <span className="shrink-0">·</span>

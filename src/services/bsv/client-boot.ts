@@ -285,13 +285,15 @@ function selectUtxos(
  * @param postId     - The post being booted
  * @param shares     - Contributor payout shares (must sum to bootPriceSats)
  * @param bootPriceSats - Total boot price in satoshis
+ * @param onStatus   - Optional callback for status updates ("sending" | "retrying")
  */
 export async function clientSideBoot(
   wif: string,
   userAddress: string,
   postId: number,
   shares: BootShare[],
-  bootPriceSats: number
+  bootPriceSats: number,
+  onStatus?: (status: "sending" | "retrying") => void
 ): Promise<ClientBootResult> {
   // ── Validate inputs ─────────────────────────────────────
   const validationError = validateShares(shares, bootPriceSats);
@@ -303,7 +305,7 @@ export async function clientSideBoot(
   const release = await acquireTxMutex();
 
   try {
-    return await _clientSideBootInner(wif, userAddress, postId, shares, bootPriceSats);
+    return await _clientSideBootInner(wif, userAddress, postId, shares, bootPriceSats, onStatus);
   } finally {
     release();
   }
@@ -317,7 +319,8 @@ async function _clientSideBootInner(
   userAddress: string,
   postId: number,
   shares: BootShare[],
-  bootPriceSats: number
+  bootPriceSats: number,
+  onStatus?: (status: "sending" | "retrying") => void
 ): Promise<ClientBootResult> {
   try {
     const { Transaction, PrivateKey, P2PKH, Script, OP, SatoshisPerKilobyte } = await getBsvSdk();
@@ -329,6 +332,8 @@ async function _clientSideBootInner(
     } catch {
       return { status: "error", error: "Invalid private key" };
     }
+
+    onStatus?.("sending");
 
     // ── Fetch UTXOs (with spent-filtering + pending change) ─
     // Use a conservative worst-case estimate for the pending-change shortcut check:
@@ -487,6 +492,7 @@ async function _clientSideBootInner(
       ) {
         retries++;
         console.log(`[clientSideBoot] Parent in orphan mempool — retry ${retries}/3 in 1.5s`);
+        onStatus?.("retrying");
         await new Promise((r) => setTimeout(r, 1500));
         broadcastResult = await tx.broadcast();
       }
@@ -564,10 +570,13 @@ const DUST_THRESHOLD = 2;
  *
  * Called automatically when clientSideBoot returns 'needs_consolidation'.
  * The user sees "Preparing..." while this runs.
+ *
+ * @param onStatus - Optional callback; called with "preparing" when consolidation starts
  */
 export async function consolidateUtxos(
   wif: string,
-  userAddress: string
+  userAddress: string,
+  onStatus?: (status: "preparing") => void
 ): Promise<ClientBootResult> {
   const release = await acquireTxMutex();
 
@@ -581,6 +590,8 @@ export async function consolidateUtxos(
     } catch {
       return { status: "error", error: "Invalid private key" };
     }
+
+    onStatus?.("preparing");
 
     const utxos = await fetchUtxos(userAddress);
 

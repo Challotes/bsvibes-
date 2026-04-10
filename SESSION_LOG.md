@@ -2,6 +2,23 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-09 — Boot Button Loading States
+
+Category: UX, feature
+
+Implemented full boot button loading state system so users get feedback during 1–30s boot operations.
+
+Files changed:
+- `src/contexts/BootContext.tsx` — new; global boot state (bootingPostId, bootStatus, bootError, claim/release/fail), consolidation warning dismissed flag
+- `src/hooks/useBoot.ts` — refactored to consume BootContext; added "pending" → "sending" (2s) → "preparing" (8s) timer cascade; proper deps array replacing eslint-disable comment
+- `src/services/bsv/client-boot.ts` — added optional `onStatus` callback to `clientSideBoot` and `consolidateUtxos`; fires "sending" before UTXO fetch, "retrying" in orphan retry loop, "preparing" in consolidation
+- `src/app/PostList.tsx` — BootButton reads BootContext; inline amber spinner (16px SVG + animate-spin); status text ("Sending...", "Retrying...", "Preparing...") appears at 2s+; other buttons dim to opacity-50 while one is active; first-time consolidation hint below active button
+- `src/app/Bootboard.tsx` — HistoryRow reads BootContext; spinner on active boot, dims on any other boot in progress
+- `src/app/Feed.tsx` — wrapped Feed in BootProvider; added BootToast render; merged duplicate BootContext imports
+- `src/components/BootToast.tsx` — new; fixed-bottom slide-up toast for failures; 5s auto-dismiss; tap to retry
+
+All 27 tests pass, tsc clean, biome clean.
+
 ## 2026-04-10 — Forensic Cross-Reference Audit: Docs vs Code Reality
 
 Category: documentation accuracy, security audit verification
@@ -36,6 +53,7 @@ Additional work in same session:
 - Fixed SEEN_IN_ORPHAN_MEMPOOL error on rapid consecutive boots: added retry loop (3 × 1.5s) for ARC parent-tx propagation delay
 - Fixed wallet dust fragmentation: lowered DUST_THRESHOLD from 10 to 2 sats (matches 10 sat/kb consolidation fee rate where cost per input = ~1.5 sats). Users with many tiny UTXOs (e.g., 139 × ~4.5 sats) can now consolidate in one sweep. Added MAX_CONSOLIDATION_SWEEP = 200 safety cap. Reduced BATCH_SIZE to 5 with 1s inter-batch delay for WoC rate limiting.
 - Fixed UTXO state poisoning (txn-mempool-conflict): switched to optimistic blacklisting — inputs marked spent BEFORE broadcast, only un-blacklisted on network exception (tx never left browser). Previously, failed broadcasts (ORPHAN/conflict) left UTXOs in "spent by network, available to client" state causing cascading mempool conflicts. Pattern applied to both clientSideBoot and consolidateUtxos. Auditor-reviewed and approved.
+- Added boot button loading states (designer-reviewed UX): spinner replaces boot icon during operation, status text after 2s ("Sending..." / "Retrying..." / "Preparing..."), other buttons dim 50% while one active, failure toast from bottom. First-time consolidation shows inline "Setting up wallet — ~30s" hint. New BootContext + BootToast components.
 - Full Biome lint + format pass: 203 errors + 18 warnings → 0 errors across 69 files (42 files reformatted)
 - Semantic lint fixes: added `type="button"` to ~30 buttons, `aria-hidden="true"` to decorative SVGs, keyboard handlers on interactive divs, stable React keys replacing array indices, renamed `Error` → `ErrorPage` in error.tsx, removed unused biome-ignore suppressions
 - Auto-formatting: standardized double quotes, semicolons, import ordering per biome.json config
