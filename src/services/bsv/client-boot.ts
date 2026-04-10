@@ -42,10 +42,14 @@ interface WocUtxo {
   tx_hash: string;
   tx_pos: number;
   value: number;
+  /** Block height — 0 for unconfirmed mempool UTXOs, > 0 for confirmed */
+  height: number;
 }
 
-/** Extended UTXO with optional sourceTransaction for 0-conf chaining */
-interface ClientUtxo extends WocUtxo {
+/** Extended UTXO with optional sourceTransaction for 0-conf chaining.
+ * Pending change entries leave `height` undefined since they're not yet indexed. */
+interface ClientUtxo extends Omit<WocUtxo, "height"> {
+  height?: number;
   sourceTransaction?: import("@bsv/sdk").Transaction;
 }
 
@@ -599,12 +603,20 @@ export async function consolidateUtxos(
       return { status: "success", txid: "" }; // nothing to consolidate
     }
 
-    // Filter out dust UTXOs that cost more to spend than they're worth.
+    // Filter: confirmed only + above dust threshold. Exclude unconfirmed WoC UTXOs
+    // (height === 0) to avoid txn-mempool-conflict from prior pending/orphan txs.
+    // Pending change entries (height === undefined) are kept — they're our own outputs.
     // Safety cap at 200 inputs to prevent pathologically large transactions.
     const MAX_CONSOLIDATION_SWEEP = 200;
     const spendable = utxos
-      .filter((u) => u.value >= DUST_THRESHOLD)
+      .filter((u) => u.value >= DUST_THRESHOLD && (u.height === undefined || u.height > 0))
       .slice(0, MAX_CONSOLIDATION_SWEEP);
+    const unconfirmedDropped = utxos.length - spendable.length;
+    if (unconfirmedDropped > 0) {
+      console.log(
+        `[consolidateUtxos] Excluded ${unconfirmedDropped} unconfirmed/dust UTXOs from sweep`
+      );
+    }
     if (spendable.length <= 1) {
       return { status: "success", txid: "" };
     }
