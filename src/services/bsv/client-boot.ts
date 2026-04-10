@@ -453,8 +453,27 @@ async function _clientSideBootInner(
       hasChangeOutput = false;
     }
 
-    // ── Broadcast ───────────────────────────────────────────
-    const broadcastResult = await tx.broadcast();
+    // ── Broadcast (with retry for 0-conf chain propagation) ──
+    // ARC returns SEEN_IN_ORPHAN_MEMPOOL when a parent tx is queued but not
+    // yet validated. This happens during rapid consecutive boots where the
+    // change output from boot N is spent by boot N+1 before ARC processes N.
+    // Retry up to 3 times with 1.5s delay — parent typically processes within 1-3s.
+    let broadcastResult = await tx.broadcast();
+    let retries = 0;
+    while (
+      retries < 3 &&
+      broadcastResult.status !== "success" &&
+      "description" in broadcastResult &&
+      ((broadcastResult as { description?: string }).description
+        ?.toUpperCase()
+        .includes("ORPHAN") ||
+        (broadcastResult as { code?: string }).code?.toUpperCase().includes("ORPHAN"))
+    ) {
+      retries++;
+      console.log(`[clientSideBoot] Parent in orphan mempool — retry ${retries}/3 in 1.5s`);
+      await new Promise((r) => setTimeout(r, 1500));
+      broadcastResult = await tx.broadcast();
+    }
 
     if (broadcastResult.status === "success") {
       const txid = tx.id("hex") as string;
@@ -516,8 +535,11 @@ async function _clientSideBootInner(
 
 // ── UTXO Consolidation ─────────────────────────────────────────
 
-/** Minimum UTXO value worth including in consolidation (below this is dust) */
-const DUST_THRESHOLD = 10;
+/** Minimum UTXO value worth including in consolidation.
+ * At 10 sat/kb (consolidation fee rate), each P2PKH input costs ~1.5 sats.
+ * Set to 2 so any UTXO that covers its own inclusion fee gets swept.
+ * Previously 10 — which left UTXOs of 3-9 sats permanently trapped. */
+const DUST_THRESHOLD = 2;
 
 /**
  * Consolidate all UTXOs into a single output.
@@ -550,8 +572,12 @@ export async function consolidateUtxos(
       return { status: "success", txid: "" }; // nothing to consolidate
     }
 
-    // Filter out dust UTXOs that cost more to spend than they're worth
-    const spendable = utxos.filter((u) => u.value >= DUST_THRESHOLD);
+    // Filter out dust UTXOs that cost more to spend than they're worth.
+    // Safety cap at 200 inputs to prevent pathologically large transactions.
+    const MAX_CONSOLIDATION_SWEEP = 200;
+    const spendable = utxos
+      .filter((u) => u.value >= DUST_THRESHOLD)
+      .slice(0, MAX_CONSOLIDATION_SWEEP);
     if (spendable.length <= 1) {
       return { status: "success", txid: "" };
     }
@@ -563,11 +589,13 @@ export async function consolidateUtxos(
 
     const tx = new Transaction();
 
-    // Fetch source transactions in batches of 20 to avoid rate limits
-    const BATCH_SIZE = 20;
+    // Fetch source transactions in small batches to respect WoC rate limits (~3 req/s).
+    // Inter-batch delay prevents 429s when sweeping many UTXOs.
+    const BATCH_SIZE = 5;
     const sourceTxs: Array<{ utxo: ClientUtxo; sourceTx: InstanceType<typeof Transaction> }> = [];
     try {
       for (let i = 0; i < spendable.length; i += BATCH_SIZE) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 1000));
         const batch = spendable.slice(i, i + BATCH_SIZE);
         const results = await Promise.all(
           batch.map(async (utxo) => {
