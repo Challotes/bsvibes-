@@ -2,7 +2,7 @@
 
 > How contributions are measured and revenue is distributed. This is a **starting point** — a working demo of agentic fairness, not a final system. As the platform evolves and real value contributions emerge (code, design, community building), this model will likely be replaced with something far more sophisticated. The point is to prove the concept works, learn from real usage, and iterate.
 >
-> Last updated: 2026-03-26
+> Last updated: 2026-04-10
 
 ## The Core Idea
 

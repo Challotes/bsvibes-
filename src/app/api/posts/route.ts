@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 import { getPosts, getNewPosts, getBootboard, getUpdatedPosts } from '@/app/actions'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  const rl = rateLimit(`posts:${ip}`, { limit: 120, windowMs: 60_000 })
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const sinceIdParam = request.nextUrl.searchParams.get('since_id')
   const sinceId = sinceIdParam !== null ? parseInt(sinceIdParam, 10) : null
   // Client sends IDs of posts it has that are missing tx_id (chain icon)
