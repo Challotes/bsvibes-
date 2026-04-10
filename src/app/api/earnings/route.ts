@@ -1,7 +1,7 @@
-import { db } from '@/lib/db';
-import { rateLimit } from '@/lib/rate-limit';
+import { db } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 /**
  * Walk the migration chain to collect all addresses ever associated with an identity.
@@ -24,9 +24,9 @@ function resolveAllAddresses(address: string): string[] {
   const allPubkeys = new Set<string>();
 
   // Seed: find pubkeys associated with this address from payouts
-  const seedPubkeys = db.prepare(
-    'SELECT DISTINCT recipient_pubkey FROM payouts WHERE recipient_address = ?'
-  ).all(address) as Array<{ recipient_pubkey: string }>;
+  const seedPubkeys = db
+    .prepare("SELECT DISTINCT recipient_pubkey FROM payouts WHERE recipient_address = ?")
+    .all(address) as Array<{ recipient_pubkey: string }>;
 
   for (const row of seedPubkeys) {
     allPubkeys.add(row.recipient_pubkey);
@@ -35,12 +35,13 @@ function resolveAllAddresses(address: string): string[] {
   // BFS over migration chain (both directions)
   const queue = [...allPubkeys];
   while (queue.length > 0) {
-    const pubkey = queue.shift()!;
+    const pubkey = queue.shift();
+    if (!pubkey) break;
 
     // Walk backwards: who migrated TO this pubkey?
-    const predecessors = db.prepare(
-      'SELECT from_pubkey FROM migrations WHERE to_pubkey = ?'
-    ).all(pubkey) as Array<{ from_pubkey: string }>;
+    const predecessors = db
+      .prepare("SELECT from_pubkey FROM migrations WHERE to_pubkey = ?")
+      .all(pubkey) as Array<{ from_pubkey: string }>;
 
     for (const row of predecessors) {
       if (!allPubkeys.has(row.from_pubkey)) {
@@ -50,9 +51,9 @@ function resolveAllAddresses(address: string): string[] {
     }
 
     // Walk forwards: what did this pubkey migrate to?
-    const successors = db.prepare(
-      'SELECT to_pubkey FROM migrations WHERE from_pubkey = ?'
-    ).all(pubkey) as Array<{ to_pubkey: string }>;
+    const successors = db
+      .prepare("SELECT to_pubkey FROM migrations WHERE from_pubkey = ?")
+      .all(pubkey) as Array<{ to_pubkey: string }>;
 
     for (const row of successors) {
       if (!allPubkeys.has(row.to_pubkey)) {
@@ -65,10 +66,12 @@ function resolveAllAddresses(address: string): string[] {
   // Collect all addresses for the full pubkey set
   if (allPubkeys.size > 0) {
     const pubkeyList = [...allPubkeys];
-    const placeholders = pubkeyList.map(() => '?').join(', ');
-    const addressRows = db.prepare(
-      `SELECT DISTINCT recipient_address FROM payouts WHERE recipient_pubkey IN (${placeholders})`
-    ).all(...pubkeyList) as Array<{ recipient_address: string }>;
+    const placeholders = pubkeyList.map(() => "?").join(", ");
+    const addressRows = db
+      .prepare(
+        `SELECT DISTINCT recipient_address FROM payouts WHERE recipient_pubkey IN (${placeholders})`
+      )
+      .all(...pubkeyList) as Array<{ recipient_address: string }>;
 
     for (const row of addressRows) {
       allAddresses.add(row.recipient_address);
@@ -80,14 +83,14 @@ function resolveAllAddresses(address: string): string[] {
 
 export async function GET(request: Request) {
   // Rate limit: 20 requests per minute per IP
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const rl = rateLimit(`earnings:${ip}`, { limit: 20, windowMs: 60_000 });
   if (!rl.success) {
-    return Response.json({ error: 'Too many requests' }, { status: 429 });
+    return Response.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);
-  const address = searchParams.get('address');
+  const address = searchParams.get("address");
 
   if (!address || address.length === 0) {
     return Response.json({ totalEarned: 0, recentActivity: [] });
@@ -96,32 +99,44 @@ export async function GET(request: Request) {
   // Resolve all addresses in this identity's migration chain so earnings
   // history survives security upgrades and cross-device restores.
   const allAddresses = resolveAllAddresses(address);
-  const placeholders = allAddresses.map(() => '?').join(', ');
+  const placeholders = allAddresses.map(() => "?").join(", ");
 
   // Fast path: ?summary=1 returns only totalEarned (used by background poll)
-  if (searchParams.get('summary') === '1') {
-    const total = db.prepare(
-      `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`
-    ).get(...allAddresses) as { total: number };
+  if (searchParams.get("summary") === "1") {
+    const total = db
+      .prepare(
+        `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`
+      )
+      .get(...allAddresses) as { total: number };
     return Response.json({ totalEarned: total.total });
   }
 
   // Sum all payouts across the full address chain
-  const total = db.prepare(
-    `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`
-  ).get(...allAddresses) as { total: number };
+  const total = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_sats), 0) as total FROM payouts WHERE recipient_address IN (${placeholders})`
+    )
+    .get(...allAddresses) as { total: number };
 
   // Recent incoming payouts (last 10) across chain
-  const incoming = db.prepare(
-    `SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address IN (${placeholders}) ORDER BY created_at DESC LIMIT 10`
-  ).all(...allAddresses) as Array<{ amount_sats: number; payout_type: string; txid: string; created_at: string }>;
+  const incoming = db
+    .prepare(
+      `SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address IN (${placeholders}) ORDER BY created_at DESC LIMIT 10`
+    )
+    .all(...allAddresses) as Array<{
+    amount_sats: number;
+    payout_type: string;
+    txid: string;
+    created_at: string;
+  }>;
 
   // Recent boots by this user (outgoing) — across all known addresses in chain.
   // is_free = 1 → server paid (free boot grant) → show as 0 cost to user.
   // is_free = 0 → user paid → sum payouts to get actual amount spent.
   // Note: free boots still have payouts recorded (server→contributors) but those
   // are not the user's money, so we zero them out here via the is_free flag.
-  const bootSpend = db.prepare(`
+  const bootSpend = db
+    .prepare(`
     SELECT
       b.id as boot_id,
       b.booted_at as created_at,
@@ -133,12 +148,18 @@ export async function GET(request: Request) {
     GROUP BY b.id, b.booted_at, b.is_free
     ORDER BY b.booted_at DESC
     LIMIT 10
-  `).all(...allAddresses) as Array<{ boot_id: number; created_at: string; is_free: number; total_paid: number }>;
+  `)
+    .all(...allAddresses) as Array<{
+    boot_id: number;
+    created_at: string;
+    is_free: number;
+    total_paid: number;
+  }>;
 
   // Merge into a unified activity feed
   type Activity = {
     amount: number;
-    direction: 'in' | 'out';
+    direction: "in" | "out";
     label: string;
     created_at: string;
     txid?: string;
@@ -149,8 +170,9 @@ export async function GET(request: Request) {
   for (const p of incoming) {
     activity.push({
       amount: p.amount_sats,
-      direction: 'in',
-      label: p.payout_type === 'boost_bonus' ? 'Agentic split · your post featured' : 'Agentic split',
+      direction: "in",
+      label:
+        p.payout_type === "boost_bonus" ? "Agentic split · your post featured" : "Agentic split",
       created_at: p.created_at,
       txid: p.txid,
     });
@@ -159,8 +181,8 @@ export async function GET(request: Request) {
   for (const b of bootSpend) {
     activity.push({
       amount: b.total_paid, // 0 = free boot, >0 = paid boot with actual cost
-      direction: 'out',
-      label: 'Boot featured',
+      direction: "out",
+      label: "Boot featured",
       created_at: b.created_at,
     });
   }
@@ -170,12 +192,14 @@ export async function GET(request: Request) {
 
   // Cumulative earnings history for the sparkline chart (last 30 data points)
   // Query across the full address chain so history survives upgrades.
-  const earningsHistory = db.prepare(`
+  const earningsHistory = db
+    .prepare(`
     SELECT created_at as t, amount_sats
     FROM payouts
     WHERE recipient_address IN (${placeholders})
     ORDER BY created_at ASC
-  `).all(...allAddresses) as Array<{ t: string; amount_sats: number }>;
+  `)
+    .all(...allAddresses) as Array<{ t: string; amount_sats: number }>;
 
   let cumulative = 0;
   const history = earningsHistory.map((row) => {
@@ -184,9 +208,10 @@ export async function GET(request: Request) {
   });
 
   // Keep last 30 points for chart (reduce noise on large datasets)
-  const chartHistory = history.length > 30
-    ? history.filter((_, i, arr) => i === arr.length - 1 || i % Math.ceil(arr.length / 30) === 0)
-    : history;
+  const chartHistory =
+    history.length > 30
+      ? history.filter((_, i, arr) => i === arr.length - 1 || i % Math.ceil(arr.length / 30) === 0)
+      : history;
 
   return Response.json({
     totalEarned: total.total,

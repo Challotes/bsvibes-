@@ -5,7 +5,7 @@
  * concurrent operations (post logging, boot splits, migrations).
  */
 
-import { PrivateKey, Transaction, P2PKH, SatoshisPerKilobyte, type LockingScript } from '@bsv/sdk';
+import { type LockingScript, P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction } from "@bsv/sdk";
 
 let _serverKey: PrivateKey | null = null;
 
@@ -14,7 +14,6 @@ let _serverKey: PrivateKey | null = null;
 let _txMutexChain: Promise<void> = Promise.resolve();
 
 function acquireTxMutex(): Promise<() => void> {
-  // biome-ignore lint: release is assigned synchronously in Promise constructor
   let release: () => void = () => {};
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -35,7 +34,7 @@ function getServerKey(): PrivateKey | null {
     _serverKey = PrivateKey.fromWif(wif);
     return _serverKey;
   } catch (e) {
-    console.error('BSVibes: invalid BSV_SERVER_WIF', e);
+    console.error("BSVibes: invalid BSV_SERVER_WIF", e);
     return null;
   }
 }
@@ -56,16 +55,16 @@ interface UTXO {
 }
 
 export type BroadcastResult =
-  | { status: 'success'; txid: string }
-  | { status: 'insufficient_funds' }
-  | { status: 'broadcast_failed'; error: string }
-  | { status: 'no_wallet' };
+  | { status: "success"; txid: string }
+  | { status: "insufficient_funds" }
+  | { status: "broadcast_failed"; error: string }
+  | { status: "no_wallet" };
 
 // ── UTXO Manager ────────────────────────────────────────────
 
 const _reserved = new Set<string>();
 const _pendingChange: UTXO[] = []; // 0-conf change outputs from recent txs
-const _spent = new Set<string>();   // UTXOs consumed as inputs — blacklist for stale WoC data
+const _spent = new Set<string>(); // UTXOs consumed as inputs — blacklist for stale WoC data
 
 function utxoKey(txHash: string, txPos: number): string {
   return `${txHash}:${txPos}`;
@@ -87,9 +86,7 @@ export async function getUtxos(neededSats?: number): Promise<UTXO[]> {
   }
 
   try {
-    const res = await fetch(
-      `https://api.whatsonchain.com/v1/bsv/main/address/${address}/unspent`
-    );
+    const res = await fetch(`https://api.whatsonchain.com/v1/bsv/main/address/${address}/unspent`);
     if (!res.ok) return [..._pendingChange];
     const confirmed = (await res.json()) as UTXO[];
 
@@ -167,9 +164,7 @@ async function getSourceTransaction(utxo: UTXO): Promise<Transaction | null> {
   if (utxo.sourceTransaction) return utxo.sourceTransaction;
 
   try {
-    const res = await fetch(
-      `https://api.whatsonchain.com/v1/bsv/main/tx/${utxo.tx_hash}/hex`
-    );
+    const res = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${utxo.tx_hash}/hex`);
     if (!res.ok) {
       console.error(`BSVibes wallet: WoC /tx/hex returned ${res.status} for ${utxo.tx_hash}`);
       return null;
@@ -194,8 +189,8 @@ export async function buildAndBroadcast(
 ): Promise<BroadcastResult> {
   const key = getServerKey();
   if (!key) {
-    console.error('BSVibes wallet: no BSV_SERVER_WIF configured');
-    return { status: 'no_wallet' };
+    console.error("BSVibes wallet: no BSV_SERVER_WIF configured");
+    return { status: "no_wallet" };
   }
 
   // Acquire the mutex — only one transaction builds at a time
@@ -220,8 +215,8 @@ async function _buildAndBroadcastInner(
   const utxos = await reserveUtxos(totalNeeded);
 
   if (!utxos) {
-    console.error('BSVibes wallet: insufficient funds or no UTXOs available');
-    return { status: 'insufficient_funds' };
+    console.error("BSVibes wallet: insufficient funds or no UTXOs available");
+    return { status: "insufficient_funds" };
   }
 
   try {
@@ -233,7 +228,7 @@ async function _buildAndBroadcastInner(
       if (!sourceTx) {
         console.error(`BSVibes wallet: failed to fetch source tx ${utxo.tx_hash}`);
         releaseUtxos(utxos);
-        return { status: 'broadcast_failed', error: 'Failed to fetch source transaction' };
+        return { status: "broadcast_failed", error: "Failed to fetch source transaction" };
       }
 
       tx.addInput({
@@ -271,8 +266,8 @@ async function _buildAndBroadcastInner(
 
     const broadcastResult = await tx.broadcast();
 
-    if (broadcastResult.status === 'success') {
-      const txid = tx.id('hex') as string;
+    if (broadcastResult.status === "success") {
+      const txid = tx.id("hex") as string;
 
       // Remove the spent UTXOs from pending change and blacklist them so
       // stale WoC responses don't resurrect them as available.
@@ -310,34 +305,42 @@ async function _buildAndBroadcastInner(
       // Release the spent UTXOs from reservation (they're consumed now)
       releaseUtxos(utxos);
 
-      return { status: 'success', txid };
+      return { status: "success", txid };
     }
 
     // Self-heal on double-spend: blacklist the competing tx's inputs and retry (max 3 attempts)
     const dsResult = broadcastResult as { code?: string; more?: { competingTxs?: string[] } };
-    if (dsResult.code === 'DOUBLE_SPEND_ATTEMPTED' && dsResult.more?.competingTxs?.length && retryCount < 3) {
-      console.warn(`BSVibes wallet: double-spend detected, blacklisting competing UTXOs and retrying (attempt ${retryCount + 1}/3)`);
+    if (
+      dsResult.code === "DOUBLE_SPEND_ATTEMPTED" &&
+      dsResult.more?.competingTxs?.length &&
+      retryCount < 3
+    ) {
+      console.warn(
+        `BSVibes wallet: double-spend detected, blacklisting competing UTXOs and retrying (attempt ${retryCount + 1}/3)`
+      );
       for (const competingTxid of dsResult.more.competingTxs) {
         try {
           const txRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${competingTxid}`);
           if (txRes.ok) {
-            const txData = await txRes.json() as { vin?: Array<{ txid: string; vout: number }> };
+            const txData = (await txRes.json()) as { vin?: Array<{ txid: string; vout: number }> };
             for (const input of txData.vin ?? []) {
               _spent.add(utxoKey(input.txid, input.vout));
             }
           }
-        } catch { /* best effort */ }
+        } catch {
+          /* best effort */
+        }
       }
       releaseUtxos(utxos);
       return _buildAndBroadcastInner(key, outputs, retryCount + 1);
     }
 
     releaseUtxos(utxos);
-    console.error('BSVibes: broadcast failed', broadcastResult);
-    return { status: 'broadcast_failed', error: String(broadcastResult) };
+    console.error("BSVibes: broadcast failed", broadcastResult);
+    return { status: "broadcast_failed", error: String(broadcastResult) };
   } catch (e) {
     releaseUtxos(utxos);
-    console.error('BSVibes: transaction error', e);
-    return { status: 'broadcast_failed', error: e instanceof Error ? e.message : String(e) };
+    console.error("BSVibes: transaction error", e);
+    return { status: "broadcast_failed", error: e instanceof Error ? e.message : String(e) };
   }
 }

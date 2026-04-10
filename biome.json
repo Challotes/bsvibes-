@@ -26,14 +26,26 @@
       "semicolons": "always"
     }
   },
+  "css": {
+    "parser": {
+      "allowWrongLineComments": true
+    },
+    "formatter": {
+      "enabled": false
+    },
+    "linter": {
+      "enabled": false
+    }
+  },
   "files": {
     "includes": [
       "**",
-      "!**/.next/**",
-      "!**/out/**",
-      "!**/build/**",
-      "!**/node_modules/**",
-      "!**/next-env.d.ts"
+      "!**/.next",
+      "!**/out",
+      "!**/build",
+      "!**/node_modules",
+      "!**/next-env.d.ts",
+      "!**/globals.css"
     ]
   }
 }

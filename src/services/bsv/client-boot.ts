@@ -21,7 +21,7 @@
  *   as an input for the next, skipping the WoC fetch entirely when sufficient
  */
 
-const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
+const WOC_BASE = "https://api.whatsonchain.com/v1/bsv/main";
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ export interface BootShare {
 }
 
 export interface ClientBootResult {
-  status: 'success' | 'insufficient_funds' | 'needs_consolidation' | 'broadcast_failed' | 'error';
+  status: "success" | "insufficient_funds" | "needs_consolidation" | "broadcast_failed" | "error";
   txid?: string;
   error?: string;
   balance?: number;
@@ -46,16 +46,16 @@ interface WocUtxo {
 
 /** Extended UTXO with optional sourceTransaction for 0-conf chaining */
 interface ClientUtxo extends WocUtxo {
-  sourceTransaction?: import('@bsv/sdk').Transaction;
+  sourceTransaction?: import("@bsv/sdk").Transaction;
 }
 
 // ── SDK loader (same pattern as identity.ts) ────────────────
 
-let _bsvSdkPromise: Promise<typeof import('@bsv/sdk')> | null = null;
+let _bsvSdkPromise: Promise<typeof import("@bsv/sdk")> | null = null;
 
-function getBsvSdk(): Promise<typeof import('@bsv/sdk')> {
+function getBsvSdk(): Promise<typeof import("@bsv/sdk")> {
   if (!_bsvSdkPromise) {
-    _bsvSdkPromise = import('@bsv/sdk');
+    _bsvSdkPromise = import("@bsv/sdk");
   }
   return _bsvSdkPromise;
 }
@@ -67,7 +67,6 @@ function getBsvSdk(): Promise<typeof import('@bsv/sdk')> {
 let _txMutexChain: Promise<void> = Promise.resolve();
 
 function acquireTxMutex(): Promise<() => void> {
-  // biome-ignore lint: release is assigned synchronously in Promise constructor
   let release: () => void = () => {};
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -81,7 +80,7 @@ function acquireTxMutex(): Promise<() => void> {
 
 /** UTXOs consumed as inputs — blacklist for stale WoC data.
  *  Persisted to localStorage so it survives page refreshes. */
-const SPENT_STORAGE_KEY = 'bsvibes_spent_utxos';
+const SPENT_STORAGE_KEY = "bsvibes_spent_utxos";
 
 function loadSpentSet(): Set<string> {
   try {
@@ -98,10 +97,12 @@ function saveSpentSet(spent: Set<string>): void {
     const arr = Array.from(spent);
     const trimmed = arr.length > 500 ? arr.slice(-500) : arr;
     localStorage.setItem(SPENT_STORAGE_KEY, JSON.stringify(trimmed));
-  } catch { /* localStorage unavailable — silent fail */ }
+  } catch {
+    /* localStorage unavailable — silent fail */
+  }
 }
 
-let _spent = loadSpentSet();
+const _spent = loadSpentSet();
 
 /** Change outputs from recent broadcasts, immediately spendable */
 const _pendingChange: ClientUtxo[] = [];
@@ -170,7 +171,7 @@ async function fetchSourceTxHex(txHash: string): Promise<string> {
 
 function validateShares(shares: BootShare[], bootPriceSats: number): string | null {
   if (shares.length === 0) {
-    return 'No shares provided';
+    return "No shares provided";
   }
 
   const totalDistributed = shares.reduce((sum, s) => sum + s.sats, 0);
@@ -231,7 +232,7 @@ function estimateFee(inputCount: number, outputCount: number): number {
 function selectUtxos(
   utxos: ClientUtxo[],
   bootPriceSats: number,
-  outputCount: number,
+  outputCount: number
 ): { selected: ClientUtxo[]; total: number; estimatedFee: number } | null {
   if (utxos.length === 0) return null;
 
@@ -290,12 +291,12 @@ export async function clientSideBoot(
   userAddress: string,
   postId: number,
   shares: BootShare[],
-  bootPriceSats: number,
+  bootPriceSats: number
 ): Promise<ClientBootResult> {
   // ── Validate inputs ─────────────────────────────────────
   const validationError = validateShares(shares, bootPriceSats);
   if (validationError) {
-    return { status: 'error', error: validationError };
+    return { status: "error", error: validationError };
   }
 
   // ── Acquire mutex — only one tx builds at a time ────────
@@ -316,7 +317,7 @@ async function _clientSideBootInner(
   userAddress: string,
   postId: number,
   shares: BootShare[],
-  bootPriceSats: number,
+  bootPriceSats: number
 ): Promise<ClientBootResult> {
   try {
     const { Transaction, PrivateKey, P2PKH, Script, OP, SatoshisPerKilobyte } = await getBsvSdk();
@@ -326,7 +327,7 @@ async function _clientSideBootInner(
     try {
       privateKey = PrivateKey.fromWif(wif);
     } catch {
-      return { status: 'error', error: 'Invalid private key' };
+      return { status: "error", error: "Invalid private key" };
     }
 
     // ── Fetch UTXOs (with spent-filtering + pending change) ─
@@ -339,8 +340,12 @@ async function _clientSideBootInner(
     const utxos = await fetchUtxos(userAddress, totalNeeded);
 
     if (utxos.length === 0) {
-      console.warn('[clientSideBoot] No UTXOs found for address:', userAddress, '— address may have no confirmed/unconfirmed outputs');
-      return { status: 'insufficient_funds', balance: 0 };
+      console.warn(
+        "[clientSideBoot] No UTXOs found for address:",
+        userAddress,
+        "— address may have no confirmed/unconfirmed outputs"
+      );
+      return { status: "insufficient_funds", balance: 0 };
     }
 
     const balance = utxos.reduce((sum, u) => sum + u.value, 0);
@@ -355,14 +360,14 @@ async function _clientSideBootInner(
       const minBootFee = estimateFee(1, outputCount); // 1 consolidated input
       if (balance >= bootPriceSats + minBootFee) {
         console.log(
-          `[clientSideBoot] Wallet fragmented: balance=${balance} sats across ${utxos.length} UTXOs — needs consolidation`,
+          `[clientSideBoot] Wallet fragmented: balance=${balance} sats across ${utxos.length} UTXOs — needs consolidation`
         );
-        return { status: 'needs_consolidation', balance };
+        return { status: "needs_consolidation", balance };
       }
       console.warn(
-        `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${bootPriceSats + worstCaseFee} sats, address=${userAddress}`,
+        `[clientSideBoot] Insufficient funds: balance=${balance} sats, needed=${bootPriceSats + worstCaseFee} sats, address=${userAddress}`
       );
-      return { status: 'insufficient_funds', balance };
+      return { status: "insufficient_funds", balance };
     }
     // ── Fetch source transactions (parallel) ────────────────
     // For 0-conf chained UTXOs, sourceTransaction is already attached — skip the fetch
@@ -379,7 +384,7 @@ async function _clientSideBootInner(
       sourceTxs = await Promise.all(sourceTxPromises);
     } catch (e) {
       return {
-        status: 'broadcast_failed',
+        status: "broadcast_failed",
         error: `Failed to fetch source transactions: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
@@ -410,18 +415,18 @@ async function _clientSideBootInner(
     opReturnScript.writeOpCode(OP.OP_RETURN);
 
     const opReturnFields = [
-      'bsvibes',       // app prefix
-      'boot',          // action type
-      String(postId),  // post being booted
+      "bsvibes", // app prefix
+      "boot", // action type
+      String(postId), // post being booted
       String(bootPriceSats), // total boot amount
-      String(Date.now()),    // timestamp
+      String(Date.now()), // timestamp
     ];
     for (const field of opReturnFields) {
       opReturnScript.writeBin(Array.from(new TextEncoder().encode(field)));
     }
 
     tx.addOutput({
-      lockingScript: opReturnScript as import('@bsv/sdk').LockingScript,
+      lockingScript: opReturnScript as import("@bsv/sdk").LockingScript,
       satoshis: 0,
     });
 
@@ -451,8 +456,8 @@ async function _clientSideBootInner(
     // ── Broadcast ───────────────────────────────────────────
     const broadcastResult = await tx.broadcast();
 
-    if (broadcastResult.status === 'success') {
-      const txid = tx.id('hex') as string;
+    if (broadcastResult.status === "success") {
+      const txid = tx.id("hex") as string;
 
       // ── Track spent UTXOs ─────────────────────────────────
       // Blacklist consumed inputs so stale WoC responses don't resurrect them
@@ -491,18 +496,19 @@ async function _clientSideBootInner(
 
       saveSpentSet(_spent);
 
-      return { status: 'success', txid };
+      return { status: "success", txid };
     }
 
     return {
-      status: 'broadcast_failed',
-      error: typeof broadcastResult === 'object'
-        ? JSON.stringify(broadcastResult)
-        : String(broadcastResult),
+      status: "broadcast_failed",
+      error:
+        typeof broadcastResult === "object"
+          ? JSON.stringify(broadcastResult)
+          : String(broadcastResult),
     };
   } catch (e) {
     return {
-      status: 'error',
+      status: "error",
       error: e instanceof Error ? e.message : String(e),
     };
   }
@@ -523,34 +529,37 @@ const DUST_THRESHOLD = 10;
  */
 export async function consolidateUtxos(
   wif: string,
-  userAddress: string,
+  userAddress: string
 ): Promise<ClientBootResult> {
   const release = await acquireTxMutex();
 
   try {
-    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } = await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } =
+      await getBsvSdk();
 
     let privateKey: InstanceType<typeof PrivateKey>;
     try {
       privateKey = PrivateKey.fromWif(wif);
     } catch {
-      return { status: 'error', error: 'Invalid private key' };
+      return { status: "error", error: "Invalid private key" };
     }
 
     const utxos = await fetchUtxos(userAddress);
 
     if (utxos.length <= 1) {
-      return { status: 'success', txid: '' }; // nothing to consolidate
+      return { status: "success", txid: "" }; // nothing to consolidate
     }
 
     // Filter out dust UTXOs that cost more to spend than they're worth
     const spendable = utxos.filter((u) => u.value >= DUST_THRESHOLD);
     if (spendable.length <= 1) {
-      return { status: 'success', txid: '' };
+      return { status: "success", txid: "" };
     }
 
     const total = spendable.reduce((sum, u) => sum + u.value, 0);
-    console.log(`[consolidateUtxos] Sweeping ${spendable.length} UTXOs (${total} sats) for ${userAddress}`);
+    console.log(
+      `[consolidateUtxos] Sweeping ${spendable.length} UTXOs (${total} sats) for ${userAddress}`
+    );
 
     const tx = new Transaction();
 
@@ -565,12 +574,15 @@ export async function consolidateUtxos(
             if (utxo.sourceTransaction) return { utxo, sourceTx: utxo.sourceTransaction };
             const hex = await fetchSourceTxHex(utxo.tx_hash);
             return { utxo, sourceTx: Transaction.fromHex(hex) };
-          }),
+          })
         );
         sourceTxs.push(...results);
       }
     } catch (e) {
-      return { status: 'broadcast_failed', error: `Failed to fetch source transactions: ${e instanceof Error ? e.message : String(e)}` };
+      return {
+        status: "broadcast_failed",
+        error: `Failed to fetch source transactions: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
 
     for (const { utxo, sourceTx } of sourceTxs) {
@@ -592,11 +604,11 @@ export async function consolidateUtxos(
     await tx.sign();
 
     // Broadcast via WhatsOnChain — relays to miners who accept 10 sat/kb
-    const woc = new WhatsOnChainBroadcaster('main');
+    const woc = new WhatsOnChainBroadcaster("main");
     const broadcastResult = await tx.broadcast(woc);
 
-    if (broadcastResult.status === 'success') {
-      const txid = tx.id('hex') as string;
+    if (broadcastResult.status === "success") {
+      const txid = tx.id("hex") as string;
       console.log(`[consolidateUtxos] Success: ${spendable.length} UTXOs → 1, txid=${txid}`);
 
       // Track spent UTXOs
@@ -627,17 +639,20 @@ export async function consolidateUtxos(
       }
 
       saveSpentSet(_spent);
-      return { status: 'success', txid };
+      return { status: "success", txid };
     }
 
-    console.error('[consolidateUtxos] Broadcast failed:', broadcastResult);
+    console.error("[consolidateUtxos] Broadcast failed:", broadcastResult);
     return {
-      status: 'broadcast_failed',
-      error: typeof broadcastResult === 'object' ? JSON.stringify(broadcastResult) : String(broadcastResult),
+      status: "broadcast_failed",
+      error:
+        typeof broadcastResult === "object"
+          ? JSON.stringify(broadcastResult)
+          : String(broadcastResult),
     };
   } catch (e) {
-    console.error('[consolidateUtxos] Error:', e);
-    return { status: 'error', error: e instanceof Error ? e.message : String(e) };
+    console.error("[consolidateUtxos] Error:", e);
+    return { status: "error", error: e instanceof Error ? e.message : String(e) };
   } finally {
     release();
   }

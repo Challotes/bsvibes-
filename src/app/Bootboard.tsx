@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
-import { BootIcon } from '@/components/icons/BootIcon';
-import { useIdentityContext } from '@/contexts/IdentityContext';
-import { useBoot } from '@/hooks/useBoot';
-import type { BootboardData } from '@/types';
+import { useEffect, useRef, useState } from "react";
+import { BootIcon } from "@/components/icons/BootIcon";
+import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useBoot } from "@/hooks/useBoot";
+import type { BootboardData } from "@/types";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -18,7 +18,7 @@ function LiveTimer({ since }: { since: string }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    const start = new Date(since + 'Z').getTime();
+    const start = new Date(`${since}Z`).getTime();
     function tick() {
       setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     }
@@ -30,7 +30,15 @@ function LiveTimer({ since }: { since: string }) {
   return <span className="font-mono text-amber-400 text-xs">{formatDuration(elapsed)}</span>;
 }
 
-function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['history'][0]; onBooted?: () => void; onFundNeeded?: (address: string, balance?: number) => void }) {
+function HistoryRow({
+  entry,
+  onBooted,
+  onFundNeeded,
+}: {
+  entry: BootboardData["history"][0];
+  onBooted?: () => void;
+  onFundNeeded?: (address: string, balance?: number) => void;
+}) {
   const { identity } = useIdentityContext();
   const { boot, isBooting } = useBoot({ onBooted, onFundNeeded });
 
@@ -42,6 +50,7 @@ function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['h
   return (
     <div className="flex items-center gap-2 text-[11px] text-zinc-600 py-0.5">
       <button
+        type="button"
         onClick={handleReboot}
         disabled={isBooting || !identity}
         className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50`}
@@ -58,7 +67,17 @@ function HistoryRow({ entry, onBooted, onFundNeeded }: { entry: BootboardData['h
   );
 }
 
-export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: BootboardData; onBooted?: () => void; bootPrice?: number; onFundNeeded?: (address: string, balance?: number) => void }) {
+export function Bootboard({
+  data,
+  onBooted,
+  bootPrice,
+  onFundNeeded,
+}: {
+  data: BootboardData;
+  onBooted?: () => void;
+  bootPrice?: number;
+  onFundNeeded?: (address: string, balance?: number) => void;
+}) {
   const { current, history } = data;
   const [shaking, setShaking] = useState(false);
   const [glowing, setGlowing] = useState(false);
@@ -90,29 +109,34 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
   return (
     <div
       className={`rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
-        glowing
-          ? 'border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
-          : 'border-amber-500/30'
-      } ${shaking ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}
+        glowing ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" : "border-amber-500/30"
+      } ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
     >
       {current ? (
-        <div className={slideIn ? 'animate-[slideUp_0.4s_ease-out]' : ''}>
+        <div className={slideIn ? "animate-[slideUp_0.4s_ease-out]" : ""}>
           {/* Meta line — label + author + timer + expand toggle */}
           <div className="flex flex-wrap items-center justify-between text-xs text-zinc-500 mb-1.5 gap-y-1">
             <div className="flex items-center gap-1.5 min-w-0">
               <BootIcon size={14} className="text-amber-400 shrink-0" />
-              <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide shrink-0">Bootboard</span>
+              <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide shrink-0">
+                Bootboard
+              </span>
               <span className="text-zinc-700 shrink-0">·</span>
               <span className="font-medium text-amber-300 truncate">{current.author_name}</span>
               {current.signature && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"
+                  title="Signed"
+                />
               )}
             </div>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <LiveTimer since={current.booted_at} />
               <button
+                type="button"
                 onClick={() => setExpanded(!expanded)}
+                aria-label={expanded ? "Collapse history" : "Expand history"}
                 className="text-zinc-600 hover:text-zinc-400 transition-colors ml-1"
               >
                 <svg
@@ -120,9 +144,16 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
                   height="12"
                   viewBox="0 0 16 16"
                   fill="none"
-                  className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                  className={`transition-transform ${expanded ? "rotate-180" : ""}`}
                 >
-                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path
+                    d="M4 6l4 4 4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
             </div>
@@ -140,9 +171,17 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
                 <span>booted by {current.boosted_by_name ?? current.boosted_by}</span>
               </div>
               {history.length > 0 && (
-                <div className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1" style={{ scrollbarWidth: 'none' }}>
-                  {history.map((h, i) => (
-                    <HistoryRow key={i} entry={h} onBooted={onBooted} onFundNeeded={onFundNeeded} />
+                <div
+                  className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  {history.map((h) => (
+                    <HistoryRow
+                      key={`${h.post_id}-${h.booted_at}`}
+                      entry={h}
+                      onBooted={onBooted}
+                      onFundNeeded={onFundNeeded}
+                    />
                   ))}
                 </div>
               )}
@@ -152,7 +191,9 @@ export function Bootboard({ data, onBooted, bootPrice, onFundNeeded }: { data: B
       ) : (
         <div className="flex items-center gap-2 text-xs">
           <BootIcon size={14} className="text-amber-400" />
-          <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">Bootboard</span>
+          <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">
+            Bootboard
+          </span>
           <span className="text-zinc-700">·</span>
           <span className="text-zinc-600">Boost any post to claim the spotlight</span>
           {bootPrice !== undefined && bootPrice > 0 && (

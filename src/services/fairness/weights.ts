@@ -4,8 +4,8 @@
  * Resolves migration chains so upgraded users keep their history.
  */
 
-import { FAIRNESS_CONFIG } from './config';
-import { PublicKey } from '@bsv/sdk';
+import { PublicKey } from "@bsv/sdk";
+import { FAIRNESS_CONFIG } from "./config";
 
 const { halfLifeDays, engagementMultiplier, scalingFn } = FAIRNESS_CONFIG;
 
@@ -54,10 +54,10 @@ interface MigrationRow {
  *
  * Also detects and breaks cycles (defensive — should never occur in practice).
  */
-function buildMigrationMap(db: import('better-sqlite3').Database): Map<string, string> {
-  const migrations = db.prepare(
-    'SELECT from_pubkey, to_pubkey FROM migrations ORDER BY id ASC'
-  ).all() as MigrationRow[];
+function buildMigrationMap(db: import("better-sqlite3").Database): Map<string, string> {
+  const migrations = db
+    .prepare("SELECT from_pubkey, to_pubkey FROM migrations ORDER BY id ASC")
+    .all() as MigrationRow[];
 
   // Build forward links — later rows overwrite earlier rows for the same from_pubkey,
   // so the latest migration from any given key always wins.
@@ -84,7 +84,7 @@ function buildMigrationMap(db: import('better-sqlite3').Database): Map<string, s
     const visited = new Set<string>();
     while (forward.has(current) && !visited.has(current)) {
       visited.add(current);
-      current = forward.get(current)!;
+      current = forward.get(current) ?? current;
     }
     resolved.set(key, current);
   }
@@ -99,7 +99,7 @@ function pubkeyToAddress(pubkey: string): string {
   try {
     return PublicKey.fromString(pubkey).toAddress().toString();
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -107,7 +107,7 @@ function pubkeyToAddress(pubkey: string): string {
  * Calculate contribution weights for all active contributors.
  * Results are cached for 30 seconds to avoid repeated full table scans.
  */
-export function calculateWeights(db: import('better-sqlite3').Database): ContributorWeight[] {
+export function calculateWeights(db: import("better-sqlite3").Database): ContributorWeight[] {
   const now = Date.now();
   if (_cachedWeights && now - _weightsCachedAt < WEIGHTS_CACHE_TTL_MS) {
     return _cachedWeights;
@@ -116,13 +116,15 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
   const migrationMap = buildMigrationMap(db);
 
   // Get all signed posts with boot counts
-  const posts = db.prepare(`
+  const posts = db
+    .prepare(`
     SELECT p.pubkey, COALESCE(bc.boot_count, 0) as boot_count, p.created_at
     FROM posts p
     LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
       ON bc.post_id = p.id
     WHERE p.pubkey IS NOT NULL
-  `).all() as PostRow[];
+  `)
+    .all() as PostRow[];
 
   // Aggregate weights by resolved pubkey
   const byPubkey = new Map<string, { weight: number; posts: number; boots: number }>();
@@ -131,9 +133,10 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
     // Resolve migration: use the latest pubkey in the chain
     const resolvedPubkey = migrationMap.get(post.pubkey) ?? post.pubkey;
 
-    const ageDays = (now - new Date(post.created_at.replace(' ', 'T') + 'Z').getTime()) / 86_400_000;
-    const decay = Math.pow(0.5, ageDays / halfLifeDays);
-    const engagement = 1 + (post.boot_count * engagementMultiplier);
+    const ageDays =
+      (now - new Date(`${post.created_at.replace(" ", "T")}Z`).getTime()) / 86_400_000;
+    const decay = 0.5 ** (ageDays / halfLifeDays);
+    const engagement = 1 + post.boot_count * engagementMultiplier;
     const postWeight = scalingFn(engagement) * decay;
 
     const entry = byPubkey.get(resolvedPubkey) ?? { weight: 0, posts: 0, boots: 0 };
@@ -152,7 +155,7 @@ export function calculateWeights(db: import('better-sqlite3').Database): Contrib
       postCount: data.posts,
       totalBoots: data.boots,
     }))
-    .filter((c) => c.address !== ''); // Exclude invalid pubkeys
+    .filter((c) => c.address !== ""); // Exclude invalid pubkeys
 
   _cachedWeights = result;
   _weightsCachedAt = now;

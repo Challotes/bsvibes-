@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface ManifestoProps {
   onAskAgent?: () => void;
@@ -27,12 +27,12 @@ export function Manifesto({ onAskAgent }: ManifestoProps) {
           build something are the people who own it.
         </p>
         <p className="text-zinc-400">
-          Here's how the old world works: your labor flows up. Value pools at the top. You get
-          what they decide.
+          Here's how the old world works: your labor flows up. Value pools at the top. You get what
+          they decide.
         </p>
         <p>
-          Here's how this works: value flows directly to the people who created it. No
-          intermediary. No approval process. Automatic, on-chain, provable.
+          Here's how this works: value flows directly to the people who created it. No intermediary.
+          No approval process. Automatic, on-chain, provable.
         </p>
 
         {/* Pull quote 1 */}
@@ -73,9 +73,10 @@ export function Manifesto({ onAskAgent }: ManifestoProps) {
         </p>
 
         <p className="text-zinc-300">
-          Be part of it.{' '}
+          Be part of it.{" "}
           {onAskAgent ? (
             <button
+              type="button"
               onClick={onAskAgent}
               className="text-amber-400 hover:text-amber-300 transition-colors underline underline-offset-2"
             >

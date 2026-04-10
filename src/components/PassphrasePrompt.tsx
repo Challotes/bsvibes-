@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 
 interface PassphrasePromptProps {
   context: string;
@@ -15,15 +15,15 @@ interface PassphrasePromptProps {
 
 export function PassphrasePrompt({
   context,
-  placeholder = 'Passphrase',
+  placeholder = "Passphrase",
   error,
   loading,
   onConfirm,
   onCancel,
-  confirmLabel = 'Confirm',
+  confirmLabel = "Confirm",
   hint,
 }: PassphrasePromptProps): React.JSX.Element {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
 
   return (
     <div className="space-y-2">
@@ -32,9 +32,10 @@ export function PassphrasePrompt({
         type="password"
         placeholder={placeholder}
         value={value}
-        autoFocus
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && value) onConfirm(value); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && value) onConfirm(value);
+        }}
         className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
       />
       {hint && (
@@ -45,17 +46,21 @@ export function PassphrasePrompt({
       {error && <p className="text-[11px] text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button
+          type="button"
           onClick={onCancel}
           className="flex-1 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
         >
           Cancel
         </button>
         <button
-          onClick={() => { if (value) onConfirm(value); }}
+          type="button"
+          onClick={() => {
+            if (value) onConfirm(value);
+          }}
           disabled={!value || loading}
           className="flex-1 bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? 'Working...' : confirmLabel}
+          {loading ? "Working..." : confirmLabel}
         </button>
       </div>
     </div>

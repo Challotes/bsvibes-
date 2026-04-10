@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { genesisMessages } from '@/data/genesis';
-import { Manifesto } from './Manifesto';
+import { genesisMessages } from "@/data/genesis";
+import { Manifesto } from "./Manifesto";
 
 const authorColors: Record<string, string> = {
-  enri: 'text-blue-400',
-  holdOn: 'text-emerald-400',
-  cryptoh: 'text-purple-400',
+  enri: "text-blue-400",
+  holdOn: "text-emerald-400",
+  cryptoh: "text-purple-400",
 };
 
 interface GenesisProps {
@@ -31,19 +31,21 @@ export function Genesis({ onAskAgent }: GenesisProps) {
       {/* Genesis header */}
       <div className="flex items-center gap-2 py-3 px-4">
         <div className="w-1 h-4 bg-amber-500 rounded-full" />
-        <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Genesis</span>
+        <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+          Genesis
+        </span>
         <span className="text-[11px] text-zinc-600">Feb 2026</span>
       </div>
 
       {/* Messages */}
       <div className="space-y-2 pb-4 px-4">
         {genesisMessages.map((msg, i) => {
-          const colorClass = authorColors[msg.author] || 'text-zinc-400';
+          const colorClass = authorColors[msg.author] || "text-zinc-400";
           const prevAuthor = i > 0 ? genesisMessages[i - 1].author : null;
           const showAuthor = msg.author !== prevAuthor;
 
           return (
-            <div key={i}>
+            <div key={`${msg.author}-${msg.content.slice(0, 24)}`}>
               {showAuthor && (
                 <div className="flex items-center gap-2 mt-3 first:mt-0">
                   <span className={`text-xs font-medium ${colorClass}`}>{msg.author}</span>

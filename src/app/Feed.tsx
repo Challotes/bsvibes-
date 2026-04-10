@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useMemo, useState, useCallback, useTransition, useEffect } from 'react';
-import { Bootboard } from './Bootboard';
-import { PostForm } from './PostForm';
-import { Header } from './Header';
-import { PostList } from './PostList';
-import { IdentityProvider, useIdentityContext } from '@/contexts/IdentityContext';
-import { useScrollTracker } from '@/hooks/useScrollTracker';
-import { useFeedPolling } from '@/hooks/useFeedPolling';
-import { getOlderPosts } from './actions';
-import { FundAddress } from './FundAddress';
-import type { Post, BootboardData } from '@/types';
-import { timeAgo } from '@/lib/utils';
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
+import { useFeedPolling } from "@/hooks/useFeedPolling";
+import { useScrollTracker } from "@/hooks/useScrollTracker";
+import { timeAgo } from "@/lib/utils";
+import type { BootboardData, Post } from "@/types";
+import { getOlderPosts } from "./actions";
+import { Bootboard } from "./Bootboard";
+import { FundAddress } from "./FundAddress";
+import { Header } from "./Header";
+import { PostForm } from "./PostForm";
+import { PostList } from "./PostList";
 
 // A post that was added optimistically before the server confirms it.
 interface OptimisticPost {
@@ -25,15 +25,10 @@ interface OptimisticPost {
 
 // Remove an optimistic post if a confirmed server post with matching content +
 // author already exists.
-function pruneOptimistic(
-  optimisticPosts: OptimisticPost[],
-  serverPosts: Post[]
-): OptimisticPost[] {
+function pruneOptimistic(optimisticPosts: OptimisticPost[], serverPosts: Post[]): OptimisticPost[] {
   return optimisticPosts.filter(
     (op) =>
-      !serverPosts.some(
-        (sp) => sp.content === op.content && sp.author_name === op.author_name
-      )
+      !serverPosts.some((sp) => sp.content === op.content && sp.author_name === op.author_name)
   );
 }
 
@@ -46,7 +41,11 @@ function FeedContent({
   initialBootboard: BootboardData;
 }) {
   const { identity } = useIdentityContext();
-  const { posts: serverPosts, bootboard, refresh } = useFeedPolling({
+  const {
+    posts: serverPosts,
+    bootboard,
+    refresh,
+  } = useFeedPolling({
     initialPosts,
     initialBootboard,
     intervalMs: 5000,
@@ -61,7 +60,7 @@ function FeedContent({
   const [bootPrice, setBootPrice] = useState(1000);
   const [freeBootsRemaining, setFreeBootsRemaining] = useState(0);
   const [showFundModal, setShowFundModal] = useState(false);
-  const [userAddress, setUserAddress] = useState('');
+  const [userAddress, setUserAddress] = useState("");
   const [userBalance, setUserBalance] = useState<number | undefined>(undefined);
 
   // Fetch the real boot status for this identity from the server once on load.
@@ -70,10 +69,10 @@ function FeedContent({
     fetch(`/api/boot-status?pubkey=${encodeURIComponent(identity.address)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (typeof data.freeBootsRemaining === 'number') {
+        if (typeof data.freeBootsRemaining === "number") {
           setFreeBootsRemaining(data.freeBootsRemaining);
         }
-        if (typeof data.bootPrice === 'number' && data.bootPrice > 0) {
+        if (typeof data.bootPrice === "number" && data.bootPrice > 0) {
           setBootPrice(data.bootPrice);
         }
       })
@@ -91,28 +90,29 @@ function FeedContent({
   const handlePostRejected = useCallback((tempId: number, reason?: string) => {
     // Mark as failed, then auto-remove after 3 seconds
     setOptimisticPosts((prev) =>
-      prev.map((op) =>
-        op.id === tempId ? { ...op, failed: true, failReason: reason } : op
-      )
+      prev.map((op) => (op.id === tempId ? { ...op, failed: true, failReason: reason } : op))
     );
     setTimeout(() => {
       setOptimisticPosts((prev) => prev.filter((op) => op.id !== tempId));
     }, 3000);
   }, []);
 
-  const handlePostCreated = useCallback((content: string, author: string, tempId: number) => {
-    setOptimisticPosts((prev) => [
-      {
-        id: tempId,
-        content,
-        author_name: author,
-        created_at: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    // Poll 500ms after posting to confirm quickly
-    setTimeout(refresh, 500);
-  }, [refresh]);
+  const handlePostCreated = useCallback(
+    (content: string, author: string, tempId: number) => {
+      setOptimisticPosts((prev) => [
+        {
+          id: tempId,
+          content,
+          author_name: author,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+      // Poll 500ms after posting to confirm quickly
+      setTimeout(refresh, 500);
+    },
+    [refresh]
+  );
 
   const handleLoadEarlier = useCallback(() => {
     // Oldest post is either the last in olderPosts, or the last in chronological.
@@ -172,7 +172,16 @@ function FeedContent({
       {/* Pinned bootboard */}
       <div className="shrink-0 relative">
         <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
-          <Bootboard data={bootboard} onBooted={refresh} bootPrice={bootPrice} onFundNeeded={(address, balance) => { setUserAddress(address); setUserBalance(balance); setShowFundModal(true); }} />
+          <Bootboard
+            data={bootboard}
+            onBooted={refresh}
+            bootPrice={bootPrice}
+            onFundNeeded={(address, balance) => {
+              setUserAddress(address);
+              setUserBalance(balance);
+              setShowFundModal(true);
+            }}
+          />
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
       </div>
@@ -181,7 +190,7 @@ function FeedContent({
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto relative scrollbar-hide"
-        style={{ scrollbarWidth: 'none' }}
+        style={{ scrollbarWidth: "none" }}
       >
         <PostList
           posts={chronological}
@@ -193,7 +202,11 @@ function FeedContent({
           onLoadEarlier={handleLoadEarlier}
           onBooted={refresh}
           onAskAgent={handleAskAgent}
-          onFundNeeded={(address, balance) => { setUserAddress(address); setUserBalance(balance); setShowFundModal(true); }}
+          onFundNeeded={(address, balance) => {
+            setUserAddress(address);
+            setUserBalance(balance);
+            setShowFundModal(true);
+          }}
           onFreeBootUsed={handleFreeBootUsed}
           bootPrice={bootPrice}
           freeBootsRemaining={freeBootsRemaining}
@@ -203,7 +216,7 @@ function FeedContent({
         {pendingOptimistic.length > 0 && (
           <div className="mx-auto max-w-2xl px-4 pb-2 divide-y divide-zinc-800/60">
             {pendingOptimistic.map((op) => (
-              <article key={op.id} className={`py-3.5 ${op.failed ? 'opacity-50' : ''}`}>
+              <article key={op.id} className={`py-3.5 ${op.failed ? "opacity-50" : ""}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -212,7 +225,9 @@ function FeedContent({
                       <time>{timeAgo(op.created_at)}</time>
                       {op.failed && (
                         <span className="text-red-400 text-[10px]">
-                          {op.failReason === 'rate_limited' ? 'Too fast — try again' : 'Failed to post'}
+                          {op.failReason === "rate_limited"
+                            ? "Too fast — try again"
+                            : "Failed to post"}
                         </span>
                       )}
                     </div>
@@ -231,11 +246,26 @@ function FeedContent({
       {!isAtBottom && (
         <div className="shrink-0 flex justify-end mx-auto max-w-2xl px-4">
           <button
+            type="button"
             onClick={scrollToBottom}
+            aria-label="Scroll to bottom"
             className="relative -mb-5 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 border border-zinc-700 shadow-lg hover:bg-zinc-700 transition-colors mr-2"
           >
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" className="text-zinc-300">
-              <path d="M8 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+              className="text-zinc-300"
+            >
+              <path
+                d="M8 3v10m0 0l-4-4m4 4l4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-1 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-amber-500 text-black text-[11px] font-bold px-1.5">
@@ -249,9 +279,18 @@ function FeedContent({
       {/* Pinned bottom — compose area */}
       <div className="shrink-0">
         <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
-          <PostForm onPostCreated={handlePostCreated} onPostRejected={handlePostRejected} agentHighlight={agentHighlight} />
+          <PostForm
+            onPostCreated={handlePostCreated}
+            onPostRejected={handlePostRejected}
+            agentHighlight={agentHighlight}
+          />
           <div className="flex justify-center mt-1">
-            <a href="https://bopen.ai" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors">
+            <a
+              href="https://bopen.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors"
+            >
               created with bopen.ai
             </a>
           </div>
@@ -264,7 +303,10 @@ function FeedContent({
           address={userAddress}
           bootPrice={bootPrice}
           balance={userBalance}
-          onClose={() => { setShowFundModal(false); setUserBalance(undefined); }}
+          onClose={() => {
+            setShowFundModal(false);
+            setUserBalance(undefined);
+          }}
         />
       )}
     </div>

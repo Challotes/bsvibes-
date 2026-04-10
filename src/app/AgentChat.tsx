@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Message {
-  from: 'user' | 'agent';
+  from: "user" | "agent";
   text: string;
 }
 
 const SUGGESTED = [
-  'What is this?',
-  'How does booting work?',
-  'What\'s the fairness agent?',
-  'How do I post?',
+  "What is this?",
+  "How does booting work?",
+  "What's the fairness agent?",
+  "How do I post?",
 ];
 
 export function AgentChat({ highlight }: { highlight?: boolean }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,19 +29,21 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      setMessages([{
-        from: 'agent',
-        text: "Hey! I can help you understand BSVibes, brainstorm ideas for posts, or answer any questions. What are you curious about?",
-      }]);
+      setMessages([
+        {
+          from: "agent",
+          text: "Hey! I can help you understand BSVibes, brainstorm ideas for posts, or answer any questions. What are you curious about?",
+        },
+      ]);
     }
   }, [open, messages.length]);
 
   // Only auto-scroll if user hasn't manually scrolled up
   useEffect(() => {
     if (!userScrolled) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, userScrolled]);
+  }, [userScrolled]);
 
   // Reset scroll tracking when user sends a new message
   function handleUserScroll() {
@@ -60,25 +62,29 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === "Escape") setOpen(false);
     }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Clean up any in-flight stream on unmount
   useEffect(() => {
-    return () => { abortRef.current?.abort(); };
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
   const ask = useCallback(async function ask(question: string) {
-    const userMsg: Message = { from: 'user', text: question };
-    const thinking: Message = { from: 'agent', text: '...' };
+    const userMsg: Message = { from: "user", text: question };
+    const thinking: Message = { from: "agent", text: "..." };
     const newMessages = [...messagesRef.current, userMsg];
     setMessages([...newMessages, thinking]);
-    setInput('');
+    setInput("");
     setIsStreaming(true);
     setUserScrolled(false); // auto-scroll to user's own message
 
@@ -88,31 +94,37 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
     abortRef.current = controller;
 
     try {
-      const res = await fetch('/api/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.filter(m => m.text !== '...'),
+          messages: newMessages.filter((m) => m.text !== "..."),
         }),
         signal: controller.signal,
       });
 
       if (!res.ok) {
         const errorText = await res.text();
-        setMessages([...newMessages, { from: 'agent', text: errorText || 'Agent had a hiccup — try again in a moment.' }]);
+        setMessages([
+          ...newMessages,
+          { from: "agent", text: errorText || "Agent had a hiccup — try again in a moment." },
+        ]);
         setIsStreaming(false);
         return;
       }
 
       if (!res.body) {
-        setMessages([...newMessages, { from: 'agent', text: "Couldn't reach the agent right now." }]);
+        setMessages([
+          ...newMessages,
+          { from: "agent", text: "Couldn't reach the agent right now." },
+        ]);
         setIsStreaming(false);
         return;
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = '';
+      let accumulated = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -120,19 +132,19 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
         accumulated += decoder.decode(value, { stream: true });
         // Update the last message with accumulated text
         const text = accumulated;
-        setMessages([...newMessages, { from: 'agent', text }]);
+        setMessages([...newMessages, { from: "agent", text }]);
       }
 
       // Final update (ensure last chunk is flushed)
       if (accumulated) {
-        setMessages([...newMessages, { from: 'agent', text: accumulated }]);
+        setMessages([...newMessages, { from: "agent", text: accumulated }]);
       } else {
-        setMessages([...newMessages, { from: 'agent', text: "I'm not sure how to answer that." }]);
+        setMessages([...newMessages, { from: "agent", text: "I'm not sure how to answer that." }]);
       }
     } catch (e) {
-      if ((e as Error).name === 'AbortError') return;
-      console.error('Agent stream error:', e);
-      setMessages([...newMessages, { from: 'agent', text: "Couldn't reach the agent right now." }]);
+      if ((e as Error).name === "AbortError") return;
+      console.error("Agent stream error:", e);
+      setMessages([...newMessages, { from: "agent", text: "Couldn't reach the agent right now." }]);
     } finally {
       setIsStreaming(false);
     }
@@ -147,14 +159,17 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
   if (!open) {
     return (
       <button
+        type="button"
         onClick={() => setOpen(true)}
         className={`flex items-center gap-1.5 text-xs border rounded-full px-2.5 py-1 transition-all mt-1 ${
           highlight
-            ? 'text-amber-300 border-amber-500 bg-amber-500/10 scale-110 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
-            : 'text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900'
+            ? "text-amber-300 border-amber-500 bg-amber-500/10 scale-110 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+            : "text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900"
         }`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${highlight ? 'bg-amber-400 animate-ping' : 'bg-cyan-400/70 animate-pulse'}`} />
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${highlight ? "bg-amber-400 animate-ping" : "bg-cyan-400/70 animate-pulse"}`}
+        />
         Ask AI
       </button>
     );
@@ -163,8 +178,10 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+      <button
+        type="button"
+        className="fixed inset-0 z-50 w-full bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out] cursor-default"
+        aria-label="Close dialog"
         onClick={() => setOpen(false)}
       />
 
@@ -172,7 +189,11 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
           className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-label="BSVibes Agent"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
@@ -181,11 +202,18 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               <span className="text-sm font-medium text-zinc-300">BSVibes Agent</span>
             </div>
             <button
+              type="button"
               onClick={() => setOpen(false)}
+              aria-label="Close"
               className="text-zinc-600 hover:text-zinc-300 transition-colors"
             >
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4l8 8m0-8l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M4 4l8 8m0-8l-8 8"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -195,22 +223,22 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
             ref={messagesContainerRef}
             onScroll={handleUserScroll}
             className="h-[60vh] sm:h-[450px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
-            style={{ scrollbarWidth: 'none' }}
+            style={{ scrollbarWidth: "none" }}
           >
-            {messages.map((msg, i) => (
+            {messages.map((msg) => (
               <div
-                key={i}
-                className={`flex flex-col ${msg.from === 'user' ? 'items-end' : 'items-start'}`}
+                key={`${msg.from}-${msg.text.slice(0, 32)}`}
+                className={`flex flex-col ${msg.from === "user" ? "items-end" : "items-start"}`}
               >
                 <span className="text-[10px] text-zinc-600 mb-0.5 px-1">
-                  {msg.from === 'agent' ? 'agent' : 'you'}
+                  {msg.from === "agent" ? "agent" : "you"}
                 </span>
                 <div
                   className={`rounded-xl px-3 py-2 text-sm leading-relaxed max-w-[85%] ${
-                    msg.from === 'agent'
-                      ? 'bg-zinc-900 text-zinc-300'
-                      : 'bg-amber-500/10 border border-amber-500/20 text-amber-200'
-                  } ${msg.text === '...' ? 'animate-pulse' : ''}`}
+                    msg.from === "agent"
+                      ? "bg-zinc-900 text-zinc-300"
+                      : "bg-amber-500/10 border border-amber-500/20 text-amber-200"
+                  } ${msg.text === "..." ? "animate-pulse" : ""}`}
                 >
                   {msg.text}
                 </div>
@@ -225,6 +253,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               {SUGGESTED.map((q) => (
                 <button
                   key={q}
+                  type="button"
                   onClick={() => ask(q)}
                   disabled={isStreaming}
                   className="text-xs text-zinc-500 border border-zinc-800 rounded-full px-3 py-1.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-50"
@@ -242,8 +271,14 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handleSubmit(e); } }}
-              placeholder={isStreaming ? 'Thinking...' : 'Ask something...'}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSubmit(e);
+                }
+              }}
+              placeholder={isStreaming ? "Thinking..." : "Ask something..."}
               disabled={isStreaming}
               className="w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
             />

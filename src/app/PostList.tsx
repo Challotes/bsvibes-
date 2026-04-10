@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import type { Post } from '@/types';
-import { BootIcon } from '@/components/icons/BootIcon';
-import { useIdentityContext } from '@/contexts/IdentityContext';
-import { useBoot } from '@/hooks/useBoot';
-import { Genesis } from './Genesis';
-import { timeAgo } from '@/lib/utils';
+import { useEffect, useState } from "react";
+import { BootIcon } from "@/components/icons/BootIcon";
+import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useBoot } from "@/hooks/useBoot";
+import { timeAgo } from "@/lib/utils";
+import type { Post } from "@/types";
+import { Genesis } from "./Genesis";
 
 interface BootButtonProps {
   postId: number;
@@ -19,14 +19,23 @@ interface BootButtonProps {
   onFreeBootUsed?: () => void;
 }
 
-function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaining, onBooted, onFundNeeded, onFreeBootUsed }: BootButtonProps) {
+function BootButton({
+  postId,
+  bootCount,
+  postPubkey,
+  bootPrice,
+  freeBootsRemaining,
+  onBooted,
+  onFundNeeded,
+  onFreeBootUsed,
+}: BootButtonProps) {
   const { identity } = useIdentityContext();
   const { boot, isBooting, bootPhase } = useBoot({ onBooted, onFundNeeded, onFreeBootUsed });
   const [optimisticBoots, setOptimisticBoots] = useState(0);
 
   useEffect(() => {
     setOptimisticBoots(0);
-  }, [bootCount]);
+  }, []);
 
   const isFree = freeBootsRemaining > 0;
   const canBoot = identity && postPubkey; // Must be signed post + signed user
@@ -43,37 +52,38 @@ function BootButton({ postId, bootCount, postPubkey, bootPrice, freeBootsRemaini
 
   const displayCount = bootCount + optimisticBoots;
   const title = !postPubkey
-    ? 'Unsigned post — cannot be booted'
+    ? "Unsigned post — cannot be booted"
     : !identity
-    ? 'Sign in to boot'
-    : isFree
-    ? `Boot to the board (FREE — ${freeBootsRemaining} remaining)`
-    : `Boot to the board (${bootPrice.toLocaleString()} sats)`;
+      ? "Sign in to boot"
+      : isFree
+        ? `Boot to the board (FREE — ${freeBootsRemaining} remaining)`
+        : `Boot to the board (${bootPrice.toLocaleString()} sats)`;
 
   return (
     <div className="flex flex-col items-center">
       <button
+        type="button"
         onClick={handleBoot}
         disabled={isBooting || !canBoot}
         className={`flex items-center rounded-full px-1.5 py-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed border ${
           displayCount > 0
-            ? 'text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10'
-            : 'text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50'
+            ? "text-amber-500 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10"
+            : "text-zinc-600 border-zinc-800 hover:border-zinc-700 hover:text-amber-400 hover:bg-zinc-800/50"
         }`}
         title={title}
       >
-        {bootPhase === 'preparing' ? (
+        {bootPhase === "preparing" ? (
           <span className="text-[9px] text-amber-400 px-1">Preparing...</span>
-        ) : bootPhase === 'booting' ? (
+        ) : bootPhase === "booting" ? (
           <span className="text-[9px] text-amber-400 px-1">Booting...</span>
         ) : (
-          <BootIcon size={13} className={displayCount > 0 ? 'text-amber-500' : ''} />
+          <BootIcon size={13} className={displayCount > 0 ? "text-amber-500" : ""} />
         )}
       </button>
-      {bootPhase === 'idle' && displayCount > 0 && (
+      {bootPhase === "idle" && displayCount > 0 && (
         <span className="text-[9px] text-zinc-600 mt-0.5">{displayCount}</span>
       )}
-      {bootPhase === 'idle' && isFree && canBoot && (
+      {bootPhase === "idle" && isFree && canBoot && (
         <span className="text-[8px] text-emerald-600 mt-0.5">FREE</span>
       )}
     </div>
@@ -126,11 +136,12 @@ export function PostList({
       {hasMore && (
         <div className="flex justify-center py-4">
           <button
+            type="button"
             onClick={onLoadEarlier}
             disabled={isLoadingMore}
             className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-1.5 rounded border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50"
           >
-            {isLoadingMore ? 'Loading...' : 'Load earlier posts'}
+            {isLoadingMore ? "Loading..." : "Load earlier posts"}
           </button>
         </div>
       )}
@@ -158,7 +169,10 @@ export function PostList({
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
                   <span className="font-medium text-zinc-300">{post.author_name}</span>
                   {post.signature && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" title="Signed" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"
+                      title="Signed"
+                    />
                   )}
                   <span>·</span>
                   <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
@@ -170,7 +184,19 @@ export function PostList({
                       title="View on chain"
                       className="inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <span className="sr-only">View on chain</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                       </svg>

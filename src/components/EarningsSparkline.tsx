@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { satsToDollars } from '@/hooks/useBsvPrice';
+import { satsToDollars } from "@/hooks/useBsvPrice";
 
 interface EarningsSparklineProps {
   history: Array<{ t: string; cumulative: number }>;
@@ -9,7 +9,12 @@ interface EarningsSparklineProps {
   bsvPrice: number;
 }
 
-export function EarningsSparkline({ history, totalSats, isGoat, bsvPrice }: EarningsSparklineProps) {
+export function EarningsSparkline({
+  history,
+  totalSats,
+  isGoat,
+  bsvPrice,
+}: EarningsSparklineProps) {
   const W = 280;
   const H = 56;
   const PAD = { top: 6, right: 4, bottom: 4, left: 0 };
@@ -19,9 +24,7 @@ export function EarningsSparkline({ history, totalSats, isGoat, bsvPrice }: Earn
     : satsToDollars(totalSats, bsvPrice);
 
   // Prepend a zero anchor at the time of the first payout
-  const points = history.length === 0
-    ? []
-    : [{ t: history[0].t, cumulative: 0 }, ...history];
+  const points = history.length === 0 ? [] : [{ t: history[0].t, cumulative: 0 }, ...history];
 
   if (points.length < 2) {
     return (
@@ -30,14 +33,24 @@ export function EarningsSparkline({ history, totalSats, isGoat, bsvPrice }: Earn
           <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Earnings</span>
           <span className="text-[10px] text-zinc-600">No earnings yet</span>
         </div>
-        <svg width={W} height={H} className="w-full">
+        <svg width={W} height={H} aria-hidden="true" className="w-full">
           <line
-            x1={PAD.left} y1={H - PAD.bottom}
-            x2={W - PAD.right} y2={H - PAD.bottom}
-            stroke="#27272a" strokeWidth="1" strokeDasharray="3 3"
+            x1={PAD.left}
+            y1={H - PAD.bottom}
+            x2={W - PAD.right}
+            y2={H - PAD.bottom}
+            stroke="#27272a"
+            strokeWidth="1"
+            strokeDasharray="3 3"
           />
-          <text x={W / 2} y={H / 2} textAnchor="middle" dominantBaseline="middle"
-            fontSize="10" fill="#52525b">
+          <text
+            x={W / 2}
+            y={H / 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="10"
+            fill="#52525b"
+          >
             Boot a post to start earning
           </text>
         </svg>
@@ -76,9 +89,16 @@ export function EarningsSparkline({ history, totalSats, isGoat, bsvPrice }: Earn
     <div className="mb-2">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] text-zinc-500 uppercase tracking-wide">All-time earnings</span>
-        <span className="text-[10px] text-emerald-400 font-medium tabular-nums">{displayTotal}</span>
+        <span className="text-[10px] text-emerald-400 font-medium tabular-nums">
+          {displayTotal}
+        </span>
       </div>
-      <svg width={W} height={H} className="w-full" aria-label={`Cumulative earnings: ${displayTotal}`}>
+      <svg
+        width={W}
+        height={H}
+        className="w-full"
+        aria-label={`Cumulative earnings: ${displayTotal}`}
+      >
         <defs>
           <linearGradient id="earn-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
@@ -87,12 +107,7 @@ export function EarningsSparkline({ history, totalSats, isGoat, bsvPrice }: Earn
         </defs>
         <path d={areaPath} fill="url(#earn-fill)" />
         <path d={d} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="miter" />
-        <circle
-          cx={lastX}
-          cy={toY(points[points.length - 1].cumulative)}
-          r="2.5"
-          fill="#10b981"
-        />
+        <circle cx={lastX} cy={toY(points[points.length - 1].cumulative)} r="2.5" fill="#10b981" />
       </svg>
     </div>
   );
