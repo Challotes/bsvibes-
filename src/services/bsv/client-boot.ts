@@ -580,14 +580,13 @@ async function _clientSideBootInner(
 // ── UTXO Consolidation ─────────────────────────────────────────
 
 /** Minimum UTXO value worth including in consolidation.
- * At 10 sat/kb (consolidation fee rate), each P2PKH input costs ~1.5 sats.
- * Set to 2 so any UTXO that covers its own inclusion fee gets swept.
- * Previously 10 — which left UTXOs of 3-9 sats permanently trapped. */
-const DUST_THRESHOLD = 2;
+ * At 100 sat/kb, each P2PKH input costs ~15 sats. Set to 16 so any UTXO
+ * that covers its own inclusion fee gets swept. */
+const DUST_THRESHOLD = 16;
 
 /**
  * Consolidate all UTXOs into a single output.
- * Uses WhatsOnChainBroadcaster at 10 sat/kb — bypasses ARC's higher minimum.
+ * Uses WhatsOnChainBroadcaster at 100 sat/kb — matches all other tx paths.
  * Consolidation is not time-sensitive so a lower fee rate is safe.
  *
  * Called automatically when clientSideBoot returns 'needs_consolidation'.
@@ -684,8 +683,8 @@ export async function consolidateUtxos(
       change: true,
     });
 
-    // 10 sat/kb — much cheaper than ARC's 100 sat/kb minimum
-    await tx.fee(new SatoshisPerKilobyte(10));
+    // 100 sat/kb — uniform rate across all tx paths
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     // NOTE: No optimistic blacklisting for consolidation. Unlike clientSideBoot
@@ -694,7 +693,7 @@ export async function consolidateUtxos(
     // entire wallet. Only blacklist on success — on failure, user retries once
     // conflicting txs confirm and WoC stops returning them.
 
-    // Broadcast via WhatsOnChain — relays to miners who accept 10 sat/kb
+    // Broadcast via WhatsOnChain — reliable from browser, avoids ARC timeout issues
     const woc = new WhatsOnChainBroadcaster("main");
     let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
     try {

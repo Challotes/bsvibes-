@@ -326,7 +326,7 @@ async function autoTransferFunds(
 
     // WhatsOnChainBroadcaster — same rationale as sweepConfirmedFunds.
     // ARC (SDK default) has browser-specific reliability issues.
-    await tx.fee(new SatoshisPerKilobyte(10));
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);
@@ -551,11 +551,11 @@ async function sweepConfirmedFunds(
       change: true,
     });
 
-    // WhatsOnChainBroadcaster at 10 sat/kb — same strategy as consolidateUtxos.
+    // WhatsOnChainBroadcaster at 100 sat/kb — uniform rate, reliable from browser.
     // ARC (the SDK default) has been unreliable from the browser (connection
     // timeouts, CORS overhead). Sweep is a simple self-transfer that uses none
     // of ARC's structured error features. WoC relays directly to miners.
-    await tx.fee(new SatoshisPerKilobyte(10));
+    await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     console.log(
