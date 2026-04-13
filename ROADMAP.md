@@ -192,10 +192,14 @@
 - [x] Rate limit added to /api/posts (120/min/IP — was the only unprotected route)
 - [x] ROADMAP.md, FAIRNESS.md, DECISIONS.md dates updated
 - [x] Boot button 3-second throttle (BootContext) — prevents rapid-click cascade
-- [x] "Move to a new address" wizard (MoveAddressModal) — 4-stage auto-advancing modal replacing inline dropdown flow. Downloads old key backup, sweeps confirmed UTXOs via WoC, records on-chain migration, deferred localStorage commit.
-- [x] Deferred commit in resetIdentity — prevents stranding funds if sweep/migration fails partway
-- [x] Client-side broadcaster routing: ARC for boots (structured errors), WoC for sweeps/consolidation (reliability + lower fees)
+- [x] "Move to a new address" wizard (MoveAddressModal) — 4-stage auto-advancing modal replacing inline dropdown flow. Downloads old key backup, sweeps ALL UTXOs (confirmed + unconfirmed) via ARC at 100 sat/kb, records on-chain migration, deferred localStorage commit.
+- [x] Deferred commit in resetIdentity AND upgradeIdentity — prevents stranding funds if sweep/migration fails partway
+- [x] Broadcaster unified to ARC (2026-04-13): all tx paths (clientSideBoot, consolidateUtxos, sweepFunds, autoTransferFunds, server wallet) use ARC via @bsv/sdk default. Previous WoC broadcaster switch was based on a misdiagnosed ARC outage (local DNS issue).
+- [x] Server-side source tx cache in /api/tx-hex (~2000-entry in-memory LRU). Eliminates WoC rate-limit failures on boots with many inputs.
+- [x] Batched source tx fetches in clientSideBoot (BATCH_SIZE=5, 1s delay).
 - [x] Sweep warning UI when fund transfer fails (non-blocking, shows in Stage 2 + Stage 4 summary)
+- [x] Optimistic UTXO blacklist removed (2026-04-13) — caused permanent wallet lockout with no recovery. Double-spend prevention now via mutex + 0-conf chaining + 3s UI throttle.
+- [x] Confirmed-only filter removed (2026-04-13) — redundant at 100 sat/kb (all txs confirm next block). Was built for 10 sat/kb era when unconfirmed meant "permanently stuck."
 
 ## Phase 6.5: UX Polish — PLANNED
 
@@ -207,8 +211,11 @@
 
 ## Tech Debt — TRACKED
 
-- [ ] **IndexedDB source-tx cache** for `client-boot.ts` — source txs are immutable, an IndexedDB cache (infinite TTL) would eliminate the WoC rate-limit problem, the batching workaround, and several error paths. Enables removal of: optimistic blacklist on boots (#5), confirmed-only filter on consolidation (#7), inter-batch delays. Estimated reduction: ~780 lines → ~250 lines.
-- [ ] **Refactor `clientSideBoot` + `consolidateUtxos`** after IndexedDB cache lands. Current state has asymmetric blacklisting rules and three duplicate broadcast-result classification blocks. Architecture review (2026-04-11) flagged as frankenstein — should be a clean rewrite, not incremental patches.
+- [x] ~~Optimistic blacklist on boots~~ — **REMOVED 2026-04-13** (replaced by mutex + throttle + 0-conf chaining).
+- [x] ~~Confirmed-only filter on consolidation~~ — **REMOVED 2026-04-13** (redundant at 100 sat/kb).
+- [x] ~~Server-side source tx cache~~ — **DONE 2026-04-13** (in-memory Map in `/api/tx-hex`, 2000-entry LRU). IndexedDB not needed — the server-side cache solves the WoC rate-limit problem for all clients.
+- [ ] **Client-side IndexedDB source-tx cache** — nice-to-have future optimization. Current server-side cache handles the main problem. Client-side cache would eliminate the server round-trip entirely. Low priority.
+- [ ] **Refactor `clientSideBoot` + `consolidateUtxos`** — current state still has some duplication across broadcast-result classification blocks. Architecture review (2026-04-11) flagged as frankenstein. Several tech debt items from that review are now resolved — refactor is lower priority. Revisit if/when the file grows further.
 
 ## Phase 7: The Recursive Model — PLANNED
 

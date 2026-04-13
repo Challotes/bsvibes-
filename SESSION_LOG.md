@@ -2,6 +2,34 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-13 — Broadcaster Unification + Source TX Cache + Filter Cleanup
+
+Category: architecture consolidation, bug fixes, simplification
+
+Cleaned up the accumulated defensive layers once the root causes were understood. Several decisions from the 2026-04-11/12 sessions were reversed after deeper investigation revealed they addressed symptoms of the 10 sat/kb fee rate (below GorillaPool's 100 sat/kb mining minimum), not fundamental design issues.
+
+**Broadcaster unification — all paths back to ARC.** `clientSideBoot`, `consolidateUtxos`, `sweepFunds` (renamed from `sweepConfirmedFunds`), `autoTransferFunds`, and server `buildAndBroadcast` all now use the @bsv/sdk default `tx.broadcast()` (which is ARC). The WoC broadcaster switch from 2026-04-12 was based on a misdiagnosed ARC outage — it was actually a local DNS cache issue on the user's PC, resolved by rebooting. ARC sends txs directly to GorillaPool (the miner), provides structured error responses, and supports 0-conf chaining via BEEF. WoC is now used only for read operations (UTXO fetches, source tx hex, balance display, exchange rate).
+
+**Server-side source tx cache in /api/tx-hex.** Added in-memory Map (~2000 entries, LRU) of fetched source tx hex. Source tx hex is immutable — cache-forever is correct. Eliminates repeated WoC calls for the same txid across boots, sweeps, and consolidations. Before this fix, a boot with 15 inputs fired 15 parallel WoC calls through the proxy from a single server IP, exceeding WoC's ~3 req/s per-IP limit and causing 429 errors on the 16th+ boot.
+
+**Batched source tx fetches in clientSideBoot.** Replaced bare `Promise.all` with batches of 5, 1s inter-batch delay (matching the `consolidateUtxos` pattern). Prevents WoC rate limiting even on cache misses. Combined with the cache above, boots now handle wallets with many UTXOs reliably.
+
+**Confirmed-only filters REMOVED** from `fetchUtxos` and `consolidateUtxos`. These filters were built to quarantine stuck UTXOs from 10 sat/kb txs that were below GorillaPool's mining minimum. At the current 100 sat/kb rate, all txs confirm in the next block — unconfirmed UTXOs are just "waiting," not "permanently stuck." The filters were actively harmful: they locked users out when their entire balance was recently-received unconfirmed funds ("0 sats" display despite having value at the address).
+
+**`sweepFunds` renamed from `sweepConfirmedFunds`.** Removed the `height > 0` filter — now sweeps ALL UTXOs (confirmed + unconfirmed). Matches `autoTransferFunds` behavior. Move to new address now transfers the user's complete balance, not just the confirmed portion.
+
+**Optimistic UTXO blacklist REMOVED.** Was marked as tech debt by the 2026-04-11 architecture review. Caused permanent wallet lockout when broadcasts failed (inputs stayed blacklisted in localStorage with no auto-recovery). Double-spend prevention is fully covered by mutex + 0-conf chaining + 3s UI throttle.
+
+**Deferred session cache in upgradeIdentity.** `upgradeIdentity()` no longer sets `_sessionIdentity`/`_cachedWif`/`_cachedPrivateKey` eagerly. `commitUpgrade(encStore, identity)` now accepts an optional identity and commits the session caches atomically with the localStorage write — only after `migrateIdentity()` succeeds. Matches the `resetIdentity` deferred commit pattern.
+
+**Balance poll interval: 15s → 30s.** Reduces WoC background request rate, lowers 429 pressure from normal page-sitting.
+
+**Root cause retrospective.** Architecture review determined ~50% of the recent debugging was downstream of the 10 sat/kb fee rate being below GorillaPool's mining minimum. Those txs literally could never confirm. Every defense built on top (optimistic blacklist, confirmed-only filters, WoC broadcaster swap, quarantine proposals) was compensating for permanently-stuck transactions that shouldn't have been permanently stuck in the first place. Fixing the fee rate eliminated the root cause; the defensive layers were then unnecessary.
+
+Files changed this session: `src/services/bsv/client-boot.ts`, `src/services/bsv/identity.ts`, `src/components/UpgradeModal.tsx`, `src/components/ChangePassphraseModal.tsx`, `src/app/IdentityBar.tsx`, `src/app/api/tx-hex/route.ts`.
+
+Verified: TypeScript clean, 27/27 tests pass, Biome 0 errors.
+
 ## 2026-04-11 — Architecture Retrospective + Reset Wallet + Boot Throttle
 
 Category: bug fix, UX, retrospective
