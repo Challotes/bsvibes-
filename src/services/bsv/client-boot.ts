@@ -462,25 +462,14 @@ async function _clientSideBootInner(
       hasChangeOutput = false;
     }
 
-    // ── Optimistic blacklist: assume inputs are spent ──────
-    // Once we call broadcast(), the tx will likely reach at least one node.
-    // Blacklist inputs NOW to prevent double-spend on next boot/consolidation.
-    // Only un-blacklist if broadcast() throws (network never reached).
-    const spentKeys = new Set(selection.selected.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
-    for (const sk of spentKeys) {
-      _spent.add(sk);
-    }
-    // Remove from pending change (they're being consumed)
-    for (let i = _pendingChange.length - 1; i >= 0; i--) {
-      const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
-      if (spentKeys.has(pendingKey)) {
-        _pendingChange.splice(i, 1);
-      }
-    }
-
     // ── Broadcast (with retry for 0-conf chain propagation) ──
-    // ARC returns SEEN_IN_ORPHAN_MEMPOOL when a parent tx is queued but not
-    // yet validated. Retry up to 3 times with 1.5s delay.
+    // No pre-broadcast blacklisting. Double-spend prevention is handled by:
+    //   1. Mutex (acquireTxMutex) — only one boot executes at a time
+    //   2. 0-conf chaining (_pendingChange) — next boot uses change directly
+    //   3. Boot throttle (3s in BootContext) — UI prevents rapid re-clicks
+    // Pre-broadcast blacklisting was removed because it caused permanent wallet
+    // lockout: failed broadcasts left inputs in localStorage _spent with no
+    // automatic recovery path. The user had to manually clear localStorage.
     let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
     try {
       broadcastResult = await tx.broadcast();
@@ -501,11 +490,6 @@ async function _clientSideBootInner(
         broadcastResult = await tx.broadcast();
       }
     } catch (networkError) {
-      // Tx bytes never left the browser — safe to un-blacklist
-      for (const sk of spentKeys) {
-        _spent.delete(sk);
-      }
-      saveSpentSet(_spent);
       return {
         status: "broadcast_failed",
         error: `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
@@ -533,6 +517,19 @@ async function _clientSideBootInner(
         console.log(`[clientSideBoot] Already in mempool (idempotent success): ${txid}`);
       }
 
+      // ── Track spent UTXOs (success-only blacklist) ───────────
+      const spentKeys = new Set(selection.selected.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
+      for (const sk of spentKeys) {
+        _spent.add(sk);
+      }
+      // Remove consumed UTXOs from pending change
+      for (let i = _pendingChange.length - 1; i >= 0; i--) {
+        const pendingKey = utxoKey(_pendingChange[i].tx_hash, _pendingChange[i].tx_pos);
+        if (spentKeys.has(pendingKey)) {
+          _pendingChange.splice(i, 1);
+        }
+      }
+
       // ── 0-conf chain: register change as immediately spendable ─
       if (hasChangeOutput) {
         const changeSats = tx.outputs[changeOutputIndex].satoshis;
@@ -557,11 +554,8 @@ async function _clientSideBootInner(
       return { status: "success", txid };
     }
 
-    // Broadcast returned non-success ARC response. The tx likely reached the
-    // network (ORPHAN, CONFLICT, SEEN_ON_NETWORK all mean "in mempool").
-    // Inputs stay blacklisted (optimistic lock holds).
-    saveSpentSet(_spent);
-
+    // Broadcast failed — do NOT blacklist inputs. Next boot retries same
+    // inputs: gets "already-known" (handled above) or builds fresh.
     return {
       status: "broadcast_failed",
       error:
