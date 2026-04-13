@@ -372,12 +372,17 @@ async function autoTransferFunds(
  * Writes the encrypted store to localStorage and removes the old plaintext key.
  * Call this ONLY after the server migration has been confirmed.
  */
-export function commitUpgrade(encStore: string): void {
+export function commitUpgrade(encStore: string, identity?: Identity): void {
   try {
     localStorage.setItem(ENCRYPTED_KEY, encStore);
     localStorage.removeItem(STORAGE_KEY);
   } catch (err) {
     console.warn("BSVibes: could not commit upgrade to localStorage", err);
+  }
+  if (identity) {
+    _sessionIdentity = identity;
+    _cachedWif = identity.wif;
+    _cachedPrivateKey = null;
   }
 }
 
@@ -440,11 +445,10 @@ export async function upgradeIdentity(
     ...(hint ? { hint } : {}),
   });
 
-  // Cache for session so the new identity is usable immediately after commit
-  const identity = { name: currentName, address: newAddress, wif: newWif };
-  _sessionIdentity = identity;
-  _cachedWif = newWif;
-  _cachedPrivateKey = newKey;
+  // Do NOT set session caches here. Caller must call commitUpgrade() after
+  // migrateIdentity() succeeds. If we set caches now and migration fails,
+  // the in-memory signing key diverges from the server's identity record.
+  const identity: Identity = { name: currentName, address: newAddress, wif: newWif };
 
   return {
     identity,

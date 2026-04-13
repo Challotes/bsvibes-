@@ -90,7 +90,7 @@ export function ChangePassphraseModal({
         throw new Error("Migration failed — passphrase change aborted.");
       }
 
-      commitUpgrade(result.encStore);
+      commitUpgrade(result.encStore, result.identity);
 
       const newIdentity = result.identity;
       let encryptedWif: string;

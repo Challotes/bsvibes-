@@ -66,7 +66,7 @@ export function UpgradeModal({
         throw new Error("Migration failed — your posts would be orphaned. Upgrade aborted.");
       }
 
-      commitUpgrade(result.encStore);
+      commitUpgrade(result.encStore, result.identity);
 
       // B2 fix: reuse the already-encrypted value from result.encStore instead of calling encryptWif again
       const newIdentity = result.identity;
