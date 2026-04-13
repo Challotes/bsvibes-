@@ -138,14 +138,15 @@ async function fetchUtxos(address: string, neededSats?: number): Promise<ClientU
 
   const wocUtxos = data as WocUtxo[];
 
-  // Deduplicate and filter: pending change UTXOs take priority (they have sourceTransaction).
-  // Exclude unconfirmed WoC UTXOs (height === 0) — they may be from stuck/orphan txs
-  // that would block any tx that includes them until the parent confirms. Pending change
-  // entries (height === undefined) pass through for 0-conf chaining from own boots.
+  // Deduplicate: pending change UTXOs take priority (they have sourceTransaction).
+  // Filter out spent UTXOs (blacklisted from prior successful broadcasts).
+  // No height filtering — at 100 sat/kb (GorillaPool's minimum), all txs confirm
+  // in the next block. Filtering unconfirmed UTXOs actively harms UX by hiding
+  // valid recently-received funds.
   const pendingKeys = new Set(_pendingChange.map((u) => utxoKey(u.tx_hash, u.tx_pos)));
   const filtered = wocUtxos.filter((u) => {
     const key = utxoKey(u.tx_hash, u.tx_pos);
-    return !pendingKeys.has(key) && !_spent.has(key) && u.height > 0;
+    return !pendingKeys.has(key) && !_spent.has(key);
   });
 
   // Clean up spent set: if WoC no longer returns a spent UTXO, it's confirmed spent
@@ -617,18 +618,17 @@ export async function consolidateUtxos(
       return { status: "success", txid: "" }; // nothing to consolidate
     }
 
-    // Filter: confirmed only + above dust threshold. Exclude unconfirmed WoC UTXOs
-    // (height === 0) to avoid txn-mempool-conflict from prior pending/orphan txs.
-    // Pending change entries (height === undefined) are kept — they're our own outputs.
+    // Filter by dust threshold only. No height filtering — at 100 sat/kb
+    // (GorillaPool's minimum), all txs confirm in the next block.
     // Safety cap at 200 inputs to prevent pathologically large transactions.
     const MAX_CONSOLIDATION_SWEEP = 200;
     const spendable = utxos
-      .filter((u) => u.value >= DUST_THRESHOLD && (u.height === undefined || u.height > 0))
+      .filter((u) => u.value >= DUST_THRESHOLD)
       .slice(0, MAX_CONSOLIDATION_SWEEP);
-    const unconfirmedDropped = utxos.length - spendable.length;
-    if (unconfirmedDropped > 0) {
+    const dustDropped = utxos.length - spendable.length;
+    if (dustDropped > 0) {
       console.log(
-        `[consolidateUtxos] Excluded ${unconfirmedDropped} unconfirmed/dust UTXOs from sweep`
+        `[consolidateUtxos] Excluded ${dustDropped} dust UTXOs (below ${DUST_THRESHOLD} sats) from sweep`
       );
     }
     if (spendable.length <= 1) {
