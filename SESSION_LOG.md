@@ -46,6 +46,12 @@ Files changed: src/components/MoveAddressModal.tsx (new), src/app/IdentityBar.ts
 
 Verified: TypeScript clean, 27/27 tests pass, Biome 0 errors. Move to new address tested manually — wizard flow works, sweep via WoC succeeds, old key backup downloads, migration records on-chain.
 
+**Fee rate normalization (2026-04-13):** Normalized all tx paths to 100 sat/kb. Previously consolidation/sweeps used 10 sat/kb to save ~120 sats; this contributed to slow confirmations (user's sweep sat unconfirmed 1+ hour). DUST_THRESHOLD updated from 2 to 16 to match (at 100 sat/kb, inputs below 16 sats cost more to include than they're worth). Boot-time opportunistic consolidation is effectively free (extra inputs ride on the boot tx — marginal cost ~15 sats per UTXO).
+
+**Rejected proposals (2026-04-13):** Multiple rounds of agent review evaluated and rejected: (1) server UTXO coordinator (regresses 0-conf chaining from 800ms to 60s, introduces trust/censorship vector), (2) 1 sat/kb consolidation fee (lower than the 10 sat/kb that already sat unconfirmed for hours — wrong direction), (3) quarantine of consolidation outputs (turns a 10-second consolidate+boot flow into 10-minute wait, solves a problem the ORPHAN retry already handles), (4) hard-block on identity operations (false positives from incoming payouts, trivial page-refresh bypass), (5) minimum payout threshold in split.ts (violates "everyone gets paid, even 1 sat" philosophy). Each was evaluated with the code-auditor and/or architecture-reviewer agents before rejection.
+
+**Final state:** Nine layers of defense in place (mutex, spent-set, 0-conf chaining, ORPHAN retry, confirmed-only filter, WoC broadcaster, 100 sat/kb, boot throttle, MoveAddressModal + deferred commit). Architecture reviewer verdict: "Ship it. What you have is enough." No further defensive layers needed — the failures this session were all from before the current fixes existed.
+
 ## 2026-04-09 — Boot Button Loading States
 
 Category: UX, feature
