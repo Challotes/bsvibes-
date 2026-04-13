@@ -382,19 +382,27 @@ async function _clientSideBootInner(
       );
       return { status: "insufficient_funds", balance };
     }
-    // ── Fetch source transactions (parallel) ────────────────
-    // For 0-conf chained UTXOs, sourceTransaction is already attached — skip the fetch
-    const sourceTxPromises = selection.selected.map(async (utxo) => {
-      if (utxo.sourceTransaction) {
-        return { utxo, sourceTx: utxo.sourceTransaction };
-      }
-      const hex = await fetchSourceTxHex(utxo.tx_hash);
-      return { utxo, sourceTx: Transaction.fromHex(hex) };
-    });
-
-    let sourceTxs: Array<{ utxo: ClientUtxo; sourceTx: InstanceType<typeof Transaction> }>;
+    // ── Fetch source transactions (batched to avoid WoC rate limits) ──
+    // For 0-conf chained UTXOs, sourceTransaction is already attached — skip the fetch.
+    // Batch in groups of 5 with 1s delay to stay under WoC's ~3 req/s limit.
+    // The server-side tx-hex proxy caches results, so repeated txids are instant.
+    const SOURCE_BATCH = 5;
+    const sourceTxs: Array<{ utxo: ClientUtxo; sourceTx: InstanceType<typeof Transaction> }> = [];
     try {
-      sourceTxs = await Promise.all(sourceTxPromises);
+      for (let i = 0; i < selection.selected.length; i += SOURCE_BATCH) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 1000));
+        const batch = selection.selected.slice(i, i + SOURCE_BATCH);
+        const results = await Promise.all(
+          batch.map(async (utxo) => {
+            if (utxo.sourceTransaction) {
+              return { utxo, sourceTx: utxo.sourceTransaction };
+            }
+            const hex = await fetchSourceTxHex(utxo.tx_hash);
+            return { utxo, sourceTx: Transaction.fromHex(hex) };
+          })
+        );
+        sourceTxs.push(...results);
+      }
     } catch (e) {
       return {
         status: "broadcast_failed",
@@ -451,9 +459,7 @@ async function _clientSideBootInner(
     });
 
     // ── Fee calculation and signing ─────────────────────────
-    // Use an explicit 50 sat/kb fee model — safely above ARC's minimum (~100 sat/kb
-    // policy, but actual acceptance is lower) while being 10x cheaper than 500 sat/kb.
-    // At 50 sat/kb a 20-input tx is ~163 sats — negligible relative to boot price.
+    // 100 sat/kb — GorillaPool's official mining minimum per ARC policy.
     await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
@@ -584,7 +590,7 @@ const DUST_THRESHOLD = 16;
 
 /**
  * Consolidate all UTXOs into a single output.
- * Uses WhatsOnChainBroadcaster at 100 sat/kb — matches all other tx paths.
+ * Uses ARC (SDK default) at 100 sat/kb — consistent with all other tx paths.
  * Consolidation is not time-sensitive so a lower fee rate is safe.
  *
  * Called automatically when clientSideBoot returns 'needs_consolidation'.
@@ -600,8 +606,7 @@ export async function consolidateUtxos(
   const release = await acquireTxMutex();
 
   try {
-    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } =
-      await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte } = await getBsvSdk();
 
     let privateKey: InstanceType<typeof PrivateKey>;
     try {
@@ -690,11 +695,11 @@ export async function consolidateUtxos(
     // entire wallet. Only blacklist on success — on failure, user retries once
     // conflicting txs confirm and WoC stops returning them.
 
-    // Broadcast via WhatsOnChain — reliable from browser, avoids ARC timeout issues
-    const woc = new WhatsOnChainBroadcaster("main");
+    // ARC (SDK default) at 100 sat/kb — consistent with all other broadcast paths.
+    // Previously used WoC due to a local DNS issue misattributed to ARC.
     let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
     try {
-      broadcastResult = await tx.broadcast(woc);
+      broadcastResult = await tx.broadcast();
     } catch (networkError) {
       return {
         status: "broadcast_failed",

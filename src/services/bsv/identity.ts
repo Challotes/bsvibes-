@@ -293,8 +293,7 @@ async function autoTransferFunds(
       `[BSVibes] autoTransferFunds: spending ${utxos.length} inputs, total ${totalSats} sats`
     );
 
-    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } =
-      await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte } = await getBsvSdk();
     const oldKey = PrivateKey.fromWif(oldWif);
 
     // Fetch source tx hexes in batches to respect WoC rate limit
@@ -324,21 +323,14 @@ async function autoTransferFunds(
       change: true,
     });
 
-    // WhatsOnChainBroadcaster — same rationale as sweepConfirmedFunds.
-    // ARC (SDK default) has browser-specific reliability issues.
+    // ARC (SDK default) at 100 sat/kb — GorillaPool's mining minimum.
+    // Txs go directly to the miner. Previously switched to WoC due to a
+    // misdiagnosed ARC outage (was actually a local DNS cache issue).
     await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
     console.log(`[BSVibes] autoTransferFunds: broadcasting tx with ${utxos.length} inputs`);
-    const woc = new WhatsOnChainBroadcaster("main");
-    let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
-    try {
-      broadcastResult = await tx.broadcast(woc);
-    } catch (networkError) {
-      const msg = `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`;
-      console.error(`[BSVibes] autoTransferFunds: ${msg}`);
-      return { txid: null, transferredSats: 0, error: msg };
-    }
+    const broadcastResult = await tx.broadcast();
 
     if (broadcastResult.status === "success") {
       const txid = tx.id("hex") as string;
@@ -465,10 +457,12 @@ export async function upgradeIdentity(
 
 /**
  * Sweep CONFIRMED-only funds from old address to new address.
- * Same as autoTransferFunds but filters to height > 0 UTXOs only,
- * leaving phantom unconfirmed UTXOs behind.
+ * Sweep all UTXOs from old address to new address.
+ * At 100 sat/kb (GorillaPool's minimum), all txs confirm in the next block,
+ * so unconfirmed UTXOs are safe to include. Previously filtered to confirmed-only
+ * when fee rate was 10 sat/kb (below miner minimum, txs never confirmed).
  */
-async function sweepConfirmedFunds(
+async function sweepFunds(
   oldWif: string,
   oldAddress: string,
   newAddress: string
@@ -476,45 +470,26 @@ async function sweepConfirmedFunds(
   const WOC_BASE = "https://api.whatsonchain.com/v1/bsv/main";
 
   try {
-    console.log(`[BSVibes] sweepConfirmedFunds: fetching UTXOs for ${oldAddress}`);
+    console.log(`[BSVibes] sweepFunds: fetching UTXOs for ${oldAddress}`);
 
     const utxoRes = await fetch(`${WOC_BASE}/address/${oldAddress}/unspent`);
     if (!utxoRes.ok) {
       const msg = `UTXO fetch failed: HTTP ${utxoRes.status} for ${oldAddress}`;
-      console.error(`[BSVibes] sweepConfirmedFunds: ${msg}`);
+      console.error(`[BSVibes] sweepFunds: ${msg}`);
       return { txid: null, transferredSats: 0, error: msg };
     }
 
     const utxoData = await utxoRes.json();
     if (!Array.isArray(utxoData) || utxoData.length === 0) {
-      console.log(
-        `[BSVibes] sweepConfirmedFunds: no UTXOs found at ${oldAddress} — nothing to transfer`
-      );
+      console.log(`[BSVibes] sweepFunds: no UTXOs found at ${oldAddress} — nothing to transfer`);
       return { txid: null, transferredSats: 0 };
     }
 
-    const allUtxos = utxoData as Array<{
-      tx_pos: number;
-      tx_hash: string;
-      value: number;
-      height: number;
-    }>;
-
-    const unconfirmedCount = allUtxos.filter((u) => u.height === 0).length;
-    if (unconfirmedCount > 0) {
-      console.log(
-        `[BSVibes] sweepConfirmedFunds: excluding ${unconfirmedCount} unconfirmed UTXO(s) (height=0) — these are likely phantom UTXOs causing the stuck wallet`
-      );
-    }
-
-    const utxos = allUtxos
-      .filter((u) => u.height > 0)
-      .map((u) => ({ tx_hash: u.tx_hash, tx_pos: u.tx_pos, value: u.value }));
+    const utxos = (utxoData as Array<{ tx_pos: number; tx_hash: string; value: number }>).map(
+      (u) => ({ tx_hash: u.tx_hash, tx_pos: u.tx_pos, value: u.value })
+    );
 
     if (utxos.length === 0) {
-      console.log(
-        `[BSVibes] sweepConfirmedFunds: no confirmed UTXOs after filtering — starting fresh on new address`
-      );
       return { txid: null, transferredSats: 0 };
     }
 
@@ -523,17 +498,14 @@ async function sweepConfirmedFunds(
       return { txid: null, transferredSats: 0 };
     }
 
-    console.log(
-      `[BSVibes] sweepConfirmedFunds: spending ${utxos.length} confirmed inputs, total ${totalSats} sats`
-    );
+    console.log(`[BSVibes] sweepFunds: spending ${utxos.length} inputs, total ${totalSats} sats`);
 
-    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte, WhatsOnChainBroadcaster } =
-      await getBsvSdk();
+    const { Transaction, PrivateKey, P2PKH, SatoshisPerKilobyte } = await getBsvSdk();
     const oldKey = PrivateKey.fromWif(oldWif);
 
     const txHashes = utxos.map((u) => u.tx_hash);
     console.log(
-      `[BSVibes] sweepConfirmedFunds: fetching ${new Set(txHashes).size} unique source txs via proxy`
+      `[BSVibes] sweepFunds: fetching ${new Set(txHashes).size} unique source txs via proxy`
     );
     const sourceTxHexMap = await fetchSourceTxsBatched(txHashes, WOC_BASE);
 
@@ -555,31 +527,18 @@ async function sweepConfirmedFunds(
       change: true,
     });
 
-    // WhatsOnChainBroadcaster at 100 sat/kb — uniform rate, reliable from browser.
-    // ARC (the SDK default) has been unreliable from the browser (connection
-    // timeouts, CORS overhead). Sweep is a simple self-transfer that uses none
-    // of ARC's structured error features. WoC relays directly to miners.
+    // ARC (SDK default) at 100 sat/kb — GorillaPool's mining minimum.
+    // Txs go directly to the miner. Previously switched to WoC due to a
+    // misdiagnosed ARC outage (was actually a local DNS cache issue).
     await tx.fee(new SatoshisPerKilobyte(100));
     await tx.sign();
 
-    console.log(
-      `[BSVibes] sweepConfirmedFunds: broadcasting tx with ${utxos.length} confirmed inputs`
-    );
-    const woc = new WhatsOnChainBroadcaster("main");
-    let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
-    try {
-      broadcastResult = await tx.broadcast(woc);
-    } catch (networkError) {
-      const msg = `Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`;
-      console.error(`[BSVibes] sweepConfirmedFunds: ${msg}`);
-      return { txid: null, transferredSats: 0, error: msg };
-    }
+    console.log(`[BSVibes] sweepFunds: broadcasting tx with ${utxos.length} inputs`);
+    const broadcastResult = await tx.broadcast();
 
     if (broadcastResult.status === "success") {
       const txid = tx.id("hex") as string;
-      console.log(
-        `[BSVibes] sweepConfirmedFunds: SUCCESS — transferred ${totalSats} sats. txid: ${txid}`
-      );
+      console.log(`[BSVibes] sweepFunds: SUCCESS — transferred ${totalSats} sats. txid: ${txid}`);
       return { txid, transferredSats: totalSats };
     }
 
@@ -588,11 +547,11 @@ async function sweepConfirmedFunds(
         ? JSON.stringify(broadcastResult)
         : String(broadcastResult)
     }`;
-    console.error(`[BSVibes] sweepConfirmedFunds: ${broadcastError}`);
+    console.error(`[BSVibes] sweepFunds: ${broadcastError}`);
     return { txid: null, transferredSats: 0, error: broadcastError };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[BSVibes] sweepConfirmedFunds: exception —", msg, e);
+    console.error("[BSVibes] sweepFunds: exception —", msg, e);
     return { txid: null, transferredSats: 0, error: msg };
   }
 }
@@ -650,7 +609,7 @@ export async function resetIdentity(
   const migrationSignature = sig.toDER("hex") as string;
 
   // Sweep confirmed-only funds (leaves phantom UTXOs behind)
-  const fundTransfer = await sweepConfirmedFunds(currentWif, oldAddress, newAddress);
+  const fundTransfer = await sweepFunds(currentWif, oldAddress, newAddress);
 
   const identity: Identity = { name: currentName, address: newAddress, wif: newWif };
 
