@@ -186,12 +186,7 @@ export function MoveAddressModal({
         downloadBackup(backupPayload, `bsvibes-${identity.name}-old-${oldDate}.html`);
       }
 
-      // Wait 1.5s after download fires, then show checkmark
-      await delay(1500);
       setCompletedSteps(1);
-
-      // Wait another 2.5s then auto-advance
-      await delay(2500);
       await runCreating();
     } catch (e) {
       setStage("error");
@@ -203,14 +198,20 @@ export function MoveAddressModal({
   async function runCreating(): Promise<void> {
     setStage("creating");
     try {
-      const result = await resetIdentity(identity.wif, identity.name, { deferCommit: true });
-      resetResultRef.current = result;
-
-      if (result.fundTransfer.error) {
-        setSweepWarning(true);
+      // Reuse a prior resetIdentity result if one exists. Retrying this stage
+      // used to call resetIdentity() again, which generates a FRESH key and
+      // broadcasts a NEW sweep tx — the previous sweep's outputs then point
+      // at an abandoned address, stranding funds across retries. By reusing
+      // the first successful result, the retry path only needs to re-attempt
+      // on-chain recording (stage 3) rather than regenerating the identity.
+      if (!resetResultRef.current) {
+        const result = await resetIdentity(identity.wif, identity.name, { deferCommit: true });
+        resetResultRef.current = result;
+        if (result.fundTransfer.error) {
+          setSweepWarning(true);
+        }
       }
 
-      await delay(2000);
       setCompletedSteps(2);
       await runRecording();
     } catch (e) {
@@ -247,7 +248,6 @@ export function MoveAddressModal({
       // but the sweep/migration failed, stranding funds on the old address.
       result.commit();
 
-      await delay(2000);
       setCompletedSteps(3);
       setStage("done");
       onComplete(result.identity);
@@ -265,6 +265,8 @@ export function MoveAddressModal({
     if (errorStage === "saving") {
       await runSaving();
     } else if (errorStage === "creating") {
+      // runCreating() now reuses resetResultRef.current if set — safe to retry
+      // without regenerating the key or re-broadcasting the sweep.
       await runCreating();
     } else if (errorStage === "recording") {
       await runRecording();
@@ -299,9 +301,7 @@ export function MoveAddressModal({
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">Moving to a new address</h2>
             <p className="text-[11px] text-zinc-500 mt-0.5">
-              {isDone
-                ? "All done."
-                : "This takes about 10 seconds \u2014 don\u2019t close this window."}
+              {isDone ? "All done." : "Don\u2019t close this window."}
             </p>
           </div>
           {isDone && (
@@ -480,10 +480,4 @@ function ErrorStep({ heading, errorMessage, onRetry, onClose, partialWarning }: 
       </div>
     </div>
   );
-}
-
-// ── Utility ──────────────────────────────────────────────────────────────────
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

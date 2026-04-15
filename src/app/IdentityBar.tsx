@@ -854,7 +854,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden="true"
-                      className={backedUp === false ? "text-red-400" : "text-zinc-400"}
+                      className={backedUp === false ? "text-amber-400" : "text-zinc-400"}
                     >
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
@@ -862,20 +862,20 @@ export function IdentityChip(): React.JSX.Element | null {
                     </svg>
                     <div className="flex-1 min-w-0">
                       <span
-                        className={`text-xs font-medium block ${backedUp === false ? "text-red-400" : "text-zinc-200"}`}
+                        className={`text-xs font-medium block ${backedUp === false ? "text-amber-400" : "text-zinc-200"}`}
                       >
                         {downloading ? "Saving..." : "Save recovery file"}
                       </span>
                       {backedUp === false && (
-                        <span className="text-[10px] text-red-400/70 block mt-0.5">
+                        <span className="text-[10px] text-amber-400/70 block mt-0.5">
                           Not saved yet — save now to avoid losing access
                         </span>
                       )}
                     </div>
                     {backedUp === false && (
                       <span className="relative flex h-2 w-2 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
                       </span>
                     )}
                   </button>
@@ -901,14 +901,14 @@ export function IdentityChip(): React.JSX.Element | null {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden="true"
-                    className={isProtected ? "text-emerald-500" : "text-red-400"}
+                    className={isProtected ? "text-emerald-500" : "text-amber-400"}
                   >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     {isProtected && <path d="m9 12 2 2 4-4" />}
                   </svg>
                   <div className="flex-1 min-w-0">
                     <span
-                      className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-red-400"}`}
+                      className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-amber-400"}`}
                     >
                       {isProtected ? "Change passphrase" : "Secure identity"}
                     </span>
