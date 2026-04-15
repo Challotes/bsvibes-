@@ -203,6 +203,7 @@
 - [x] WoC rate-limit mitigation via cached server proxies (2026-04-14) — `/api/balance` (10s TTL) and `/api/unspent` (3s TTL) join `/api/tx-hex`. All direct browser→WoC reads removed. Fixes 429 cascades that broke paid boots and froze balance polling.
 - [x] Boot confirmation via local tx parsing (2026-04-14) — client sends `rawTx`, server verifies `hash === txid` and parses P2PKH outputs locally. Eliminates 5–30s WoC indexing lag from the boot-confirm path. Server re-broadcasts via ARC as safety net. Explicit TX_CONFLICT vs ARC_UNAVAILABLE codes.
 - [x] Structured error-code matching for broadcast failures (2026-04-14) — replaces substring search that produced false positives on numbers appearing inside txids.
+- [x] Live activity + earnings-history refresh when dropdown open (2026-04-15) — IdentityBar 30s poll now uses `summary=1` fast path when closed and the full earnings payload (activity + sparkline) when open. Recent boots/payouts appear within 30s of the DB insert instead of waiting for a close→reopen cycle. Tab-visibility gated.
 
 ## Phase 6.5: UX Polish — PLANNED
 

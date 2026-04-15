@@ -30,7 +30,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 - `src/app/api/posts/route.ts` — Feed polling (GET, ?since_id for incremental updates)
 - `src/app/api/boot-shares/route.ts` — Contributor shares + boot price for client-side tx building
-- `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (replay protection, output verification, rate limiting)
+- `src/app/api/boot-confirm/route.ts` — Records boot after client broadcasts (rawTx + local P2PKH parsing, self-authenticating hash(rawTx)===txid check, ARC re-broadcast safety net, replay protection, rate limiting)
 - `src/app/api/boot-status/route.ts` — Free boots remaining + boot price for a user
 - `src/app/api/earnings/route.ts` — Total earned, activity feed, earnings history for chart
 - `src/app/api/agent/route.ts` — Streaming agent chat (SSE, rate-limited)
@@ -54,7 +54,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Header.tsx` — Top bar with logo, genesis nav, identity chip
 - `src/app/PostList.tsx` — Post rendering, BootButton, Genesis anchor
 - `src/app/PostForm.tsx` — Compose box (enter-to-post, voice-to-text, agent chat trigger)
-- `src/app/IdentityBar.tsx` — Identity chip + manage modal (balance, earnings, backup, import)
+- `src/app/IdentityBar.tsx` — Identity chip + manage modal (balance poll 30s via /api/balance, earnings poll 30s — full feed when dropdown open, summary only when closed — backup, import)
 - `src/app/Bootboard.tsx` — Pay-to-feature spotlight (live timer, shake/glow animations)
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
 - `src/app/Genesis.tsx` — Founding conversation (always visible, NOT collapsible)
@@ -69,6 +69,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
 - `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon
+- `src/components/BootToast.tsx` — Transient boot error toast (retry action, auto-dismiss)
 
 ### BSV Services
 
@@ -119,7 +120,7 @@ All on-chain payloads are JSON inside OP_FALSE OP_RETURN outputs:
 PostForm → signPost (ECDSA) → createPost server action → verify signature → insert DB → logPostOnChain (fire-and-forget OP_RETURN) → return post ID → optimistic UI update → Feed polls for confirmation
 
 **Boot payment (paid):**
-BootButton/useBoot → bootPost server action (checks free quota) → requiresPayment response → fetch /api/boot-shares (split calculation) → clientSideBoot (browser builds multi-output BSV tx) → broadcast via ARC → POST /api/boot-confirm (verify on-chain outputs match split, replay protection, record payouts) → Feed polls for bootboard update
+BootButton/useBoot → bootPost server action (checks free quota) → requiresPayment response → fetch /api/boot-shares (split calculation) → clientSideBoot (browser builds multi-output BSV tx) → broadcast via ARC → POST /api/boot-confirm with rawTx (server verifies hash(rawTx)===txid, parses P2PKH outputs locally to check split, re-broadcasts via ARC as safety net, records payouts, emits TX_CONFLICT vs ARC_UNAVAILABLE codes) → Feed polls for bootboard update
 
 **Boot payment (free):**
 BootButton/useBoot → bootPost server action → server wallet builds split tx via boot-orchestrator → broadcast → consume free boot grant → return success

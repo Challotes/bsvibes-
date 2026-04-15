@@ -18,7 +18,7 @@
 ### C3: /api/boot-confirm accepts any txid without verification — FIXED
 **File:** src/app/api/boot-confirm/route.ts
 **Risk:** Attacker can fake boot confirmations, inflate contribution weight, game fairness system at zero cost.
-**Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + application-level SELECT before insert), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance). DB-level uniqueness is composite `UNIQUE(txid, recipient_address)` at db.ts:117 — replay protection relies on the app-level check, not the index alone.
+**Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + application-level SELECT before insert), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance). DB-level uniqueness is composite `UNIQUE(txid, recipient_address)` at db.ts:117 — replay protection relies on the app-level check, not the index alone. **Upgrade (2026-04-14):** output verification no longer fetches from WoC. Client sends `rawTx`; server validates `hash(rawTx)===txid` (self-authenticating — can't be spoofed), parses P2PKH outputs locally from the raw bytes, and re-broadcasts via ARC as safety net. Eliminates 5–30s WoC indexing lag and removes a rate-limit chokepoint. Explicit `TX_CONFLICT` vs `ARC_UNAVAILABLE` error codes distinguish fatal from retriable. Trust boundary: the server accepts client bytes but the hash binding makes forgery computationally infeasible, so security posture is unchanged.
 
 ### C4: Auto-download backup only has NEW key when fund transfer fails
 **File:** src/app/IdentityBar.tsx lines 171-185
@@ -30,10 +30,10 @@
 **Risk:** User loses free boot but nobody gets paid. Boot appears successful but no on-chain payment.
 **Fix:** (2026-03-28) Grant consumed only after successful broadcast.
 
-### C6: Interrupted upgrade locks user out
-**File:** src/services/bsv/identity.ts lines 366-372
+### C6: Interrupted upgrade locks user out — FIXED
+**File:** src/services/bsv/identity.ts
 **Risk:** Power failure between setItem(encrypted) and removeItem(plaintext) = both keys exist. System only checks encrypted, user locked out despite plaintext key being present.
-**Fix:** getIdentity() should prefer plaintext key when both exist (upgrade was interrupted).
+**Fix:** (2026-04-12) Deferred localStorage commit pattern — `upgradeIdentity()` accepts an identity object and defers the session cache + storage commit until `commitUpgrade()` is called atomically only after the server-side `migrateIdentity()` succeeds. Matches the `resetIdentity({ deferCommit: true })` pattern. No intermediate state where both keys exist.
 
 ### C7: Double-upgrade from same key orphans intermediate posts — FIXED
 **File:** src/app/actions.ts + src/services/fairness/weights.ts
@@ -68,13 +68,13 @@
 **File:** src/services/bsv/wallet.ts
 **Fix:** Document risk. Move to signing oracle when value increases.
 
-### H5: Unsigned posts accepted with no attribution
-**File:** src/app/actions.ts lines 27-43
-**Fix:** Require pubkey on all posts. Reject or flag unsigned.
+### H5: Unsigned posts accepted with no attribution — FIXED
+**File:** src/app/actions.ts lines 36-37
+**Fix:** `createPost` rejects posts with missing pubkey/signature (`missing_pubkey` / `missing_sig` error codes). All posts must be ECDSA-signed and attributable.
 
 ### H6: /api/tx-hex is an open proxy with no rate limiting — FIXED
 **File:** src/app/api/tx-hex/route.ts
-**Fix:** (2026-03-31) Added 500/min/IP rate limit.
+**Fix:** (2026-03-31) Added 500/min/IP rate limit. **Extended 2026-04-14:** `/api/balance` (10s cache, 120/min/IP) and `/api/unspent` (3s cache, 180/min/IP) joined the proxy fleet with equivalent rate limiting, address format validation, retries on 429/5xx, and stale-cache fallback. All direct browser→WoC reads have been eliminated.
 
 ### H7: Migration registration after local key storage — FIXED
 **File:** src/services/bsv/identity.ts + src/app/IdentityBar.tsx
