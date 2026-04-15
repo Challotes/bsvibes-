@@ -21,8 +21,6 @@
  *   as an input for the next, skipping the WoC fetch entirely when sufficient
  */
 
-const WOC_BASE = "https://api.whatsonchain.com/v1/bsv/main";
-
 // ── Types ───────────────────────────────────────────────────
 
 export interface BootShare {
@@ -34,6 +32,7 @@ export interface BootShare {
 export interface ClientBootResult {
   status: "success" | "insufficient_funds" | "needs_consolidation" | "broadcast_failed" | "error";
   txid?: string;
+  rawTx?: string;
   error?: string;
   balance?: number;
 }
@@ -126,7 +125,7 @@ async function fetchUtxos(address: string, neededSats?: number): Promise<ClientU
     }
   }
 
-  const res = await fetch(`${WOC_BASE}/address/${address}/unspent`);
+  const res = await fetch(`/api/unspent?address=${address}&fresh=1`);
   if (!res.ok) {
     throw new Error(`UTXO fetch failed: ${res.status} ${res.statusText}`);
   }
@@ -510,16 +509,25 @@ async function _clientSideBootInner(
     // mempool from a prior submission. Deterministic signing means the txid
     // matches, so this is OUR tx — treat as success. Exclude "conflict" (258)
     // which means a DIFFERENT tx spent our inputs first.
-    const desc = (
-      (broadcastResult as { description?: string }).description ?? JSON.stringify(broadcastResult)
-    ).toLowerCase();
+    //
+    // Match on the structured code field, NOT substring of the raw payload.
+    // A previous `desc.includes("257")` falsely matched "257" in timestamps,
+    // txid hex, byte offsets, fee amounts, port numbers — classifying failed
+    // broadcasts as success and poisoning _spent with unspent UTXOs.
+    const result = broadcastResult as {
+      status?: string | number;
+      code?: string | number;
+      description?: string;
+    };
+    const code = String(result.code ?? "").trim();
+    const desc = (result.description ?? "").toLowerCase();
     const alreadyKnown =
       broadcastResult.status !== "success" &&
+      code !== "258" &&
       !desc.includes("conflict") &&
-      (desc.includes("257") ||
-        desc.includes("already-known") ||
-        desc.includes("already in the mempool") ||
-        desc.includes("already known"));
+      (code === "257" ||
+        /\balready[- ]known\b/.test(desc) ||
+        desc.includes("already in the mempool"));
 
     if (broadcastResult.status === "success" || alreadyKnown) {
       const txid = tx.id("hex") as string;
@@ -561,7 +569,7 @@ async function _clientSideBootInner(
       }
 
       saveSpentSet(_spent);
-      return { status: "success", txid };
+      return { status: "success", txid, rawTx: tx.toHex() };
     }
 
     // Broadcast failed — do NOT blacklist inputs. Next boot retries same
@@ -710,16 +718,21 @@ export async function consolidateUtxos(
     // Detect "txn-already-known" (code 257) — our exact tx already in mempool
     // from a prior submission. Deterministic signing means matching txid = our tx.
     // Exclude "conflict" (258) which means a DIFFERENT tx spent our inputs.
-    const desc = (
-      (broadcastResult as { description?: string }).description ?? JSON.stringify(broadcastResult)
-    ).toLowerCase();
+    // Match on structured code field, not substring of raw payload.
+    const result = broadcastResult as {
+      status?: string | number;
+      code?: string | number;
+      description?: string;
+    };
+    const code = String(result.code ?? "").trim();
+    const desc = (result.description ?? "").toLowerCase();
     const alreadyKnown =
       broadcastResult.status !== "success" &&
+      code !== "258" &&
       !desc.includes("conflict") &&
-      (desc.includes("257") ||
-        desc.includes("already-known") ||
-        desc.includes("already in the mempool") ||
-        desc.includes("already known"));
+      (code === "257" ||
+        /\balready[- ]known\b/.test(desc) ||
+        desc.includes("already in the mempool"));
 
     if (broadcastResult.status === "success" || alreadyKnown) {
       const txid = tx.id("hex") as string;

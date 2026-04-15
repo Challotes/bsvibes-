@@ -169,13 +169,13 @@ export function IdentityChip(): React.JSX.Element | null {
     if (!identity?.address) return;
     function fetchLiveBalance() {
       if (document.visibilityState !== "visible") return;
-      fetch(`https://api.whatsonchain.com/v1/bsv/main/address/${identity?.address}/unspent`)
-        .then((res) => res.json())
-        .then((utxos) => {
-          const total = Array.isArray(utxos)
-            ? utxos.reduce((s: number, u: { value: number }) => s + u.value, 0)
-            : 0;
-          setBalanceSats(total);
+      fetch(`/api/balance?address=${encodeURIComponent(identity?.address ?? "")}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && typeof data.balance === "number") {
+            setBalanceSats(data.balance);
+          }
+          // On failure: preserve last-known balance (don't flash to 0)
         })
         .catch(() => {});
     }

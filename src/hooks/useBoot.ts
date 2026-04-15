@@ -153,19 +153,37 @@ export function useBoot(opts: UseBootOptions = {}) {
           }
 
           if (bootResult.status === "success" && bootResult.txid) {
-            await fetch("/api/boot-confirm", {
+            const confirmRes = await fetch("/api/boot-confirm", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 postId,
                 txid: bootResult.txid,
+                rawTx: bootResult.rawTx,
                 booterPubkey: identity.address,
                 booterName: identity.name,
               }),
             });
-            onBooted?.();
-            releaseBoot();
-            return { success: true };
+
+            // Treat 409 "already recorded" as idempotent success (prior confirm worked)
+            if (confirmRes.ok || confirmRes.status === 409) {
+              // Distinguish "already recorded" (good) from "conflict" (bad) via payload
+              const confirmData = await confirmRes.json().catch(() => ({ error: "parse_failed" }));
+              if (confirmRes.status === 409 && confirmData.code === "TX_CONFLICT") {
+                console.error("[useBoot] boot-confirm TX_CONFLICT:", confirmData);
+                failBoot("Payment couldn't be confirmed, tap to retry.");
+                return { success: false };
+              }
+              onBooted?.();
+              releaseBoot();
+              return { success: true };
+            }
+
+            // Non-ok response — log and fail visibly so user sees what happened
+            const errData = await confirmRes.json().catch(() => ({ error: "unknown" }));
+            console.error("[useBoot] boot-confirm failed:", confirmRes.status, errData);
+            failBoot("Boot failed, tap to retry.");
+            return { success: false };
           }
 
           failBoot("Boot failed, tap to retry.");

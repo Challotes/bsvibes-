@@ -2,6 +2,28 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-14 — WoC Proxy Fleet + Local TX Parsing in boot-confirm
+
+Category: reliability, rate-limit mitigation, architecture
+
+Extended server-side proxy pattern to eliminate remaining direct browser→WhatsOnChain read paths, and removed the WoC dependency from the boot-confirm critical path.
+
+**New cached proxies.** `/api/balance/route.ts` (10s TTL, 120/min per IP) and `/api/unspent/route.ts` (3s TTL, 180/min per IP) join `/api/tx-hex` as server-cached WoC reads. Both retry 429/5xx with stale-cache fallback. With these in place, no client code path calls WoC directly anymore. N clients within the TTL window produce 1 upstream request, and WoC's ~3 req/s per-IP limit no longer gates the app.
+
+**IdentityBar balance polling** switched from direct WoC to `/api/balance` with graceful fallback — on transient errors it preserves last-known balance instead of flashing 0.
+
+**`clientSideBoot.fetchUtxos`** switched from direct WoC to `/api/unspent?fresh=1`.
+
+**boot-confirm refactor.** Client now sends `rawTx` alongside `txid`. Server validates `hash(rawTx) === txid` (self-authenticating — can't be spoofed), parses P2PKH outputs locally from the raw bytes to check the split, and re-broadcasts via ARC as a safety net. Removes the 5–30s WoC indexing lag that previously produced false TX_NOT_FOUND errors on fresh boots. Returns explicit `TX_CONFLICT` (fatal) vs `ARC_UNAVAILABLE` (retriable) so the client can react correctly.
+
+**Structured error-code matching.** Broadcast error classification in `client-boot.ts` now matches against the structured `code` field on ARC responses rather than substring search. Prior substring matching against e.g. "257" produced false positives inside unrelated txids/timestamps and mislabelled successful broadcasts as conflicts.
+
+**Session continuity note.** PC crashed mid-session; a large chunk of conversation history was lost but all code changes were preserved on disk. This entry was reconstructed from the diff against `eef5856` plus user confirmation that boots were working again the following morning.
+
+Files changed: `src/app/api/balance/route.ts` (new), `src/app/api/unspent/route.ts` (new), `src/app/api/boot-confirm/route.ts`, `src/app/IdentityBar.tsx`, `src/hooks/useBoot.ts`, `src/services/bsv/client-boot.ts`.
+
+Verified: TypeScript clean, 27/27 tests pass, Biome 0 errors.
+
 ## 2026-04-13 — Broadcaster Unification + Source TX Cache + Filter Cleanup
 
 Category: architecture consolidation, bug fixes, simplification

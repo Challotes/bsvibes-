@@ -200,6 +200,9 @@
 - [x] Sweep warning UI when fund transfer fails (non-blocking, shows in Stage 2 + Stage 4 summary)
 - [x] Optimistic UTXO blacklist removed (2026-04-13) — caused permanent wallet lockout with no recovery. Double-spend prevention now via mutex + 0-conf chaining + 3s UI throttle.
 - [x] Confirmed-only filter removed (2026-04-13) — redundant at 100 sat/kb (all txs confirm next block). Was built for 10 sat/kb era when unconfirmed meant "permanently stuck."
+- [x] WoC rate-limit mitigation via cached server proxies (2026-04-14) — `/api/balance` (10s TTL) and `/api/unspent` (3s TTL) join `/api/tx-hex`. All direct browser→WoC reads removed. Fixes 429 cascades that broke paid boots and froze balance polling.
+- [x] Boot confirmation via local tx parsing (2026-04-14) — client sends `rawTx`, server verifies `hash === txid` and parses P2PKH outputs locally. Eliminates 5–30s WoC indexing lag from the boot-confirm path. Server re-broadcasts via ARC as safety net. Explicit TX_CONFLICT vs ARC_UNAVAILABLE codes.
+- [x] Structured error-code matching for broadcast failures (2026-04-14) — replaces substring search that produced false positives on numbers appearing inside txids.
 
 ## Phase 6.5: UX Polish — PLANNED
 

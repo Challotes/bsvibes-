@@ -9,6 +9,7 @@ import { calculateWeights } from "@/services/fairness/weights";
 interface BootConfirmBody {
   postId: number;
   txid: string;
+  rawTx?: string;
   booterPubkey: string;
   booterName: string;
 }
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { postId, txid, booterPubkey, booterName } = body;
+  const { postId, txid, rawTx, booterPubkey, booterName } = body;
 
   if (!Number.isInteger(postId) || postId <= 0) {
     return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
@@ -50,40 +51,110 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Transaction already recorded" }, { status: 409 });
   }
 
-  // Verify the transaction exists on-chain and its outputs match the expected split.
-  // Recently broadcast txs may not be indexed yet — retry once after 2s.
-  interface WocVout {
-    value: number; // BSV (not sats)
-    scriptPubKey?: { addresses?: string[] };
+  // Verify the transaction by parsing the raw tx hex sent by the client.
+  // The tx bytes are self-authenticating: txid = hash(bytes), so a forged
+  // rawTx produces a different txid and fails the binding check below.
+  // This removes the dependency on WhatsOnChain indexing (which has 5-30s+
+  // propagation lag from ARC and can rate-limit the server).
+  if (typeof rawTx !== "string" || rawTx.trim().length === 0) {
+    return NextResponse.json({ error: "Missing rawTx" }, { status: 400 });
   }
-  let txVouts: WocVout[] = [];
+  if (!/^[a-fA-F0-9]+$/.test(rawTx.trim()) || rawTx.trim().length % 2 !== 0) {
+    return NextResponse.json({ error: "Invalid rawTx format" }, { status: 400 });
+  }
+
+  interface ParsedVout {
+    sats: number;
+    address: string | null;
+  }
+  let txVouts: ParsedVout[] = [];
   try {
-    let wocRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!wocRes.ok) {
-      await new Promise((r) => setTimeout(r, 2000));
-      wocRes = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid.trim()}`, {
-        headers: { Accept: "application/json" },
-      });
+    const { Transaction, Utils } = await import("@bsv/sdk");
+    const OP_DUP = 0x76;
+    const OP_HASH160 = 0xa9;
+    const OP_EQUALVERIFY = 0x88;
+    const OP_CHECKSIG = 0xac;
+    const parsed = Transaction.fromHex(rawTx.trim());
+
+    // Bind rawTx to claimed txid — prevents substitution attacks
+    const parsedTxid = parsed.id("hex") as string;
+    if (parsedTxid !== txid.trim()) {
+      return NextResponse.json({ error: "rawTx does not match txid" }, { status: 400 });
     }
-    if (!wocRes.ok) {
+
+    // Server re-broadcasts the signed tx via ARC as an idempotent safety net.
+    // If the client's broadcast succeeded, ARC returns code 257 "already known"
+    // (still success — tx is in mempool). If the client's broadcast silently
+    // failed, ARC accepts the fresh submission. Either way, past this point
+    // the tx is GUARANTEED in ARC's mempool — eliminates phantom recordings.
+    const broadcast = await parsed.broadcast();
+    const bcResult = broadcast as {
+      status?: string | number;
+      code?: string | number;
+      description?: string;
+    };
+    const bcCode = String(bcResult.code ?? "").trim();
+    const bcDesc = (bcResult.description ?? "").toLowerCase();
+    const bcAlreadyKnown =
+      broadcast.status !== "success" &&
+      bcCode !== "258" &&
+      !bcDesc.includes("conflict") &&
+      (bcCode === "257" ||
+        /\balready[- ]known\b/.test(bcDesc) ||
+        bcDesc.includes("already in the mempool"));
+
+    if (broadcast.status !== "success" && !bcAlreadyKnown) {
+      if (bcCode === "258" || bcDesc.includes("conflict") || bcDesc.includes("missing inputs")) {
+        console.warn(
+          `[BSVibes] boot-confirm: TX_CONFLICT for ${txid.slice(0, 16)}… — ${bcDesc || bcCode}`
+        );
+        return NextResponse.json(
+          {
+            error: "Transaction conflicts with chain (inputs already spent)",
+            code: "TX_CONFLICT",
+          },
+          { status: 409 }
+        );
+      }
       console.warn(
-        `[BSVibes] boot-confirm: txid ${txid.slice(0, 16)}… not found on-chain (HTTP ${wocRes.status})`
+        `[BSVibes] boot-confirm: ARC_UNAVAILABLE for ${txid.slice(0, 16)}… — ${bcDesc || bcCode}`
       );
       return NextResponse.json(
-        { error: "Transaction not found on-chain — please wait for confirmation and retry" },
-        { status: 400 }
+        { error: "Could not confirm broadcast, please retry", code: "ARC_UNAVAILABLE" },
+        { status: 503 }
       );
     }
-    const txData = (await wocRes.json()) as { vout?: WocVout[] };
-    txVouts = txData.vout ?? [];
+
+    // Extract (sats, address) from each output by matching P2PKH locking scripts.
+    // Inspect chunks directly — P2PKH.lock() builds { op: 20, data } for the push,
+    // which toASM() can render inconsistently across SDK versions.
+    txVouts = parsed.outputs.map((out) => {
+      const sats = out.satoshis ?? 0;
+      let address: string | null = null;
+      try {
+        const chunks = out.lockingScript.chunks;
+        if (
+          chunks.length === 5 &&
+          chunks[0].op === OP_DUP &&
+          chunks[1].op === OP_HASH160 &&
+          chunks[2].op === 20 &&
+          chunks[2].data?.length === 20 &&
+          chunks[3].op === OP_EQUALVERIFY &&
+          chunks[4].op === OP_CHECKSIG
+        ) {
+          // toBase58Check defaults prefix=[0x00] (mainnet) and prepends it to
+          // `bin`. Pass raw 20-byte hash, NOT versioned bytes, to avoid the
+          // double-prefix that produces 35-char "11..." addresses.
+          address = Utils.toBase58Check(chunks[2].data);
+        }
+      } catch {
+        /* non-P2PKH output (e.g. OP_RETURN) — no address */
+      }
+      return { sats, address };
+    });
   } catch (err) {
-    console.error("[BSVibes] boot-confirm: WhatsOnChain verification failed", err);
-    return NextResponse.json(
-      { error: "Could not verify transaction — please try again" },
-      { status: 502 }
-    );
+    console.error("[BSVibes] boot-confirm: rawTx parse failed", err);
+    return NextResponse.json({ error: "Could not parse rawTx" }, { status: 400 });
   }
 
   if (typeof booterPubkey !== "string" || booterPubkey.trim().length === 0) {
@@ -151,10 +222,8 @@ export async function POST(req: NextRequest) {
   // Allow 2 sat tolerance per output for fee rounding differences.
   const onChainByAddr = new Map<string, number>();
   for (const vout of txVouts) {
-    const addr = vout.scriptPubKey?.addresses?.[0];
-    if (addr) {
-      const sats = Math.round(vout.value * 1e8);
-      onChainByAddr.set(addr, (onChainByAddr.get(addr) ?? 0) + sats);
+    if (vout.address) {
+      onChainByAddr.set(vout.address, (onChainByAddr.get(vout.address) ?? 0) + vout.sats);
     }
   }
 
@@ -164,6 +233,9 @@ export async function POST(req: NextRequest) {
       console.warn(
         `[BSVibes] boot-confirm: output mismatch for ${addr} — expected ${expectedSats}, got ${actualSats}`
       );
+      console.warn("[BSVibes] boot-confirm: expected split:", [...expectedOutputs.entries()]);
+      console.warn("[BSVibes] boot-confirm: on-chain outputs:", [...onChainByAddr.entries()]);
+      console.warn("[BSVibes] boot-confirm: boot price:", bootPrice);
       return NextResponse.json(
         { error: "Transaction outputs do not match expected split" },
         { status: 400 }

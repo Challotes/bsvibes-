@@ -34,7 +34,9 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/api/boot-status/route.ts` — Free boots remaining + boot price for a user
 - `src/app/api/earnings/route.ts` — Total earned, activity feed, earnings history for chart
 - `src/app/api/agent/route.ts` — Streaming agent chat (SSE, rate-limited)
-- `src/app/api/tx-hex/route.ts` — WhatsOnChain proxy (avoids CORS for client tx building)
+- `src/app/api/tx-hex/route.ts` — WhatsOnChain raw-tx proxy (cached, retries, stale fallback)
+- `src/app/api/balance/route.ts` — WhatsOnChain balance proxy (10s cache, 120/min, graceful fallback on 429)
+- `src/app/api/unspent/route.ts` — WhatsOnChain UTXO proxy (3s cache, 180/min, retries with stale fallback)
 
 ### Server Actions & Data
 
