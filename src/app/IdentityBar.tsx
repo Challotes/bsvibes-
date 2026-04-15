@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { ChangePassphraseModal } from "@/components/ChangePassphraseModal";
-import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -87,8 +86,6 @@ export function IdentityChip(): React.JSX.Element | null {
   const [keyRevealed, setKeyRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
-  const [showPasteKey, setShowPasteKey] = useState(false);
-  const [pasteKeyValue, setPasteKeyValue] = useState("");
 
   // Unlock state (when needsUnlock)
   const [unlockPassphrase, setUnlockPassphrase] = useState("");
@@ -126,8 +123,6 @@ export function IdentityChip(): React.JSX.Element | null {
     setShowAdvanced(false);
     setKeyRevealed(false);
     setCopied(false);
-    setShowPasteKey(false);
-    setPasteKeyValue("");
     setShowImport(false);
     setImportError("");
     setImportSuccess(false);
@@ -246,8 +241,6 @@ export function IdentityChip(): React.JSX.Element | null {
     setShowAdvanced(false);
     setKeyRevealed(false);
     setCopied(false);
-    setShowPasteKey(false);
-    setPasteKeyValue("");
     resetImport();
     setImportSuccess(false);
     setShowResetConfirm(false);
@@ -427,8 +420,6 @@ export function IdentityChip(): React.JSX.Element | null {
     setEncryptedImportError("");
     setPendingRestoreWif(null);
     setPendingRestoreName(undefined);
-    setShowPasteKey(false);
-    setPasteKeyValue("");
   }
 
   // B5 fix: close import when upgrade modal opens
@@ -649,11 +640,6 @@ export function IdentityChip(): React.JSX.Element | null {
     } finally {
       setDecryptingImport(false);
     }
-  }
-
-  async function handlePasteKeyImport(): Promise<void> {
-    if (!pasteKeyValue.trim()) return;
-    await doImport(pasteKeyValue.trim());
   }
 
   // ── Loading / identity guards ──────────────────────────────────────────
@@ -1300,74 +1286,34 @@ export function IdentityChip(): React.JSX.Element | null {
                         onClick={() => {
                           setShowAdvanced(false);
                           setKeyRevealed(false);
-                          setShowPasteKey(false);
-                          setPasteKeyValue("");
                         }}
                         className="text-[10px] text-red-400/80 hover:text-red-300 transition-colors font-medium"
                       >
                         Cancel
                       </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400 break-all leading-relaxed">
-                        {keyRevealed ? identity.wif : "\u2022".repeat(12) + identity.wif.slice(-4)}
-                      </div>
+                    <div className="bg-zinc-800/60 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-zinc-400 break-all leading-relaxed">
+                      {keyRevealed
+                        ? identity.wif
+                        : `${"\u2022".repeat(12)}${identity.wif.slice(-4)}`}
+                    </div>
+                    {!keyRevealed && (
                       <button
                         type="button"
                         onClick={handleRevealKey}
-                        className="shrink-0 text-[10px] text-zinc-500 hover:text-amber-400 transition-colors px-1"
+                        className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
                       >
-                        {keyRevealed ? "Hide" : "Show"}
+                        Show key
                       </button>
-                    </div>
-                    <div className="flex gap-2">
+                    )}
+                    {keyRevealed && (
                       <button
                         type="button"
                         onClick={handleCopy}
-                        className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
+                        className="w-full bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
                       >
                         {copied ? "Copied" : "Copy key"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPasteKey((v) => !v);
-                          setPasteKeyValue("");
-                        }}
-                        className="flex-1 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-700 transition-colors"
-                      >
-                        Paste key
-                      </button>
-                    </div>
-                    {showPasteKey && (
-                      <div className="space-y-2 pt-1">
-                        <textarea
-                          placeholder="Paste your key here..."
-                          value={pasteKeyValue}
-                          onChange={(e) => {
-                            setPasteKeyValue(e.target.value);
-                            setImportError("");
-                          }}
-                          rows={3}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none leading-relaxed"
-                        />
-                        {importError && (
-                          <p className="text-[11px] text-red-400 leading-relaxed">{importError}</p>
-                        )}
-                        {importSuccess && (
-                          <p className="text-[11px] text-emerald-400 font-medium">
-                            Identity restored.
-                          </p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handlePasteKeyImport}
-                          disabled={!pasteKeyValue.trim() || importing}
-                          className="w-full bg-zinc-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {importing ? "Restoring..." : "Restore from key"}
-                        </button>
-                      </div>
                     )}
                   </div>
                 )}
@@ -1496,14 +1442,8 @@ export function IdentityChip(): React.JSX.Element | null {
               </button>
             </div>
 
-            {/* ── Earnings chart + activity ── */}
+            {/* ── Activity ── */}
             <div className="px-3 py-2.5 border-b border-zinc-800">
-              <EarningsSparkline
-                history={earningsHistory}
-                totalSats={earnedSats ?? 0}
-                isGoat={isGoat}
-                bsvPrice={bsvPrice}
-              />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">
                 Activity
               </span>
