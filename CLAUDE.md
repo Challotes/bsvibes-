@@ -67,6 +67,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
 - `src/components/MoveAddressModal.tsx` — Wizard modal for "Move to a new address" (key rotation + sweep all UTXOs + on-chain migration)
 - `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
+- `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon
 - `src/components/BootToast.tsx` — Transient boot error toast (retry action, auto-dismiss)
 

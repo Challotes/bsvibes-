@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { ChangePassphraseModal } from "@/components/ChangePassphraseModal";
+import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -1442,8 +1443,14 @@ export function IdentityChip(): React.JSX.Element | null {
               </button>
             </div>
 
-            {/* ── Activity ── */}
+            {/* ── Earnings chart + activity ── */}
             <div className="px-3 py-2.5 border-b border-zinc-800">
+              <EarningsSparkline
+                history={earningsHistory}
+                totalSats={earnedSats ?? 0}
+                isGoat={isGoat}
+                bsvPrice={bsvPrice}
+              />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">
                 Activity
               </span>
