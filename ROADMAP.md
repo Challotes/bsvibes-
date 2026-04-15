@@ -206,6 +206,7 @@
 
 ## Phase 6.5: UX Polish — PLANNED
 
+- [ ] **`/api/broadcast` proxy with TAAL failover** — eliminates GorillaPool ARC as a single point of failure for browser tx paths (paid boots, sweep, consolidate, auto-transfer). Primary: GorillaPool. Fallback on 5xx: TAAL ARC. All client broadcasters wired via `new ARC('/api/broadcast')`. Motivated by GorillaPool ARC outages on 2026-04-08 (misdiagnosed as DNS, later confirmed by 2026-04-14 repeat) and 2026-04-14 (nginx 502 upstream, surfaces in browser as misleading CORS error). Lock in at build time: 10s timeout, structured ARC error passthrough (client's 257/258 classification depends on it), rate limit keyed on pubkey not IP. ~2–3h work.
 - [ ] Notification system (bell icon — "anon_x7f2 featured your post", daily earnings summary)
 - [ ] Content moderation (report mechanism, basic filtering)
 - [ ] Deploy to Railway + custom domain
