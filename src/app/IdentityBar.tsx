@@ -1384,9 +1384,15 @@ export function IdentityChip(): React.JSX.Element | null {
           onClick={() => setOpen((v) => !v)}
           className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
         >
-          <span
-            className={`w-2 h-2 rounded-full ${isProtected ? "bg-emerald-500" : "bg-amber-500"}`}
-          />
+          {/* Static protection-status dot. Hidden while the pulsing backup
+              warning is visible to avoid two overlapping amber dots competing
+              for attention — the backup warning is urgent and time-sensitive;
+              protection status can be seen in the modal. */}
+          {!(showWarningDot && backedUp === false) && (
+            <span
+              className={`w-2 h-2 rounded-full ${isProtected ? "bg-emerald-500" : "bg-amber-500"}`}
+            />
+          )}
           <span className="text-zinc-300">{identity.name}</span>
           {balanceSats !== null && balanceSats > 0 && (
             <AnimatedBalance
