@@ -22,6 +22,8 @@ Large session spanning the identity card redesign + adjacent resilience work.
 
 **Stage 3 — Merge + reframe.** Passphrase row unified to single "Passphrase" label with dynamic secondary text. `+ Add funds` button added to the balance zone (deposit now one click from chip). Modal header renamed "Manage identity" → "You". Coinbase/Phantom amber backup banner added to the top of the dropdown with pulsing dot + single CTA — disappears forever once saved and acknowledged.
 
+**Stage 4 — Questions layout ATTEMPTED + REVERTED (2026-04-16).** Built the 3-question intent-led IA ("Is my account backed up?", "I'm on a new device", "I think my keys were exposed") replacing the flat You-modal section list. User rejected the approach during live review — the flat list reads faster and feels less like a support FAQ. Reverted via `git restore` before commit; no artifacts in git history. Flat section list is the settled state. Pending-payment badge (originally bundled into Stage 4) is still wanted and carried forward as a standalone ROADMAP item.
+
 **Resilience planning (no code this session).**
 - `/api/broadcast` proxy + TAAL failover — extended to include server-wallet reuse, shared WoC read cache module, broadcast timeout, queue-depth metric, low-balance alert. Architect flagged that the server wallet currently hits ARC/WoC directly — none of the client-side mitigations apply; browser is now better-armored than the backend it talks to.
 - Split mutexes (posts vs boots), backpressure on `logPostOnChain`, WoC retry/backoff in double-spend recovery — all captured in ROADMAP Phase 6.5.

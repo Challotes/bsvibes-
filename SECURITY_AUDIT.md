@@ -48,7 +48,7 @@
 ### C9: Backup warning dot clears on dropdown OPEN, not on actual backup — FIXED
 **File:** src/app/IdentityBar.tsx lines 110-115
 **Risk:** User thinks they're backed up after opening dropdown, but never actually copied or downloaded.
-**Fix:** `markBackedUp()` now only fires from `handleDownload()`, `handleSaveEncrypted()`, and `handleCopy()` handlers — no longer on dropdown open. Verified 2026-04-10.
+**Fix:** `markBackedUp()` now only fires from `handleDownload()`, `handleSaveEncrypted()`, and `handleCopy()` handlers — no longer on dropdown open. Verified 2026-04-10. **Hardened 2026-04-16 (commit `e7ecf9f`):** backup download now requires explicit "Got it" acknowledgement before `backedUp` flips. Prevents silent download failures (popup blocker, disk full, CSP deny, user cancels save dialog) from clearing the warning dot. Applied to the You dropdown (green confirmation banner replaces the orange save-CTA on success) and `MoveAddressModal` stage 1 (new `saved-confirm` gate before the irreversible sweep broadcast).
 
 ## HIGH (7 findings — fix this sprint)
 

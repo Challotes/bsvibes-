@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-04-10
+> Last updated: 2026-04-16
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -231,7 +231,8 @@
   - **Stage 1b — Remaining bug fixes (DONE 2026-04-16):** `/api/tx-hex` now retries 404s with 2s backoff up to 3 times (~6s budget) to ride out WoC's 2–10s mempool indexing lag on 0-conf chain ancestors. Backup download now requires an explicit "Got it" acknowledgement before `backedUp` flips — both in the You modal flow (green confirmation banner replaces the orange save-CTA in the dropdown) and in `MoveAddressModal` stage 1 (new `saved-confirm` stage gates the auto-advance to the irreversible sweep). Silent download failures (popup blocker, disk full, CSP deny) no longer masquerade as success.
   - **Stage 2 — Dead-code cuts (DONE 2026-04-15):** removed Paste-recovery-key textarea (redundant with file import), removed Hide toggle inside Show-recovery-key (dead micro-state once revealed in a session). Sparkline kept in dropdown per user preference.
   - **Stage 3 — Merge + reframe (DONE 2026-04-15):** passphrase row unified to single "Passphrase" label with dynamic secondary text; Deposit moved into balance zone as `+ Add funds` button (one click from the chip); modal header renamed "Manage identity" → "You"; Coinbase/Phantom one-time backup banner added to the dropdown — amber "Save your recovery file" pulse until saved + acknowledged, then gone forever.
-  - **Stage 4 — Questions layout:** replace flat You-modal list with 3 intent-led questions ("Is my account backed up?", "I'm on a new device", "I think my keys were exposed") that expand in-place; pending-payment badge on balance ("$0.12 · 1 pending") with honest tooltip about sub-minute confirmation. ~3–4h.
+  - **Stage 4 — ATTEMPTED + REVERTED (2026-04-16):** built the 3-question intent-led layout ("Is my account backed up?", "I'm on a new device", "I think my keys were exposed") replacing the flat You-modal section list. User rejected the approach during live review — the flat list reads faster and feels less like a support FAQ. Reverted via `git restore` before commit; no artifacts in git history. Flat section list is the settled state. **Do not re-queue.**
+  - **Pending-payment badge (still wanted, split out from Stage 4):** on-chip/in-balance "$0.12 · 1 pending" badge with honest tooltip about sub-minute confirmation. Track broadcasts from `useBoot` and client-side transfer paths; clear on next balance-poll delta or 90s timeout. ~30–60min. Natural fit once SSE/optimistic work lands — defer until after `/api/events`.
   - **What to preserve (architect red-team):** C9 backup-warning dot semantics, deferred-commit pattern in `commitUpgrade` and `resetIdentity`, `getIdentity()` plaintext-preferred fallback ordering (subtle H5 regression surface), migration signature chain.
 - [ ] Notification system (bell icon — "anon_x7f2 featured your post", daily earnings summary)
 - [ ] Content moderation (report mechanism, basic filtering)

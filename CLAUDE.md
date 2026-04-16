@@ -54,7 +54,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Header.tsx` — Top bar with logo, genesis nav, identity chip
 - `src/app/PostList.tsx` — Post rendering, BootButton, Genesis anchor
 - `src/app/PostForm.tsx` — Compose box (enter-to-post, voice-to-text, agent chat trigger)
-- `src/app/IdentityBar.tsx` — Identity chip + manage modal (balance poll 30s via /api/balance, earnings poll 30s — full feed when dropdown open, summary only when closed — backup, import)
+- `src/app/IdentityBar.tsx` — Identity chip + You modal (balance poll 30s via /api/balance; earnings poll 30s — full feed when dropdown open, summary only when closed; `+ Add funds` button in the balance zone; one-time backup banner with "Got it" acknowledgement; backup, import)
 - `src/app/Bootboard.tsx` — Pay-to-feature spotlight (live timer, shake/glow animations)
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
 - `src/app/Genesis.tsx` — Founding conversation (always visible, NOT collapsible)
