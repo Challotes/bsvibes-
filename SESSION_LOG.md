@@ -2,6 +2,26 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-17 — Identity Dropdown Polish (Stage 5) — Earnings-First Hierarchy
+
+Category: UX, design polish
+
+Full dropdown restructure driven by parallel designer + researcher agent audits of Apple, Google, Coinbase, Cash App, Phantom, Stripe, and Revolut account panel patterns.
+
+**Earnings-first hierarchy.** Reordered dropdown: all-time earnings (hero) → activity → balance. The user's insight: "This is not a wallet, this is an idea earning platform." Earnings total is now the hero number (`text-lg font-semibold`), with a collapsible sparkline chart (default open). Balance demoted to a single quiet row with inline "Add funds" text link (replaced full-width green button). Designer agent confirmed: the first number frames the mental model.
+
+**Activity redesign.** Activity feed shows 2 items collapsed by default with "View all N" toggle right-aligned in the header (Stripe pattern). Replaced scroll container (anti-pattern on mobile). API limits bumped from 10 to 50 per type (incoming + outgoing). Static activity text toned down to zinc-500, interactive links promoted to zinc-100 with underline decoration.
+
+**Inline verified checkmark.** Protected security status replaced with a subtle emerald checkmark next to the identity name (X-verified pattern, `text-emerald-500/70`, `title="Identity protected"`). Full-width green "Identity protected" banner removed — calm states don't need space. Unprotected red banner kept (urgency deserves prominence).
+
+**Font hierarchy audit.** Two-tier system established with designer agent: static data recedes (zinc-500), interactive elements pop (zinc-100 + underline + decoration-zinc-600). Section labels standardized to zinc-400 font-medium. All ✕ close characters replaced with SVG icons for cross-platform consistency.
+
+**Other changes.** "Your identity" button → "Manage" (bordered, better contrast). EarningsSparkline header removed (parent handles via toggle). Noob/Goat emoji toggle kept per user preference.
+
+Files changed: `src/app/IdentityBar.tsx`, `src/components/EarningsSparkline.tsx`, `src/app/api/earnings/route.ts`, CLAUDE.md, ROADMAP.md.
+
+Verified: tsc clean, 27/27 tests pass, biome clean.
+
 ## 2026-04-15/16 — Manage Identity Redesign (Stages 1–3 + 1b) + resilience planning
 
 Category: UX, bug fixes, planning

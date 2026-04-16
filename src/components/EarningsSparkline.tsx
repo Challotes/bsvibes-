@@ -28,11 +28,7 @@ export function EarningsSparkline({
 
   if (points.length < 2) {
     return (
-      <div className="mb-2">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Earnings</span>
-          <span className="text-[10px] text-zinc-600">No earnings yet</span>
-        </div>
+      <div>
         <svg width={W} height={H} aria-hidden="true" className="w-full">
           <line
             x1={PAD.left}
@@ -86,13 +82,7 @@ export function EarningsSparkline({
   const areaPath = `${d} L ${lastX} ${baselineY} L ${PAD.left} ${baselineY} Z`;
 
   return (
-    <div className="mb-2">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wide">All-time earnings</span>
-        <span className="text-[10px] text-emerald-400 font-medium tabular-nums">
-          {displayTotal}
-        </span>
-      </div>
+    <div>
       <svg
         width={W}
         height={H}

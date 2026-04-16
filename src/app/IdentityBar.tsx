@@ -100,6 +100,10 @@ export function IdentityChip(): React.JSX.Element | null {
   const [storedHint, setStoredHint] = useState<string | null>(null);
   const [showUnlockHint, setShowUnlockHint] = useState(false);
 
+  // Activity / chart expand
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [chartExpanded, setChartExpanded] = useState(true);
+
   // Deposit modal
   const [showDeposit, setShowDeposit] = useState(false);
   // Manage identity modal
@@ -809,10 +813,22 @@ export function IdentityChip(): React.JSX.Element | null {
                 <button
                   type="button"
                   onClick={closeManageModal}
-                  className="text-zinc-600 hover:text-zinc-300 transition-colors text-lg leading-none ml-3"
+                  className="text-zinc-500 hover:text-zinc-200 transition-colors ml-3"
                   aria-label="Close"
                 >
-                  ✕
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
 
@@ -1335,14 +1351,43 @@ export function IdentityChip(): React.JSX.Element | null {
                     className={`w-2 h-2 rounded-full shrink-0 ${isProtected ? "bg-emerald-500" : "bg-amber-500"}`}
                   />
                   <span className="text-sm font-medium text-zinc-200">{identity.name}</span>
+                  {isProtected && (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-emerald-500/70 shrink-0"
+                      aria-label="Identity protected"
+                    >
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={closeDropdown}
-                  className="text-zinc-600 hover:text-zinc-300 transition-colors text-base leading-none"
+                  className="text-zinc-500 hover:text-zinc-200 transition-colors"
                   aria-label="Close"
                 >
-                  ✕
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
               <button
@@ -1477,141 +1522,9 @@ export function IdentityChip(): React.JSX.Element | null {
               </div>
             )}
 
-            {/* ── Balance + Add funds + currency toggle ── */}
-            <div className="px-3 py-3 border-b border-zinc-800 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-0.5">
-                    Balance
-                  </span>
-                  <span className="text-base text-emerald-400 font-medium tabular-nums">
-                    {isGoat
-                      ? `${(balanceSats ?? 0).toLocaleString()} sats`
-                      : satsToDollars(balanceSats ?? 0, bsvPrice)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCurrency();
-                  }}
-                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
-                  title={isGoat ? "Switch to dollar mode" : "Switch to sats mode"}
-                >
-                  {isGoat ? <span>🐐 Goat</span> : <span>💵 Noob</span>}
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  setShowDeposit(true);
-                }}
-                className="w-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
-              >
-                + Add funds
-              </button>
-            </div>
-
-            {/* ── Earnings chart + activity ── */}
-            <div className="px-3 py-2.5 border-b border-zinc-800">
-              <EarningsSparkline
-                history={earningsHistory}
-                totalSats={earnedSats ?? 0}
-                isGoat={isGoat}
-                bsvPrice={bsvPrice}
-              />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1.5">
-                Activity
-              </span>
-              {activity.length === 0 ? (
-                <p className="text-[11px] text-zinc-600 py-1 leading-relaxed">
-                  Nothing yet — when your posts get featured, earnings appear here
-                </p>
-              ) : (
-                <div
-                  className="max-h-[120px] overflow-y-auto space-y-1"
-                  style={{ scrollbarWidth: "none" }}
-                >
-                  {activity.map((a) => {
-                    const isFree = a.amount === 0;
-                    const isBoot = a.label.toLowerCase().includes("boot");
-                    return (
-                      <div
-                        key={`${a.created_at}-${a.label}`}
-                        className="flex items-center justify-between text-[11px]"
-                      >
-                        <span className="text-zinc-500 truncate mr-2">
-                          {a.label}
-                          {isBoot && (
-                            <span
-                              className={`ml-1 text-[10px] ${isFree ? "text-zinc-600" : "text-amber-600"}`}
-                            >
-                              {isFree
-                                ? "· free"
-                                : isGoat
-                                  ? `· ${a.amount.toLocaleString()} sats`
-                                  : `· ${satsToDollars(a.amount, bsvPrice)}`}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className={`font-mono shrink-0 ${a.direction === "in" ? "text-emerald-400" : "text-zinc-400"}`}
-                        >
-                          {isFree ? (
-                            <span className="text-zinc-600 text-[10px] font-sans">FREE</span>
-                          ) : (
-                            <>
-                              {a.direction === "in" ? "+" : "-"}
-                              {isGoat
-                                ? a.amount.toLocaleString()
-                                : satsToDollars(a.amount, bsvPrice)}
-                            </>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {earnedSats !== null && earnedSats > 0 && (
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-800/60">
-                  <span className="text-[10px] text-zinc-500">Total earned</span>
-                  <span className="text-[10px] text-emerald-500 font-medium tabular-nums">
-                    {isGoat
-                      ? `${earnedSats.toLocaleString()} sats`
-                      : satsToDollars(earnedSats, bsvPrice)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* ── Security status bar ── */}
-            <div className="border-b border-zinc-800">
-              {isProtected ? (
-                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-950/30">
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-emerald-500 shrink-0"
-                  >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="m9 12 2 2 4-4" />
-                  </svg>
-                  <span className="text-[11px] text-emerald-500 font-medium">
-                    Identity protected
-                  </span>
-                </div>
-              ) : (
+            {/* ── Security warning (unprotected only — protected uses inline checkmark) ── */}
+            {!isProtected && (
+              <div className="border-b border-zinc-800">
                 <button
                   type="button"
                   onClick={openUpgradeModal}
@@ -1637,7 +1550,162 @@ export function IdentityChip(): React.JSX.Element | null {
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
                 </button>
+              </div>
+            )}
+
+            {/* ── All-time earnings (hero section, collapsible chart, default open) ── */}
+            <div className="px-3 py-2.5 border-b border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-zinc-400 uppercase tracking-wide font-medium block mb-0.5">
+                    All-time earnings
+                  </span>
+                  <span className="text-lg text-emerald-400 font-semibold tabular-nums">
+                    {earnedSats !== null && earnedSats > 0
+                      ? isGoat
+                        ? `${earnedSats.toLocaleString()} sats`
+                        : satsToDollars(earnedSats, bsvPrice)
+                      : isGoat
+                        ? "0 sats"
+                        : "$0.00"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCurrency();
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
+                  title={isGoat ? "Switch to dollar mode" : "Switch to sats mode"}
+                >
+                  {isGoat ? <span>🐐 Goat</span> : <span>💵 Noob</span>}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChartExpanded((v) => !v)}
+                className="w-full flex items-center justify-end gap-1 group"
+              >
+                <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                  {chartExpanded ? "Hide chart" : "Show chart"}
+                </span>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className={`text-zinc-500 group-hover:text-zinc-300 transition-transform ${chartExpanded ? "rotate-180" : ""}`}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {chartExpanded && (
+                <EarningsSparkline
+                  history={earningsHistory}
+                  totalSats={earnedSats ?? 0}
+                  isGoat={isGoat}
+                  bsvPrice={bsvPrice}
+                />
               )}
+            </div>
+
+            {/* ── Activity (2 visible, expand to see all) ── */}
+            <div className="px-3 py-2.5 border-b border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wide font-medium">
+                  Activity
+                </span>
+                {activity.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setActivityExpanded((v) => !v)}
+                    className="text-[11px] text-zinc-100 font-medium underline underline-offset-2 decoration-zinc-600 hover:decoration-zinc-400 transition-colors"
+                  >
+                    {activityExpanded ? "Show less" : `View all ${activity.length}`}
+                  </button>
+                )}
+              </div>
+              {activity.length === 0 ? (
+                <p className="text-[11px] text-zinc-600 leading-relaxed">
+                  Nothing yet — when your posts get featured, earnings appear here
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {(activityExpanded ? activity : activity.slice(0, 2)).map((a) => {
+                    const isFree = a.amount === 0;
+                    const isBoot = a.label.toLowerCase().includes("boot");
+                    return (
+                      <div
+                        key={`${a.created_at}-${a.label}`}
+                        className="flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-zinc-500 truncate mr-2">
+                          {a.label}
+                          {isBoot && (
+                            <span
+                              className={`ml-1 text-[10px] ${isFree ? "text-zinc-600" : "text-amber-500/70"}`}
+                            >
+                              {isFree
+                                ? "· free"
+                                : isGoat
+                                  ? `· ${a.amount.toLocaleString()} sats`
+                                  : `· ${satsToDollars(a.amount, bsvPrice)}`}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`font-mono shrink-0 ${a.direction === "in" ? "text-emerald-400" : "text-zinc-500"}`}
+                        >
+                          {isFree ? (
+                            <span className="text-zinc-600 text-[10px] font-sans">FREE</span>
+                          ) : (
+                            <>
+                              {a.direction === "in" ? "+" : "-"}
+                              {isGoat
+                                ? a.amount.toLocaleString()
+                                : satsToDollars(a.amount, bsvPrice)}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Balance (demoted — secondary to earnings) ── */}
+            <div className="px-3 py-2 border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wide font-medium">
+                  Balance
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-400 tabular-nums">
+                    {isGoat
+                      ? `${(balanceSats ?? 0).toLocaleString()} sats`
+                      : satsToDollars(balanceSats ?? 0, bsvPrice)}
+                  </span>
+                  <span className="text-zinc-600">·</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpen(false);
+                      setShowDeposit(true);
+                    }}
+                    className="text-[11px] text-zinc-100 underline underline-offset-2 decoration-zinc-600 hover:decoration-zinc-400 transition-colors"
+                  >
+                    Add funds
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* ── Transient banners ── */}
@@ -1648,10 +1716,22 @@ export function IdentityChip(): React.JSX.Element | null {
                   <button
                     type="button"
                     onClick={() => setBackupConfirmed(false)}
-                    className="text-emerald-700 hover:text-emerald-400 transition-colors text-[11px]"
+                    className="text-emerald-700 hover:text-emerald-400 transition-colors"
                     aria-label="Dismiss"
                   >
-                    ✕
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -1675,16 +1755,16 @@ export function IdentityChip(): React.JSX.Element | null {
               </div>
             )}
 
-            {/* ── Manage identity button ── */}
-            <div className="px-3 py-3">
+            {/* ── Manage button ── */}
+            <div className="px-3 py-2.5">
               <button
                 type="button"
                 onClick={() => setShowManage(true)}
-                className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs font-medium hover:bg-zinc-700 hover:text-white transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-zinc-700 py-2 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white transition-all"
               >
                 <svg
-                  width="14"
-                  height="14"
+                  width="13"
+                  height="13"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1692,12 +1772,11 @@ export function IdentityChip(): React.JSX.Element | null {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   aria-hidden="true"
-                  className="text-zinc-400"
                 >
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
-                Your identity
+                Manage
               </button>
             </div>
           </div>

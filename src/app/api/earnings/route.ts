@@ -118,10 +118,10 @@ export async function GET(request: Request) {
     )
     .get(...allAddresses) as { total: number };
 
-  // Recent incoming payouts (last 10) across chain
+  // Recent incoming payouts (last 50) across chain
   const incoming = db
     .prepare(
-      `SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address IN (${placeholders}) ORDER BY created_at DESC LIMIT 10`
+      `SELECT amount_sats, payout_type, txid, created_at FROM payouts WHERE recipient_address IN (${placeholders}) ORDER BY created_at DESC LIMIT 50`
     )
     .all(...allAddresses) as Array<{
     amount_sats: number;
@@ -147,7 +147,7 @@ export async function GET(request: Request) {
     WHERE b.boosted_by IN (${placeholders})
     GROUP BY b.id, b.booted_at, b.is_free
     ORDER BY b.booted_at DESC
-    LIMIT 10
+    LIMIT 50
   `)
     .all(...allAddresses) as Array<{
     boot_id: number;
@@ -187,7 +187,7 @@ export async function GET(request: Request) {
     });
   }
 
-  // Sort by time descending, take last 10
+  // Sort by time descending
   activity.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Cumulative earnings history for the sparkline chart (last 30 data points)
@@ -215,7 +215,7 @@ export async function GET(request: Request) {
 
   return Response.json({
     totalEarned: total.total,
-    recentActivity: activity.slice(0, 10),
+    recentActivity: activity,
     earningsHistory: chartHistory,
   });
 }
