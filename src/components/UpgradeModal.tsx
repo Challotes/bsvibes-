@@ -229,6 +229,10 @@ export function UpgradeModal({
               placeholder={`e.g. "blue house + 2019"`}
               value={hint}
               maxLength={100}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               onChange={(e) => setHint(e.target.value)}
               className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
             />

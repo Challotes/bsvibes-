@@ -12,6 +12,11 @@ interface ChangePassphraseModalProps {
   onClose: () => void;
   onSuccess: (newIdentity: Identity, transferMsg: string | null) => void;
   currentIdentity: Identity;
+  /**
+   * Passphrase that was already verified at the parent gate (manage modal entry).
+   * When provided, the verify step is skipped — user goes straight to newpass entry.
+   */
+  preVerifiedPassphrase?: string;
 }
 
 export function ChangePassphraseModal({
@@ -19,9 +24,12 @@ export function ChangePassphraseModal({
   onClose,
   onSuccess,
   currentIdentity,
+  preVerifiedPassphrase,
 }: ChangePassphraseModalProps): React.JSX.Element | null {
-  const [step, setStep] = useState<"verify" | "newpass">("verify");
-  const [currentPass, setCurrentPass] = useState("");
+  const [step, setStep] = useState<"verify" | "newpass">(
+    preVerifiedPassphrase ? "newpass" : "verify"
+  );
+  const [currentPass, setCurrentPass] = useState(preVerifiedPassphrase ?? "");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [hint, setHint] = useState("");
@@ -30,8 +38,8 @@ export function ChangePassphraseModal({
   const [chainWarning, setChainWarning] = useState(false);
 
   function handleClose() {
-    setStep("verify");
-    setCurrentPass("");
+    setStep(preVerifiedPassphrase ? "newpass" : "verify");
+    setCurrentPass(preVerifiedPassphrase ?? "");
     setNewPass("");
     setConfirmPass("");
     setHint("");
@@ -298,6 +306,10 @@ export function ChangePassphraseModal({
                   placeholder={`e.g. "blue house + 2019"`}
                   value={hint}
                   maxLength={100}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   onChange={(e) => setHint(e.target.value)}
                   className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
                 />

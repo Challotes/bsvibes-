@@ -35,15 +35,15 @@ const COMPLETED_STEPS: Record<ErrorStage, StepState> = {
   saving: {
     heading: "Old key saved",
     description:
-      "Old key saved. Check your downloads. That file can recover any funds on your old address.",
+      "Temporary safety copy. Your final recovery file at the end replaces this with both keys under one passphrase.",
   },
   creating: {
-    heading: "New address ready",
-    description: "New address ready. Your name, posts, earnings, and future payouts will follow.",
+    heading: "New key ready",
+    description: "Your name, posts, earnings, and future payouts follow automatically.",
   },
   recording: {
     heading: "Move recorded on-chain",
-    description: "Move recorded on-chain. Anyone can verify both addresses are the same identity.",
+    description: "Anyone can verify your old and new keys belong to the same identity.",
   },
 };
 
@@ -169,6 +169,10 @@ export function MoveAddressModal({
     }
     if (newPass !== confirmNewPass) {
       setPassError("Passphrases don't match");
+      return;
+    }
+    if (isProtected && passphrase && newPass === passphrase) {
+      setPassError("New passphrase must be different from your current one");
       return;
     }
     if (!newHint.trim()) {
@@ -336,7 +340,12 @@ export function MoveAddressModal({
       // Commit encrypted key to localStorage
       commitUpgrade(result.encStore, result.identity);
 
-      // Download new encrypted backup
+      // Download combined recovery file containing BOTH keys, encrypted under
+      // the new passphrase. The final file supersedes the temporary stage-1
+      // file: one passphrase decrypts both keys.
+      // CRITICAL: identity.wif here is the OLD key (prop captured at mount).
+      // Do not replace with localStorage.getItem — commitUpgrade above wrote
+      // the NEW key already.
       const newIdentity = result.identity;
       let encryptedWif: string;
       try {
@@ -345,12 +354,14 @@ export function MoveAddressModal({
       } catch {
         encryptedWif = await encryptWif(newIdentity.wif, newPass);
       }
+      const oldWifEncrypted = await encryptWif(identity.wif, newPass);
       const newBackup: BackupData = {
         name: newIdentity.name,
         address: newIdentity.address,
         wif_encrypted: encryptedWif,
+        oldWif_encrypted: oldWifEncrypted,
         createdAt: new Date().toISOString(),
-        note: "Use your passphrase to restore.",
+        note: "Use your passphrase to reveal both keys. The previous key is included for recovering any funds left on the old address.",
       };
       if (newHint.trim()) newBackup.hint = newHint.trim();
       downloadBackup(
@@ -417,7 +428,7 @@ export function MoveAddressModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">
-              {isPassphraseStage ? "Protect your new address" : "Moving to a new address"}
+              {isPassphraseStage ? "Protect your new key" : "Moving to a new key"}
             </h2>
             <p className="text-[11px] text-zinc-500 mt-0.5">
               {isPassphraseStage
@@ -478,13 +489,17 @@ export function MoveAddressModal({
                 placeholder={`e.g. "blue house + 2019"`}
                 value={newHint}
                 maxLength={100}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 onChange={(e) => {
                   setNewHint(e.target.value);
                   setPassError("");
                 }}
                 className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
               />
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-[10px] text-red-400/90">
                 If you forget your passphrase, this is your only reminder. Stored as plain text.
               </p>
             </div>
@@ -533,7 +548,7 @@ export function MoveAddressModal({
               ) : stage === "saving" ? (
                 <ActiveStep
                   heading="Saving your current key"
-                  description="Downloading a recovery file for your old address\u2026"
+                  description="Downloading a recovery file for your current key\u2026"
                 />
               ) : stage === "saved-confirm" ? (
                 <div className="space-y-2.5">
@@ -544,8 +559,8 @@ export function MoveAddressModal({
                         Your file should have downloaded
                       </p>
                       <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                        Move it somewhere safe (phone, cloud, USB). It&apos;s the only way to
-                        recover funds on your old address if the transfer below fails.
+                        Move it somewhere safe (phone, cloud, USB). If the fund transfer fails, this
+                        file is your recovery.
                       </p>
                     </div>
                   </div>
@@ -580,19 +595,19 @@ export function MoveAddressModal({
                   <CompletedStep
                     heading={
                       sweepWarning
-                        ? "New address ready \u2014 transfer skipped"
+                        ? "New key ready \u2014 transfer skipped"
                         : COMPLETED_STEPS.creating.heading
                     }
                     description={
                       sweepWarning
-                        ? "You chose to proceed without transferring funds. They\u2019re safe on your old address \u2014 use your backup file."
+                        ? "You chose to proceed without transferring funds. They\u2019re safe on your old key \u2014 use your backup file."
                         : COMPLETED_STEPS.creating.description
                     }
                     variant={sweepWarning ? "warn" : undefined}
                   />
                 ) : stage === "creating" ? (
                   <ActiveStep
-                    heading="Creating your new address"
+                    heading="Creating your new key"
                     description="Generating a fresh keypair and sweeping funds\u2026"
                   />
                 ) : stage === "sweep-failed" ? (
@@ -601,11 +616,11 @@ export function MoveAddressModal({
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-amber-400">Fund transfer failed</p>
                       <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        {errorMessage || "Couldn\u2019t move your funds to the new address."}
+                        {errorMessage || "Couldn\u2019t move your funds to the new key."}
                       </p>
                       <p className="text-[11px] text-zinc-500 leading-relaxed">
-                        Your funds are safe on your old address. You can retry the transfer or
-                        proceed without moving funds.
+                        Your funds are safe on your old key. You can retry the transfer or proceed
+                        without moving funds.
                       </p>
                       <div className="flex gap-2 pt-1">
                         <button
@@ -658,20 +673,38 @@ export function MoveAddressModal({
               {isDone && (
                 <div className="space-y-3 pt-1">
                   <p className="text-[11px] text-zinc-300 leading-relaxed">
-                    You&apos;re on a fresh address. Your identity is intact \u2014 same name, same
-                    history.
+                    You&apos;re on a fresh key. Same name, same history &mdash; nothing changed for
+                    anyone else.
                   </p>
+                  {!sweepWarning &&
+                  upgradeResultRef.current?.fundTransfer.transferredSats &&
+                  upgradeResultRef.current.fundTransfer.transferredSats > 0 ? (
+                    <div className="border-l-2 border-emerald-500/60 pl-2.5 py-0.5">
+                      <p className="text-[11px] text-emerald-400/90 leading-relaxed">
+                        {upgradeResultRef.current.fundTransfer.transferredSats.toLocaleString()}{" "}
+                        sats moved to your new key.
+                      </p>
+                    </div>
+                  ) : null}
                   {sweepWarning && (
                     <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                       <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                        Funds weren&apos;t transferred \u2014 still on your old address. Use your
+                        Funds weren&apos;t moved &mdash; they&apos;re still on your old key. Use your
                         backup file to recover them.
                       </p>
                     </div>
                   )}
-                  <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
+                  <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5 space-y-1.5">
                     <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                      Your new recovery file has been downloaded. Move it somewhere safe.
+                      Your final recovery file has been downloaded. It contains both your new key
+                      and your previous key. The temporary file from earlier can be deleted.
+                    </p>
+                    <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                      Keep this file somewhere safe &mdash; a cloud drive, a USB stick, away from
+                      this device. Your passphrase is the only thing that opens it.{" "}
+                      <span className="font-semibold text-amber-300">
+                        Without both, you cannot recover your account.
+                      </span>
                     </p>
                   </div>
                   <button

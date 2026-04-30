@@ -2,6 +2,30 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-04-30 — Manage Gate + Combined Backup + Done-State Polish (Stage 7)
+
+Category: UX, security, copy
+
+Follow-up to Stage 6 closing the loose ends in the You modal + key-rotation flow.
+
+**Single-passphrase manage gate.** The You modal now verifies the passphrase once on entry, then unlocks all eligible actions (Passphrase, Move) while the modal is open. Session is destroyed on modal close OR tab blur — same pattern password managers use. Removes the prior friction of re-entering the passphrase per action. Show recovery key + Restore still re-prompt (asymmetric theatre vs real security debated with architect agent — accepted that consistent re-prompts on truly destructive actions are worth the friction).
+
+**Move + Passphrase merged into one row.** Both flows called identical primitives (`upgradeIdentity` + migration + backup). Collapsed into a single "Passphrase" row that opens `MoveAddressModal`. Restore row mirrored with parallel "Move to a saved key" subtitle so the two are visually paired.
+
+**Combined recovery file.** Stage-3 download now contains both `wif_encrypted` (new key) and `oldWif_encrypted` (old key under new passphrase). One file, one passphrase, both keys recoverable. Supersedes the temporary stage-1 file. Note copy reframed.
+
+**Auto-close timing bug fixed.** Previously `onComplete` in `IdentityBar` closed the wizard immediately when stage hit `done`, so the user never saw the completed steps, sats-moved confirmation, or safeguard copy. Split into two phases: `onComplete` updates identity state only (parent stays mounted); `onClose` (Continue button / X / backdrop on done) is the single dismissal path.
+
+**Done-state safeguard copy.** Extended the amber block above the Continue button with the file-and-passphrase mutual-dependency reminder: *"Keep this file somewhere safe — a cloud drive, a USB stick, away from this device. Your passphrase is the only thing that opens it. **Without both, you cannot recover your account.**"* Marketer agent recommended extending the existing amber block over adding a separate one (avoids fragmentation, single attention container). Designer agent recommended amber over red: red after green checkmarks reads as contradiction. Critical sentence bolded in `text-amber-300` for typographic weight.
+
+**Memory clue autocomplete off.** Hint inputs on all three passphrase modals (Move/Change/Upgrade) now have `autoComplete="off"` + `autoCorrect/Capitalize="off"` + `spellCheck={false}` — browsers no longer surface previously-entered memory clues from saved form history.
+
+**Em-dash entity fix.** Three JSX text nodes were still using literal `—` escape sequences which JSX text content doesn't decode. Replaced with `&mdash;` HTML entities (matching the `&apos;` precedent already in those same lines). Other `—` usages inside JS string expressions (props, ternaries) work correctly and were left alone.
+
+**Address → key.** User-facing copy refined throughout the wizard. "Address" is BSV jargon; "key" is what the user actually controls and what the recovery file contains.
+
+Files changed: `src/app/IdentityBar.tsx`, `src/components/MoveAddressModal.tsx`, `src/components/ChangePassphraseModal.tsx`, `src/components/UpgradeModal.tsx`, `src/components/RestoreModal.tsx`, ROADMAP.md.
+
 ## 2026-04-17 (cont.) — Amber Rebrand + Sweep Hardening + Modal Restructure (Stage 6)
 
 Category: security, UX, architecture, bug fixes

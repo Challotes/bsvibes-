@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
-import { ChangePassphraseModal } from "@/components/ChangePassphraseModal";
 import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { RestoreModal } from "@/components/RestoreModal";
-import { UpgradeModal } from "@/components/UpgradeModal";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
@@ -32,8 +30,6 @@ export function IdentityChip(): React.JSX.Element | null {
   // believing backup was saved" failure mode when the browser didn't
   // actually save the file (popup blocker, disk full, CSP deny, etc).
   const [justDownloaded, setJustDownloaded] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showChangePassModal, setShowChangePassModal] = useState(false);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
 
@@ -58,14 +54,8 @@ export function IdentityChip(): React.JSX.Element | null {
   // Save recovery file state
   const [downloading, setDownloading] = useState(false);
 
-  // Re-auth grace window (for actions that need passphrase confirmation)
-  const [reAuthTime, setReAuthTime] = useState(0);
+  // Cached passphrase for the manage modal session (cleared on close / tab blur)
   const reAuthPassphraseRef = useRef("");
-
-  // Re-auth prompt
-  const [reAuthAction, setReAuthAction] = useState<(() => void) | null>(null);
-  const [reAuthError, setReAuthError] = useState("");
-  const [reAuthLoading, setReAuthLoading] = useState(false);
 
   // Import state moved to RestoreModal
 
@@ -90,6 +80,15 @@ export function IdentityChip(): React.JSX.Element | null {
   const [showDeposit, setShowDeposit] = useState(false);
   // Manage identity modal
   const [showManage, setShowManage] = useState(false);
+  // Manage modal gate — passphrase verified once on entry, all eligible actions
+  // unlocked while modal is open. Show recovery key + Restore still re-prompt.
+  // Session destroyed on modal close OR tab blur.
+  const [manageAuthed, setManageAuthed] = useState(false);
+  // Pending gate passphrase entry (shown before You modal opens for protected users)
+  const [showManageGate, setShowManageGate] = useState(false);
+  const [manageGatePass, setManageGatePass] = useState("");
+  const [manageGateError, setManageGateError] = useState("");
+  const [manageGateLoading, setManageGateLoading] = useState(false);
   // Restore modal
   const [showRestoreModal, setShowRestoreModal] = useState(false);
 
@@ -103,8 +102,6 @@ export function IdentityChip(): React.JSX.Element | null {
 
   const closeDropdown = useCallback(() => {
     setOpen(false);
-    setReAuthAction(null);
-    setReAuthError("");
     setShowAdvanced(false);
     setKeyRevealed(false);
     setCopied(false);
@@ -202,20 +199,31 @@ export function IdentityChip(): React.JSX.Element | null {
       // Don't close the dropdown if the upgrade modal or move modal is open — those
       // modals render outside dropdownRef so every click inside them would otherwise
       // trigger this handler.
-      if (showUpgradeModal || showChangePassModal || showMoveModal) return;
+      if (showMoveModal) return;
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         closeDropdown();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, showUpgradeModal, showChangePassModal, showMoveModal, closeDropdown]);
+  }, [open, showMoveModal, closeDropdown]);
+
+  // Destroy manage session on tab blur — same pattern password managers use.
+  useEffect(() => {
+    if (!manageAuthed) return;
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") {
+        setManageAuthed(false);
+        reAuthPassphraseRef.current = "";
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [manageAuthed]);
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function resetManageState() {
-    setReAuthAction(null);
-    setReAuthError("");
     setShowAdvanced(false);
     setKeyRevealed(false);
     setCopied(false);
@@ -224,40 +232,50 @@ export function IdentityChip(): React.JSX.Element | null {
   function closeManageModal() {
     setShowManage(false);
     resetManageState();
+    // Destroy manage session on close
+    setManageAuthed(false);
+    reAuthPassphraseRef.current = "";
   }
 
-  function isRecentlyAuthed(): boolean {
-    return Date.now() - reAuthTime <= 60_000;
+  function closeManageGate() {
+    setShowManageGate(false);
+    setManageGatePass("");
+    setManageGateError("");
+    setManageGateLoading(false);
   }
 
-  function requireReAuth(action: () => void): void {
-    if (!isProtected || isRecentlyAuthed()) {
-      action();
+  // Click "Manage" — gate the modal if protected, else open directly
+  function openManageModal(): void {
+    if (!isProtected) {
+      // Unprotected users: open directly, no gate
+      setManageAuthed(true);
+      setShowManage(true);
       return;
     }
-    setReAuthAction(() => action);
-    setReAuthError("");
+    // Protected: show gate first
+    setShowManageGate(true);
   }
 
-  async function handleReAuthConfirm(passphrase: string): Promise<void> {
-    setReAuthLoading(true);
-    setReAuthError("");
+  async function handleManageGateConfirm(): Promise<void> {
+    if (!manageGatePass) return;
+    setManageGateLoading(true);
+    setManageGateError("");
     try {
-      const unlocked = await unlockIdentity(passphrase);
+      const unlocked = await unlockIdentity(manageGatePass);
       if (!unlocked) {
-        setReAuthError("Wrong passphrase");
-        setReAuthLoading(false);
+        setManageGateError("Wrong passphrase");
+        setManageGateLoading(false);
         return;
       }
-      setReAuthTime(Date.now());
-      reAuthPassphraseRef.current = passphrase;
-      const pendingAction = reAuthAction;
-      setReAuthAction(null);
-      if (pendingAction) pendingAction();
+      // Verified — store passphrase, mark authed, open modal
+      reAuthPassphraseRef.current = manageGatePass;
+      setManageAuthed(true);
+      closeManageGate();
+      setShowManage(true);
     } catch {
-      setReAuthError("Something went wrong — try again");
+      setManageGateError("Something went wrong — try again");
     } finally {
-      setReAuthLoading(false);
+      setManageGateLoading(false);
     }
   }
 
@@ -272,7 +290,6 @@ export function IdentityChip(): React.JSX.Element | null {
       if (!unlocked) {
         setUnlockError("Wrong passphrase — try again");
       } else {
-        setReAuthTime(Date.now());
         reAuthPassphraseRef.current = unlockPassphrase;
         updateIdentity(unlocked);
         setUnlockPassphrase("");
@@ -288,16 +305,10 @@ export function IdentityChip(): React.JSX.Element | null {
 
   function handleSaveFile(): void {
     if (isProtected) {
-      // Single passphrase entry: re-auth captures passphrase, then save directly
-      if (isRecentlyAuthed() && reAuthPassphraseRef.current) {
+      // Gate already verified passphrase; use the cached value directly
+      if (reAuthPassphraseRef.current) {
         void handleSaveEncrypted(reAuthPassphraseRef.current);
-        return;
       }
-      requireReAuth(() => {
-        if (reAuthPassphraseRef.current) {
-          void handleSaveEncrypted(reAuthPassphraseRef.current);
-        }
-      });
       return;
     }
     // Unprotected: plaintext download
@@ -319,8 +330,7 @@ export function IdentityChip(): React.JSX.Element | null {
       `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`
     );
     setJustDownloaded(true);
-    setShowManage(false);
-    setOpen(true);
+    // Stay in You modal — inline confirmation appears on the Save row.
     setTimeout(() => setDownloading(false), 1000);
   }
 
@@ -354,8 +364,7 @@ export function IdentityChip(): React.JSX.Element | null {
         `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`
       );
       setJustDownloaded(true);
-      setShowManage(false);
-      setOpen(true);
+      // Stay in You modal — inline confirmation appears on the Save row.
     } catch {
       console.error("BSVibes: save encrypted failed");
     } finally {
@@ -373,28 +382,23 @@ export function IdentityChip(): React.JSX.Element | null {
   // ── Advanced: Show/Copy key ────────────────────────────────────────────
 
   function handleCopy(): void {
-    requireReAuth(() => {
-      if (!identity) return;
-      navigator.clipboard.writeText(identity.wif);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      markBackedUp();
-    });
+    if (!identity) return;
+    navigator.clipboard.writeText(identity.wif);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    markBackedUp();
   }
 
   function handleRevealKey(): void {
-    requireReAuth(() => setKeyRevealed((v) => !v));
+    setKeyRevealed((v) => !v);
   }
 
   // ── Modal launchers ────────────────────────────────────────────────────
 
-  function openUpgradeModal(): void {
-    setShowUpgradeModal(true);
-  }
-
   function openMoveModal(pass: string): void {
     setMovePassphrase(pass);
-    setShowManage(false);
+    // Keep You modal mounted underneath — sub-modal stacks on top.
+    // Cancel returns to You modal; only successful completion closes both.
     setShowMoveModal(true);
   }
 
@@ -484,45 +488,30 @@ export function IdentityChip(): React.JSX.Element | null {
   return (
     <>
       {/* Modals — rendered at root level to avoid dropdown stacking context */}
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        onSuccess={(newIdentity, transferMsg) => {
-          updateIdentity(newIdentity);
-          setReAuthTime(Date.now());
-          setIsProtected(true);
-          setBackupConfirmed(true);
-          if (transferMsg) setTransferStatus(transferMsg);
-        }}
-        currentIdentity={identity}
-      />
-      <ChangePassphraseModal
-        isOpen={showChangePassModal}
-        onClose={() => setShowChangePassModal(false)}
-        onSuccess={(newIdentity, transferMsg) => {
-          updateIdentity(newIdentity);
-          setReAuthTime(Date.now());
-          setIsProtected(true);
-          setBackupConfirmed(true);
-          if (transferMsg) setTransferStatus(transferMsg);
-        }}
-        currentIdentity={identity}
-      />
       {showMoveModal && identity && (
         <MoveAddressModal
           identity={identity}
           isProtected={isProtected}
           passphrase={movePassphrase}
           onComplete={(newIdentity) => {
+            // Wizard reached the "done" stage — update identity state but
+            // leave the wizard mounted so the user can see all status updates
+            // (completed steps, sats moved, recovery file note). The actual
+            // close happens when the user clicks "Continue" → onClose below.
             updateIdentity(newIdentity);
             setIsProtected(true);
-            setReAuthTime(Date.now());
-            localStorage.removeItem(BACKED_UP_KEY);
-            setBackedUp(false);
+            localStorage.setItem(BACKED_UP_KEY, "1");
+            setBackedUp(true);
           }}
           onClose={() => {
+            // Fired by the Continue button on the done screen, the X icon, or
+            // a backdrop click on done/sweep-failed. Close the wizard and the
+            // parent You modal, and clear the cached re-auth passphrase.
             setShowMoveModal(false);
             setMovePassphrase("");
+            setShowManage(false);
+            setManageAuthed(false);
+            reAuthPassphraseRef.current = "";
           }}
         />
       )}
@@ -546,6 +535,71 @@ export function IdentityChip(): React.JSX.Element | null {
           isProtected={isProtected}
           reAuthPassphrase={reAuthPassphraseRef.current}
         />
+      )}
+
+      {/* ── Manage gate (passphrase entry before You modal opens) ── */}
+      {showManageGate && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 w-full cursor-default"
+            aria-label="Close"
+            onClick={closeManageGate}
+          />
+          <div
+            className="relative z-10 w-full max-w-sm rounded-xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden"
+            style={{ backgroundColor: "#0f0f0f" }}
+          >
+            <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+            <div className="px-4 py-3 border-b border-amber-400/10">
+              <p className="text-sm font-semibold text-zinc-100">Unlock identity</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                Enter your passphrase to access identity settings
+              </p>
+            </div>
+            <div className="px-4 py-4 space-y-3">
+              <input
+                type="password"
+                placeholder="Passphrase"
+                value={manageGatePass}
+                onChange={(e) => {
+                  setManageGatePass(e.target.value);
+                  setManageGateError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && manageGatePass) handleManageGateConfirm();
+                }}
+                className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+              />
+              {storedHint && (
+                <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
+                  <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+                </div>
+              )}
+              {manageGateError && <p className="text-[11px] text-red-400">{manageGateError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closeManageGate}
+                  className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManageGateConfirm}
+                  disabled={!manageGatePass || manageGateLoading}
+                  className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {manageGateLoading ? "Unlocking..." : "Unlock"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Manage Identity modal ── */}
@@ -592,20 +646,44 @@ export function IdentityChip(): React.JSX.Element | null {
 
               <div className="divide-y divide-amber-400/10">
                 {/* Save recovery file */}
-                {reAuthAction !== null ? (
-                  <div className="px-4 py-3">
-                    <PassphrasePrompt
-                      context="Enter your passphrase to continue."
-                      error={reAuthError}
-                      loading={reAuthLoading}
-                      onConfirm={handleReAuthConfirm}
-                      onCancel={() => {
-                        setReAuthAction(null);
-                        setReAuthError("");
-                      }}
-                      confirmLabel="Continue"
-                      hint={storedHint}
-                    />
+                {justDownloaded ? (
+                  <div className="px-4 py-3 bg-emerald-500/5 border-l-2 border-emerald-500/60">
+                    <div className="flex items-start gap-3">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="text-emerald-400 shrink-0 mt-0.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-emerald-300 block">
+                          Your file should have downloaded
+                        </span>
+                        <span className="text-[10px] text-emerald-300/80 block mt-0.5 mb-1.5 leading-relaxed">
+                          Move it somewhere safe (phone, cloud, USB). It&apos;s the only way back
+                          into your account.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markBackedUp();
+                            setJustDownloaded(false);
+                          }}
+                          className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-2.5 py-0.5 text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
+                        >
+                          Got it
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <button
@@ -651,15 +729,12 @@ export function IdentityChip(): React.JSX.Element | null {
                   </button>
                 )}
 
-                {/* Secure / Change passphrase */}
+                {/* Passphrase — opens MoveAddressModal (rotates key + new passphrase) */}
                 <button
                   type="button"
-                  onClick={() => {
-                    closeManageModal();
-                    if (isProtected) setShowChangePassModal(true);
-                    else openUpgradeModal();
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
+                  onClick={() => openMoveModal(reAuthPassphraseRef.current)}
+                  disabled={!identity}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left disabled:opacity-40"
                 >
                   <svg
                     width="18"
@@ -671,22 +746,22 @@ export function IdentityChip(): React.JSX.Element | null {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden="true"
-                    className="text-amber-400"
+                    className={isProtected ? "text-amber-400" : "text-red-400"}
                   >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     {isProtected && <path d="m9 12 2 2 4-4" />}
                   </svg>
                   <div className="flex-1 min-w-0">
                     <span
-                      className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-amber-400"}`}
+                      className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-red-400"}`}
                     >
                       Passphrase
                     </span>
                     <span
-                      className={`text-[10px] block mt-0.5 ${isProtected ? "text-zinc-500" : "text-amber-400/70"}`}
+                      className={`text-[10px] block mt-0.5 ${isProtected ? "text-zinc-500" : "text-red-400/70"}`}
                     >
                       {isProtected
-                        ? "Set · tap to change"
+                        ? "Move to a fresh key — earnings and posts stay synced"
                         : "Not set — add one so you can recover from any device"}
                     </span>
                   </div>
@@ -706,17 +781,10 @@ export function IdentityChip(): React.JSX.Element | null {
                   </svg>
                 </button>
 
-                {/* Restore from another device — opens RestoreModal */}
+                {/* Restore key from file — opens RestoreModal (stacks on You modal) */}
                 <button
                   type="button"
-                  onClick={() => {
-                    closeManageModal();
-                    if (isProtected && !isRecentlyAuthed()) {
-                      requireReAuth(() => setShowRestoreModal(true));
-                    } else {
-                      setShowRestoreModal(true);
-                    }
-                  }}
+                  onClick={() => setShowRestoreModal(true)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
                 >
                   <svg
@@ -737,63 +805,10 @@ export function IdentityChip(): React.JSX.Element | null {
                   </svg>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-medium text-zinc-200 block">
-                      Restore from another device
+                      Restore key from file
                     </span>
                     <span className="text-[10px] text-zinc-500 block mt-0.5">
-                      Import a recovery file
-                    </span>
-                  </div>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-zinc-600 shrink-0"
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-
-                {/* Move to a new address — goes straight to MoveAddressModal */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeManageModal();
-                    if (isProtected && !isRecentlyAuthed()) {
-                      requireReAuth(() => openMoveModal(reAuthPassphraseRef.current));
-                    } else {
-                      openMoveModal(reAuthPassphraseRef.current);
-                    }
-                  }}
-                  disabled={!identity}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left disabled:opacity-40"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-zinc-600 shrink-0"
-                  >
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-zinc-200 block">
-                      Move to a new address
-                    </span>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">
-                      Rotate to a new address. Your name, earnings, and posts stay intact.
+                      Move to a saved key — posts and earnings stay on this one
                     </span>
                   </div>
                   <svg
@@ -816,7 +831,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 {!showAdvanced ? (
                   <button
                     type="button"
-                    onClick={() => requireReAuth(() => setShowAdvanced(true))}
+                    onClick={() => setShowAdvanced(true)}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
                   >
                     <svg
@@ -1048,7 +1063,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   // Unprotected: download directly, no re-auth needed.
                   if (isProtected) {
                     setOpen(false);
-                    setShowManage(true);
+                    openManageModal();
                   } else {
                     handleSaveFile();
                   }
@@ -1246,8 +1261,10 @@ export function IdentityChip(): React.JSX.Element | null {
                   {(activityExpanded ? activity : activity.slice(0, 2)).map((a, i) => {
                     const isFree = a.amount === 0;
                     const isBoot = a.label.toLowerCase().includes("boot");
+                    // List is read-only, server-sorted, fully replaced on each fetch — index disambiguates same-timestamp payouts
                     return (
                       <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: see comment above
                         key={`${a.created_at}-${a.label}-${i}`}
                         className="flex items-center justify-between text-[11px]"
                       >
@@ -1365,7 +1382,7 @@ export function IdentityChip(): React.JSX.Element | null {
             <div className="px-3 py-2.5">
               <button
                 type="button"
-                onClick={() => setShowManage(true)}
+                onClick={() => openManageModal()}
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-amber-400/10 border border-amber-400/25 py-2 text-sm text-amber-300 font-medium hover:bg-amber-400/15 hover:border-amber-400/40 transition-all"
               >
                 <svg

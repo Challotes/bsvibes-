@@ -247,7 +247,7 @@ export function RestoreModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
     >
       <button
@@ -265,8 +265,10 @@ export function RestoreModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-amber-400/10">
           <div>
-            <p className="text-sm font-semibold text-zinc-100">Restore from another device</p>
-            <p className="text-[11px] text-zinc-500 mt-0.5">Import a recovery file</p>
+            <p className="text-sm font-semibold text-zinc-100">Restore key from file</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              This will replace your current identity
+            </p>
           </div>
           <button
             type="button"
@@ -292,8 +294,12 @@ export function RestoreModal({
 
         {/* Body */}
         <div className="px-4 py-4 space-y-3">
-          <p className="text-[11px] text-amber-400/80 leading-relaxed">
+          <p className="text-[11px] text-red-400 leading-relaxed">
             This will replace your current identity. Your current recovery file will be saved first.
+          </p>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Your current posts and earnings stay with your current key — the backup file is how you
+            return to them.
           </p>
 
           {pendingRestoreWif !== null ? (
