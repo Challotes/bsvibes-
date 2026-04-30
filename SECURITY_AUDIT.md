@@ -14,6 +14,7 @@
 **File:** src/services/bsv/identity.ts lines 39-45
 **Risk:** `_cachedWif` and `_sessionIdentity.wif` in memory for entire session. Any script can read.
 **Fix:** Cache CryptoKey object instead of WIF string where possible. Accepted risk for plaintext path.
+**Partial mitigation (2026-04-30, Stage 7):** the manage-gate session (`manageAuthed` in IdentityBar) is now destroyed on tab blur (`visibilitychange === "hidden"`). This bounds the *manage-flow* exposure window to active tab focus — but the underlying `_cachedWif` / `_sessionIdentity` caches in `identity.ts` still persist for the session. Full mitigation requires extending the tab-blur destroy to the identity-module caches and adding a configurable idle timer.
 
 ### C3: /api/boot-confirm accepts any txid without verification — FIXED
 **File:** src/app/api/boot-confirm/route.ts
@@ -95,7 +96,7 @@
 ## MEDIUM (8 findings — before public launch)
 
 - M1: PBKDF2 at 100k iterations (increase to 600k)
-- M2: Backup file contains plaintext WIF — PARTIAL (encrypted with passphrase for protected users; unprotected users still get plaintext WIF via doDownloadPlaintext path at IdentityBar.tsx:282-297)
+- M2: Backup file contains plaintext WIF — PARTIAL (encrypted with passphrase for protected users; unprotected users still get plaintext WIF via doDownloadPlaintext path at IdentityBar.tsx:282-297). **Update (2026-04-30, Stage 7):** the combined recovery file produced by MoveAddressModal now also encrypts the *prior* key (`oldWif_encrypted`) under the new passphrase, so even during rotation no plaintext old WIF is written to disk for protected users. The remaining plaintext exposure is limited to the unprotected-user "Show recovery key" / "Save recovery file" paths.
 - M3: Migration signature has no timestamp validation
 - M4: Rate limiter is in-memory, resets on restart
 - M5: /api/earnings exposes full financial history unauthenticated

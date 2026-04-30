@@ -54,7 +54,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Header.tsx` — Top bar with logo, genesis nav, identity chip
 - `src/app/PostList.tsx` — Post rendering, BootButton, Genesis anchor
 - `src/app/PostForm.tsx` — Compose box (enter-to-post, voice-to-text, agent chat trigger)
-- `src/app/IdentityBar.tsx` — Identity chip + You modal. Amber brand theme (#f59e0b). Earnings-first hierarchy: all-time earnings (hero) → activity (2 visible, "View all" toggle) → balance (demoted, inline "Add funds" link). Protected state = inline checkmark (X-verified pattern); unprotected = red banner → opens MoveAddressModal (combined passphrase + move flow). You modal is a clean launcher: each row opens its own modal (passphrase, restore, move) except recovery key (inline). Earnings poll 30s — full feed when dropdown open, summary only when closed.
+- `src/app/IdentityBar.tsx` — Identity chip + You modal. Amber brand theme (#f59e0b). Earnings-first hierarchy: all-time earnings (hero) → activity (2 visible, "View all" toggle) → balance (demoted, inline "Add funds" link). Protected state = inline checkmark (X-verified pattern); unprotected = red banner → opens MoveAddressModal (combined passphrase + move flow). **Manage gate:** opening the You modal on a protected identity prompts for the passphrase once; verified session (`manageAuthed`) unlocks Passphrase + Move while open and is destroyed on close OR tab blur (password-manager pattern). Show recovery key + Restore still re-prompt (defense-in-depth on highest-stakes paths — see DECISIONS.md). Move + Change Passphrase rows merged into a single "Passphrase" row (both flows called the same primitives). Recovery key stays inline (read-only). Earnings poll 30s — full feed when dropdown open, summary only when closed.
 - `src/components/RestoreModal.tsx` — Standalone restore-from-device modal (extracted from IdentityBar). Handles plain WIF, encrypted WIF, pending restore confirmation, auto-backup of current identity.
 - `src/app/Bootboard.tsx` — Pay-to-feature spotlight (live timer, shake/glow animations)
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
@@ -66,7 +66,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
 - `src/components/UpgradeModal.tsx` — Security upgrade modal (passphrase encryption + migration)
 - `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
-- `src/components/MoveAddressModal.tsx` — Combined "move + protect" wizard. Collects passphrase first → backup old key → upgradeIdentity (encrypted new key + sweep) → migrateIdentity → download new backup. Sweep failure blocks rotation with retry/proceed options. Pre-rotation chain verification warns if posts would be orphaned. Also serves as the "Not protected" flow (every rotation produces an encrypted key).
+- `src/components/MoveAddressModal.tsx` — Combined "move + protect" wizard. Collects passphrase first → backup old key → upgradeIdentity (encrypted new key + sweep) → migrateIdentity → download **combined recovery file** containing both `wif_encrypted` (new key) and `oldWif_encrypted` (old key under new passphrase) — one file, one passphrase, supersedes the temporary stage-1 file. Sweep failure blocks rotation with retry/proceed options. Pre-rotation chain verification warns if posts would be orphaned. `onComplete` updates identity state only (parent stays mounted); `onClose` (Continue button / X / backdrop on done) is the single dismissal path so the user sees all status updates + safeguard copy before exiting. Also serves as the "Not protected" flow (every rotation produces an encrypted key).
 - `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
 - `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon
@@ -142,6 +142,8 @@ BootButton/useBoot → bootPost server action → server wallet builds split tx 
 - Anonymous names: `anon_XXXX` format (4 random alphanumeric chars)
 - Posts are cryptographically signed (ECDSA via BSV SDK)
 - Users can copy/download their key for backup
+- **Combined recovery file pattern:** every passphrase-protected backup contains both the current encrypted key (`wif_encrypted`) and the most-recent prior encrypted key (`oldWif_encrypted`), encrypted under the same passphrase. One file, one passphrase, both keys recoverable — reduces file-management burden across rotations.
+- **Manage gate:** the You modal verifies the passphrase once on entry (`manageAuthed` state); session destroyed on modal close or tab blur. Show recovery key + Restore still re-prompt (asymmetric by design — see DECISIONS.md).
 - Dynamic imports for `@bsv/sdk` to avoid bundling issues
 - Upgrade path: raw localStorage → passphrase encryption → passkey wrapping → server HSM
 - See DECISIONS.md for the full security upgrade plan

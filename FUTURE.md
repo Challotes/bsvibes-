@@ -90,7 +90,7 @@ None of this is roadmap. It's what the code is quietly becoming.
 
 Features noted for when real money flows at scale:
 
-- **Session timeout** — auto-lock after 30 min tab hidden. Currently stays unlocked until tab close. Not needed at current stakes.
+- **Session timeout** — auto-lock after 30 min tab hidden. *Stage 7 (2026-04-30) shipped tab-blur destroy on the manage gate (`manageAuthed` cleared on `visibilitychange === "hidden"`); the underlying decrypted-key cache (`_cachedWif` / `_sessionIdentity`) still stays unlocked until tab close.* Full app-wide auto-lock with a configurable timer (e.g. 30 min idle) remains deferred. Not needed at current stakes.
 - **Device sync via QR** — scan QR on Device B to import identity from Device A. Faster than file transfer.
 - **Passkey wrapping (WebAuthn)** — biometric unlock instead of passphrase. Firefox fallback needed.
 - **PBKDF2 increase to 600k iterations** — currently 100k. Increase when real funds flow.
