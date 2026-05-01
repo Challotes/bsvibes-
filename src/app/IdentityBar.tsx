@@ -887,28 +887,39 @@ export function IdentityChip(): React.JSX.Element | null {
                         Cancel
                       </button>
                     </div>
+                    <p className="text-[11px] text-red-400 leading-relaxed">
+                      Anyone with this key owns your account and any funds in it. Never share it.
+                    </p>
                     <div className="bg-amber-400/5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-amber-300/70 break-all leading-relaxed">
                       {keyRevealed
                         ? identity.wif
                         : `${"\u2022".repeat(12)}${identity.wif.slice(-4)}`}
                     </div>
-                    {!keyRevealed && (
+                    {!keyRevealed ? (
                       <button
                         type="button"
                         onClick={handleRevealKey}
                         className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
                       >
-                        Show key
+                        Reveal key
                       </button>
-                    )}
-                    {keyRevealed && (
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
-                      >
-                        {copied ? "Copied" : "Copy key"}
-                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleRevealKey}
+                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                        >
+                          Hide key
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCopy}
+                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                        >
+                          {copied ? "Copied" : "Copy key"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
