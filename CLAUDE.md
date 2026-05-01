@@ -40,7 +40,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 ### Server Actions & Data
 
-- `src/app/actions.ts` — createPost (sig verification), getPosts, getBootboard, bootPost, migrateIdentity, cleanupMigrations
+- `src/app/actions.ts` — Server actions (all signature-verified): createPost, getPosts, getBootboard, bootPost, migrateIdentity, cleanupMigrations, verifyMigrationChain (pre-rotation orphan check)
 - `src/lib/db.ts` — SQLite setup (WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/lib/utils.ts` — Shared utilities (generateAnonName, cn helper)
@@ -64,7 +64,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/layout.tsx` — Root layout (metadata, fonts, IdentityProvider wrapper)
 - `src/app/error.tsx` — Error boundary
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
-- `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
+- `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup, or new → backup when `preVerifiedPassphrase` is passed in from the manage gate). Includes pre-rotation chain verification warning.
 - `src/components/MoveAddressModal.tsx` — Combined "move + protect" wizard. Collects passphrase first → backup old key → upgradeIdentity (encrypted new key + sweep) → migrateIdentity → download **combined recovery file** containing both `wif_encrypted` (new key) and `oldWif_encrypted` (old key under new passphrase) — one file, one passphrase, supersedes the temporary stage-1 file. Sweep failure blocks rotation with retry/proceed options. Pre-rotation chain verification warns if posts would be orphaned. `onComplete` updates identity state only (parent stays mounted); `onClose` (Continue button / X / backdrop on done) is the single dismissal path so the user sees all status updates + safeguard copy before exiting. Also serves as the "Not protected" flow (every rotation produces an encrypted key).
 - `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
 - `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
@@ -106,8 +106,9 @@ All on-chain payloads are JSON inside OP_FALSE OP_RETURN outputs:
 ### Hooks & Context
 
 - `src/contexts/IdentityContext.tsx` — Shared identity provider (single BSV SDK load)
+- `src/contexts/BootContext.tsx` — Global boot coordinator: single-flight lock (only one boot in flight at a time across the whole app), 3s UI throttle, status state machine, consolidation-warning dismissal state. Consumed by Bootboard, Feed, PostList, useBoot.
 - `src/hooks/useIdentity.ts` — React hook for identity management
-- `src/hooks/useBoot.ts` — Shared boot logic (free → server, paid → client trustless, consolidation)
+- `src/hooks/useBoot.ts` — Shared boot logic (free → server, paid → client trustless, consolidation); coordinates with BootContext for global single-flight + 3s throttle
 - `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s (pauses on hidden tab)
 - `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking
 - `src/hooks/useBsvPrice.ts` — BSV/USD price (cached 5 min)
