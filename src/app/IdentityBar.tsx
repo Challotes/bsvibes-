@@ -854,7 +854,7 @@ export function IdentityChip(): React.JSX.Element | null {
                         </span>
                       </div>
                       <span className="text-[10px] text-zinc-500 block mt-0.5">
-                        View, copy, or manually paste your key
+                        Secret key &mdash; handle with care
                       </span>
                     </div>
                     <svg
@@ -1252,7 +1252,7 @@ export function IdentityChip(): React.JSX.Element | null {
               </div>
               {activity.length === 0 ? (
                 <p className="text-[11px] text-zinc-600 leading-relaxed">
-                  Nothing yet — when your posts get featured, earnings appear here
+                  Your earnings show here &mdash; share an idea, or boot posts you like.
                 </p>
               ) : (
                 <div className="space-y-1">

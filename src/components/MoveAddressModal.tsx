@@ -172,13 +172,11 @@ export function MoveAddressModal({
       return;
     }
     if (isProtected && passphrase && newPass === passphrase) {
-      setPassError("New passphrase must be different from your current one");
+      setPassError("Same as your current passphrase");
       return;
     }
     if (!newHint.trim()) {
-      setPassError(
-        "Add a memory clue — if you forget your passphrase, this is your only reminder."
-      );
+      setPassError("Add a memory clue — it's your only reminder if you forget.");
       return;
     }
     void runSaving();
@@ -432,7 +430,7 @@ export function MoveAddressModal({
             </h2>
             <p className="text-[11px] text-zinc-500 mt-0.5">
               {isPassphraseStage
-                ? "Set a passphrase for your new key"
+                ? "Choose a passphrase"
                 : isDone
                   ? "All done."
                   : "Don\u2019t close this window."}
@@ -500,7 +498,8 @@ export function MoveAddressModal({
                 className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
               />
               <p className="text-[10px] text-red-400/90">
-                If you forget your passphrase, this is your only reminder. Stored as plain text.
+                Only you should know what this means &mdash; it&apos;s stored unprotected in your
+                recovery file.
               </p>
             </div>
             {passError && <p className="text-[11px] text-red-400">{passError}</p>}
@@ -689,8 +688,8 @@ export function MoveAddressModal({
                   {sweepWarning && (
                     <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                       <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                        Funds weren&apos;t moved &mdash; they&apos;re still on your old key. Use your
-                        backup file to recover them.
+                        Funds weren&apos;t moved &mdash; they&apos;re still on your old key. Use
+                        your backup file to recover them.
                       </p>
                     </div>
                   )}
