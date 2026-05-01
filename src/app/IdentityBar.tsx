@@ -527,6 +527,12 @@ export function IdentityChip(): React.JSX.Element | null {
           onClose={() => setShowRestoreModal(false)}
           onSuccess={(imported) => {
             updateIdentity(imported);
+            // The file the user just restored IS their backup — mark
+            // backedUp so the dropdown banner doesn't reappear and prompt
+            // for a redundant new save on a device that already has the
+            // recovery file by definition.
+            localStorage.setItem(BACKED_UP_KEY, "1");
+            setBackedUp(true);
             setShowRestoreModal(false);
           }}
           currentIdentity={identity}
@@ -1067,15 +1073,12 @@ export function IdentityChip(): React.JSX.Element | null {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Protected identities need a passphrase prompt, which only
-                  // renders inside the Manage modal — so route through it.
-                  // Unprotected: download directly, no re-auth needed.
-                  if (isProtected) {
-                    setOpen(false);
-                    openManageModal();
-                  } else {
-                    handleSaveFile();
-                  }
+                  // Stage 7+ flow: any path that produces a protected
+                  // identity (MoveAddressModal completion, RestoreModal
+                  // success) atomically sets backedUp=true. So this
+                  // banner is only reachable for unprotected users —
+                  // direct download, no re-auth needed.
+                  handleSaveFile();
                 }}
                 disabled={downloading}
                 className="w-full flex items-center gap-3 px-3 py-2.5 bg-amber-500/10 border-b border-amber-500/30 hover:bg-amber-500/15 transition-colors text-left disabled:opacity-50"
