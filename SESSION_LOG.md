@@ -2,6 +2,34 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-01 (cont.) — Stage 8 Implementation (DONE)
+
+Category: UX, copy, architecture
+
+Implemented all locked-in Stage 8 decisions across seven batches, each gated by a code-auditor pre-commit pass.
+
+**Batch 1 (645aec2):** A3 + Bonus — deleted dead `backupConfirmed` state + render block (~30 lines), deleted orphaned `src/components/UpgradeModal.tsx`. Auditor surfaced unused `PassphrasePrompt` import in IdentityBar — also removed.
+
+**Batch 2 (bbe8244):** R4 + R5 partial + R7 + R8 + R10 — copy refinements. Show recovery key row subtitle "Secret key — handle with care". Two validation errors trimmed. MoveAddressModal subtitle to "Choose a passphrase". Empty activity state turned into a CTA. Memory clue red helper rewritten without "plain text" jargon.
+
+**Batch 3 (028658d):** R2 — Restore row subtitle reframed to action-led "Imports posts and earnings from a saved key" (resolves the "stay on this one" pronoun ambiguity flagged by both designer and marketer agents).
+
+**Batch 4 (080596e):** C1 + C3 + C4 — UI cuts. Dropped pulse from "Not protected" banner. Done-state amber block 6 sentences → 3. RestoreModal red body drops duplicate. Bonus: removed unused `isIdentityEncrypted` import from RestoreModal.
+
+**Batch 5 (db4beba):** C6 — Show recovery key panel rework. Added red warning ("Anyone with this key owns your account and any funds in it. Never share it."). Replaced two-step Show→Copy with acknowledgement-gated Reveal that splits into side-by-side Hide/Copy on click.
+
+**Batch 6 (05c6624):** A2 — RestoreModal `onSuccess` now atomically marks `backedUp = true` (the file just restored IS the backup). Dropdown banner click handler collapsed to single `handleSaveFile` path; removed the 3-click protected-user detour.
+
+**Batch 7 (9785332):** A1 — biggest structural change. Two stacked modals (manage gate + You modal) → single You modal with locked/unlocked internal states. Body fades on transition. Auto-focus input on locked-state mount. Deleted ~63 lines of gate JSX.
+
+**Rejected (validated by second-opinion agents, do not relitigate):** C2, C5, R1, R3, Passphrase row label.
+
+**Deferred:** R6/R9 manage gate copy — finalized inline as part of A1 (the new locked body shows just the passphrase input + hint + buttons, no header/subtitle).
+
+Files changed: `src/app/IdentityBar.tsx`, `src/components/MoveAddressModal.tsx`, `src/components/ChangePassphraseModal.tsx`, `src/components/RestoreModal.tsx`, `CLAUDE.md`, `ROADMAP.md`, `SESSION_LOG.md`. Deleted: `src/components/UpgradeModal.tsx`.
+
+Verified: tsc clean, biome clean across every batch. Each batch had its own auditor pre-commit pass before committing.
+
 ## 2026-05-01 — Stage 8 Planning Session (no code changes)
 
 Category: planning, multi-agent UX review
