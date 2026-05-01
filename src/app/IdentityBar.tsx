@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
-import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { RestoreModal } from "@/components/RestoreModal";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
@@ -30,7 +29,6 @@ export function IdentityChip(): React.JSX.Element | null {
   // believing backup was saved" failure mode when the browser didn't
   // actually save the file (popup blocker, disk full, CSP deny, etc).
   const [justDownloaded, setJustDownloaded] = useState(false);
-  const [backupConfirmed, setBackupConfirmed] = useState(false);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
 
   // Balance / earnings
@@ -1332,33 +1330,6 @@ export function IdentityChip(): React.JSX.Element | null {
             </div>
 
             {/* ── Transient banners ── */}
-            {backupConfirmed && (
-              <div className="px-3 py-2 border-b border-emerald-800/60 bg-emerald-950/40">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-emerald-400 flex-1">Recovery file saved</span>
-                  <button
-                    type="button"
-                    onClick={() => setBackupConfirmed(false)}
-                    className="text-emerald-700 hover:text-emerald-400 transition-colors"
-                    aria-label="Dismiss"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      aria-hidden="true"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
             {transferStatus && (
               <div
                 className={`px-3 py-2 border-b text-[11px] leading-relaxed ${

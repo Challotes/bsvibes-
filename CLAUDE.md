@@ -64,7 +64,6 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/layout.tsx` — Root layout (metadata, fonts, IdentityProvider wrapper)
 - `src/app/error.tsx` — Error boundary
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
-- `src/components/UpgradeModal.tsx` — Security upgrade modal (passphrase encryption + migration)
 - `src/components/ChangePassphraseModal.tsx` — Change passphrase flow (verify → new → backup)
 - `src/components/MoveAddressModal.tsx` — Combined "move + protect" wizard. Collects passphrase first → backup old key → upgradeIdentity (encrypted new key + sweep) → migrateIdentity → download **combined recovery file** containing both `wif_encrypted` (new key) and `oldWif_encrypted` (old key under new passphrase) — one file, one passphrase, supersedes the temporary stage-1 file. Sweep failure blocks rotation with retry/proceed options. Pre-rotation chain verification warns if posts would be orphaned. `onComplete` updates identity state only (parent stays mounted); `onClose` (Continue button / X / backdrop on done) is the single dismissal path so the user sees all status updates + safeguard copy before exiting. Also serves as the "Not protected" flow (every rotation produces an encrypted key).
 - `src/components/AnimatedBalance.tsx` — Animated balance counter (count-up, green flash)
