@@ -2,6 +2,22 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-01 (cont.) — Identity-modal consistency refactor (CONSIDERED, DEFERRED FOR NOW)
+
+Category: planning
+
+User noticed the three actionable rows in the You modal behave inconsistently: Passphrase opens MoveAddressModal as a `max-w-md` overlay with side-by-side buttons; Restore opens RestoreModal as a `max-w-sm` overlay with stacked buttons; Show recovery key expands inline.
+
+Designer recommended **Path B** — convert all three to inline body-swaps inside the You modal (the locked-state pattern just shipped in Stage 8 as precedent). Code-wise this would delete ~60 lines of duplicate modal chrome and centralize identity-management UI in one container.
+
+Architect produced a detailed 7-step plan. **Code-auditor adversarial review of the plan flagged 4 real bugs and 1 missed concern** — most seriously, tab-blur during the wizard's `creating`/`recording` stages could leak in-flight broadcast transactions without committing the new key locally, creating a fund-loss scenario. Other findings: stale `keyRevealed` on mode swap, stale `pendingRestoreWif` on back-chevron, `_rotationInProgress` lock leak on body unmount, identity-prop capture race with `commitUpgrade`.
+
+**Decision: defer the refactor for now.** The settings flow is rarely visited; each modal individually works correctly today. The inconsistency only manifests on rapid cycling between all three rows, which users don't do. The risk of breaking blockchain-state-mutating code paths to fix a low-traffic visual inconsistency is not worth it on a "ship it without breaking anything" requirement.
+
+**Revisit when:** user feedback specifically flags the inconsistency, OR the team has bandwidth for a careful Path B implementation with explicit mitigations for all 5 findings + manual end-to-end testing of every wizard stage. Not as proactive polish.
+
+No code changes this session. Architect's plan and skeptic's bug list are preserved in agent transcripts; can be re-loaded if the work resumes.
+
 ## 2026-05-01 (cont.) — Stage 8 Implementation (DONE)
 
 Category: UX, copy, architecture
