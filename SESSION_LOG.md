@@ -2,6 +2,24 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-01 (cont.) — Documentation audit pass (5 batches)
+
+Category: documentation
+
+Cross-checked all 9 MDs against the current codebase after Stage 8 + Path B deferral. Three parallel auditor passes surfaced 14 inaccuracies grouped into 5 batches; each shipped as its own commit.
+
+**Batch 1 (69220d8) — UpgradeModal scrub.** Removed live references to the deleted `src/components/UpgradeModal.tsx` from CLAUDE.md (UX Principles "Exception" line) + DECISIONS.md ("5-minute window" / "Security upgrade model" / "Memory clue mandatory" all rerouted to MoveAddressModal). Stage notes that historically describe UpgradeModal kept verbatim — they document past state.
+
+**Batch 2 (9cb51a6) — Missing inventory + Stage 8 decisions.** CLAUDE.md gained `BootContext` (single-flight + 3s throttle), `verifyMigrationChain` server action, and `preVerifiedPassphrase` on ChangePassphraseModal. DECISIONS.md "Asymmetric re-prompt" and "Wizard auto-close split" entries refined for the Stage 8 reveal-acknowledge gate + `moveCompletedRef` pattern; new "Locked-state You modal pattern (settled 2026-05-01)" decision added.
+
+**Batch 3 (b6e3fc8) — ROADMAP Stage 8 rewrite.** Stage 8 entry converted from planning-doc format to DONE summary with `Shipped` / `Explicitly rejected` / `Considered, deferred` sections — eight commit references (645aec2 through 9785332, plus 4e37f3c bug fix). Stages reordered chronologically (5 → 6 → 7 → 8). Phase 6.5 status header `PLANNED` → `IN PROGRESS` (8 sub-stages now done; remaining items are server-side resilience + SSE work).
+
+**Batch 4 (8e18474) — SECURITY_AUDIT status updates.** C4 (auto-download backup missing old key) marked **FIXED** — Stage 7 combined-recovery-file pattern (`oldWif_encrypted` alongside `wif_encrypted` under one passphrase) closes the original risk; Stage 6 removed plaintext rotation from primary UI; sweep failures block rotation rather than silently committing. M6 (WIF reveal no auto-hide) gets a partial-mitigation note pointing at Stage 8 C6 ack-gated reveal.
+
+**Batch 5 (1a8e942) — Cosmetic + FAIRNESS migration-chain section.** CLAUDE.md actions.ts inventory split into reads (no signature) vs sig-verified mutations; surfaces previously-missing getNewPosts/getUpdatedPosts/getOlderPosts. DIRECTION.md `BS Vibes` typo → `BSVibes`. New `Migration Chain Resolution` subsection in FAIRNESS.md documenting how `weights.ts` walks `from_pubkey → to_pubkey` to keep contribution history across rotations, references C7 fork repair logic, `verifyMigrationChain` pre-rotation check, and the 30s weight cache. README placeholder URL (`your-org/bsvibes`) left as-is pending GitHub org choice for public release.
+
+Files changed: `CLAUDE.md`, `DECISIONS.md`, `ROADMAP.md`, `SECURITY_AUDIT.md`, `DIRECTION.md`, `FAIRNESS.md`. No code changes.
+
 ## 2026-05-01 (cont.) — Identity-modal consistency refactor (CONSIDERED, DEFERRED FOR NOW)
 
 Category: planning
