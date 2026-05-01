@@ -5,7 +5,7 @@ import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
-import { importIdentity, isIdentityEncrypted, signPost } from "@/services/bsv/identity";
+import { importIdentity, signPost } from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface RestoreModalProps {
@@ -295,7 +295,7 @@ export function RestoreModal({
         {/* Body */}
         <div className="px-4 py-4 space-y-3">
           <p className="text-[11px] text-red-400 leading-relaxed">
-            This will replace your current identity. Your current recovery file will be saved first.
+            Your current recovery file will be saved first.
           </p>
           <p className="text-[11px] text-zinc-400 leading-relaxed">
             Your current posts and earnings stay with your current key — the backup file is how you

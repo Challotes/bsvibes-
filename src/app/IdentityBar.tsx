@@ -1149,10 +1149,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 bg-red-950/20 hover:bg-red-950/40 transition-colors cursor-pointer text-left"
                 >
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                  </span>
+                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                   <span className="text-[11px] text-red-400 font-medium flex-1">Not protected</span>
                   <svg
                     width="14"

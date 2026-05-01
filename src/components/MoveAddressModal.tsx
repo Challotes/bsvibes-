@@ -693,16 +693,12 @@ export function MoveAddressModal({
                       </p>
                     </div>
                   )}
-                  <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5 space-y-1.5">
+                  <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                     <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                      Your final recovery file has been downloaded. It contains both your new key
-                      and your previous key. The temporary file from earlier can be deleted.
-                    </p>
-                    <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                      Keep this file somewhere safe &mdash; a cloud drive, a USB stick, away from
-                      this device. Your passphrase is the only thing that opens it.{" "}
+                      Recovery file downloaded &mdash; it has both keys. Keep it safe (cloud, USB)
+                      and remember your passphrase.{" "}
                       <span className="font-semibold text-amber-300">
-                        Without both, you cannot recover your account.
+                        Without both, you can&apos;t get back in.
                       </span>
                     </p>
                   </div>
