@@ -82,8 +82,9 @@ export function IdentityChip(): React.JSX.Element | null {
   // unlocked while modal is open. Show recovery key + Restore still re-prompt.
   // Session destroyed on modal close OR tab blur.
   const [manageAuthed, setManageAuthed] = useState(false);
-  // Pending gate passphrase entry (shown before You modal opens for protected users)
-  const [showManageGate, setShowManageGate] = useState(false);
+  // Locked-state passphrase input (rendered inline as the You modal body
+  // when manageAuthed === false). The modal opens locked for protected
+  // users; on unlock the body cross-fades to the rows.
   const [manageGatePass, setManageGatePass] = useState("");
   const [manageGateError, setManageGateError] = useState("");
   const [manageGateLoading, setManageGateLoading] = useState(false);
@@ -95,6 +96,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const [movePassphrase, setMovePassphrase] = useState("");
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const gateInputRef = useRef<HTMLInputElement>(null);
 
   // ── Helpers defined early for use in effects ──────────────────────────────
 
@@ -219,6 +221,16 @@ export function IdentityChip(): React.JSX.Element | null {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [manageAuthed]);
 
+  // Auto-focus the passphrase input when the You modal opens in locked
+  // state. requestAnimationFrame defers focus until after the input is
+  // mounted (handles the cross-fade re-mount on re-open after blur).
+  useEffect(() => {
+    if (showManage && !manageAuthed) {
+      const id = requestAnimationFrame(() => gateInputRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [showManage, manageAuthed]);
+
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function resetManageState() {
@@ -230,28 +242,21 @@ export function IdentityChip(): React.JSX.Element | null {
   function closeManageModal() {
     setShowManage(false);
     resetManageState();
-    // Destroy manage session on close
+    // Destroy manage session on close — also clear the locked-state
+    // passphrase input fields so reopening starts fresh.
     setManageAuthed(false);
-    reAuthPassphraseRef.current = "";
-  }
-
-  function closeManageGate() {
-    setShowManageGate(false);
     setManageGatePass("");
     setManageGateError("");
     setManageGateLoading(false);
+    reAuthPassphraseRef.current = "";
   }
 
-  // Click "Manage" — gate the modal if protected, else open directly
+  // Click "Manage" — opens the You modal. Protected users see the
+  // locked-state passphrase prompt first; unprotected users go straight
+  // to the rows (manageAuthed flipped synchronously to avoid a flash).
   function openManageModal(): void {
-    if (!isProtected) {
-      // Unprotected users: open directly, no gate
-      setManageAuthed(true);
-      setShowManage(true);
-      return;
-    }
-    // Protected: show gate first
-    setShowManageGate(true);
+    setShowManage(true);
+    if (!isProtected) setManageAuthed(true);
   }
 
   async function handleManageGateConfirm(): Promise<void> {
@@ -265,11 +270,11 @@ export function IdentityChip(): React.JSX.Element | null {
         setManageGateLoading(false);
         return;
       }
-      // Verified — store passphrase, mark authed, open modal
+      // Verified — body cross-fades from passphrase prompt to rows.
       reAuthPassphraseRef.current = manageGatePass;
       setManageAuthed(true);
-      closeManageGate();
-      setShowManage(true);
+      setManageGatePass("");
+      setManageGateError("");
     } catch {
       setManageGateError("Something went wrong — try again");
     } finally {
@@ -541,71 +546,6 @@ export function IdentityChip(): React.JSX.Element | null {
         />
       )}
 
-      {/* ── Manage gate (passphrase entry before You modal opens) ── */}
-      {showManageGate && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 w-full cursor-default"
-            aria-label="Close"
-            onClick={closeManageGate}
-          />
-          <div
-            className="relative z-10 w-full max-w-sm rounded-xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden"
-            style={{ backgroundColor: "#0f0f0f" }}
-          >
-            <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-            <div className="px-4 py-3 border-b border-amber-400/10">
-              <p className="text-sm font-semibold text-zinc-100">Unlock identity</p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
-                Enter your passphrase to access identity settings
-              </p>
-            </div>
-            <div className="px-4 py-4 space-y-3">
-              <input
-                type="password"
-                placeholder="Passphrase"
-                value={manageGatePass}
-                onChange={(e) => {
-                  setManageGatePass(e.target.value);
-                  setManageGateError("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && manageGatePass) handleManageGateConfirm();
-                }}
-                className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
-              />
-              {storedHint && (
-                <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
-                  <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
-                </div>
-              )}
-              {manageGateError && <p className="text-[11px] text-red-400">{manageGateError}</p>}
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeManageGate}
-                  className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleManageGateConfirm}
-                  disabled={!manageGatePass || manageGateLoading}
-                  className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {manageGateLoading ? "Unlocking..." : "Unlock"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Manage Identity modal ── */}
       {showManage && (
         <div
@@ -648,11 +588,98 @@ export function IdentityChip(): React.JSX.Element | null {
                 </button>
               </div>
 
-              <div className="divide-y divide-amber-400/10">
-                {/* Save recovery file */}
-                {justDownloaded ? (
-                  <div className="px-4 py-3 bg-emerald-500/5 border-l-2 border-emerald-500/60">
-                    <div className="flex items-start gap-3">
+              {!manageAuthed ? (
+                <div key="lock" className="px-4 py-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                  <input
+                    ref={gateInputRef}
+                    type="password"
+                    placeholder="Passphrase"
+                    value={manageGatePass}
+                    onChange={(e) => {
+                      setManageGatePass(e.target.value);
+                      setManageGateError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && manageGatePass) handleManageGateConfirm();
+                    }}
+                    className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+                  />
+                  {storedHint && (
+                    <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
+                      <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+                    </div>
+                  )}
+                  {manageGateError && <p className="text-[11px] text-red-400">{manageGateError}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={closeManageModal}
+                      className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleManageGateConfirm}
+                      disabled={!manageGatePass || manageGateLoading}
+                      className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {manageGateLoading ? "Unlocking..." : "Unlock"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key="rows"
+                  className="divide-y divide-amber-400/10 animate-[fadeIn_0.2s_ease-out]"
+                >
+                  {/* Save recovery file */}
+                  {justDownloaded ? (
+                    <div className="px-4 py-3 bg-emerald-500/5 border-l-2 border-emerald-500/60">
+                      <div className="flex items-start gap-3">
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                          className="text-emerald-400 shrink-0 mt-0.5"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium text-emerald-300 block">
+                            Your file should have downloaded
+                          </span>
+                          <span className="text-[10px] text-emerald-300/80 block mt-0.5 mb-1.5 leading-relaxed">
+                            Move it somewhere safe (phone, cloud, USB). It&apos;s the only way back
+                            into your account.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markBackedUp();
+                              setJustDownloaded(false);
+                            }}
+                            className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-2.5 py-0.5 text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
+                          >
+                            Got it
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSaveFile}
+                      disabled={downloading}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left disabled:opacity-40"
+                    >
                       <svg
                         width="18"
                         height="18"
@@ -663,37 +690,38 @@ export function IdentityChip(): React.JSX.Element | null {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         aria-hidden="true"
-                        className="text-emerald-400 shrink-0 mt-0.5"
+                        className={backedUp === false ? "text-amber-400" : "text-zinc-400"}
                       >
-                        <polyline points="20 6 9 17 4 12" />
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs font-medium text-emerald-300 block">
-                          Your file should have downloaded
-                        </span>
-                        <span className="text-[10px] text-emerald-300/80 block mt-0.5 mb-1.5 leading-relaxed">
-                          Move it somewhere safe (phone, cloud, USB). It&apos;s the only way back
-                          into your account.
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markBackedUp();
-                            setJustDownloaded(false);
-                          }}
-                          className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-2.5 py-0.5 text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
+                        <span
+                          className={`text-xs font-medium block ${backedUp === false ? "text-amber-400" : "text-zinc-200"}`}
                         >
-                          Got it
-                        </button>
+                          {downloading ? "Saving..." : "Save recovery file"}
+                        </span>
+                        {backedUp === false && (
+                          <span className="text-[10px] text-amber-400/70 block mt-0.5">
+                            Not saved yet — save now to avoid losing access
+                          </span>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                ) : (
+                      {backedUp === false && (
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Passphrase — opens MoveAddressModal (rotates key + new passphrase) */}
                   <button
                     type="button"
-                    onClick={handleSaveFile}
-                    disabled={downloading}
+                    onClick={() => openMoveModal(reAuthPassphraseRef.current)}
+                    disabled={!identity}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left disabled:opacity-40"
                   >
                     <svg
@@ -706,161 +734,23 @@ export function IdentityChip(): React.JSX.Element | null {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden="true"
-                      className={backedUp === false ? "text-amber-400" : "text-zinc-400"}
+                      className={isProtected ? "text-amber-400" : "text-red-400"}
                     >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      {isProtected && <path d="m9 12 2 2 4-4" />}
                     </svg>
                     <div className="flex-1 min-w-0">
                       <span
-                        className={`text-xs font-medium block ${backedUp === false ? "text-amber-400" : "text-zinc-200"}`}
+                        className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-red-400"}`}
                       >
-                        {downloading ? "Saving..." : "Save recovery file"}
+                        Passphrase
                       </span>
-                      {backedUp === false && (
-                        <span className="text-[10px] text-amber-400/70 block mt-0.5">
-                          Not saved yet — save now to avoid losing access
-                        </span>
-                      )}
-                    </div>
-                    {backedUp === false && (
-                      <span className="relative flex h-2 w-2 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* Passphrase — opens MoveAddressModal (rotates key + new passphrase) */}
-                <button
-                  type="button"
-                  onClick={() => openMoveModal(reAuthPassphraseRef.current)}
-                  disabled={!identity}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left disabled:opacity-40"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className={isProtected ? "text-amber-400" : "text-red-400"}
-                  >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    {isProtected && <path d="m9 12 2 2 4-4" />}
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={`text-xs font-medium block ${isProtected ? "text-zinc-200" : "text-red-400"}`}
-                    >
-                      Passphrase
-                    </span>
-                    <span
-                      className={`text-[10px] block mt-0.5 ${isProtected ? "text-zinc-500" : "text-red-400/70"}`}
-                    >
-                      {isProtected
-                        ? "Move to a fresh key — earnings and posts stay synced"
-                        : "Not set — add one so you can recover from any device"}
-                    </span>
-                  </div>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-zinc-600 shrink-0"
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-
-                {/* Restore key from file — opens RestoreModal (stacks on You modal) */}
-                <button
-                  type="button"
-                  onClick={() => setShowRestoreModal(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-zinc-400"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-zinc-200 block">
-                      Restore key from file
-                    </span>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">
-                      Imports posts and earnings from a saved key
-                    </span>
-                  </div>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className="text-zinc-600 shrink-0"
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-
-                {/* Show recovery key (advanced) */}
-                {!showAdvanced ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="text-zinc-600"
-                    >
-                      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                    </svg>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-zinc-400">Show recovery key</span>
-                        <span className="text-[9px] font-medium text-amber-400/60 bg-amber-400/5 border border-amber-400/20 rounded px-1 py-px uppercase tracking-wide">
-                          Advanced
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-zinc-500 block mt-0.5">
-                        Secret key &mdash; handle with care
+                      <span
+                        className={`text-[10px] block mt-0.5 ${isProtected ? "text-zinc-500" : "text-red-400/70"}`}
+                      >
+                        {isProtected
+                          ? "Move to a fresh key — earnings and posts stay synced"
+                          : "Not set — add one so you can recover from any device"}
                       </span>
                     </div>
                     <svg
@@ -878,58 +768,155 @@ export function IdentityChip(): React.JSX.Element | null {
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </button>
-                ) : (
-                  <div className="px-4 py-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-zinc-200">Recovery key</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAdvanced(false);
-                          setKeyRevealed(false);
-                        }}
-                        className="text-[10px] text-red-400/80 hover:text-red-300 transition-colors font-medium"
-                      >
-                        Cancel
-                      </button>
+
+                  {/* Restore key from file — opens RestoreModal (stacks on You modal) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowRestoreModal(true)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="text-zinc-400"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-medium text-zinc-200 block">
+                        Restore key from file
+                      </span>
+                      <span className="text-[10px] text-zinc-500 block mt-0.5">
+                        Imports posts and earnings from a saved key
+                      </span>
                     </div>
-                    <p className="text-[11px] text-red-400 leading-relaxed">
-                      Anyone with this key owns your account and any funds in it. Never share it.
-                    </p>
-                    <div className="bg-amber-400/5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-amber-300/70 break-all leading-relaxed">
-                      {keyRevealed
-                        ? identity.wif
-                        : `${"\u2022".repeat(12)}${identity.wif.slice(-4)}`}
-                    </div>
-                    {!keyRevealed ? (
-                      <button
-                        type="button"
-                        onClick={handleRevealKey}
-                        className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="text-zinc-600 shrink-0"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+
+                  {/* Show recovery key (advanced) */}
+                  {!showAdvanced ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(true)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-400/5 transition-colors text-left"
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="text-zinc-600"
                       >
-                        Reveal key
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-zinc-400">
+                            Show recovery key
+                          </span>
+                          <span className="text-[9px] font-medium text-amber-400/60 bg-amber-400/5 border border-amber-400/20 rounded px-1 py-px uppercase tracking-wide">
+                            Advanced
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-zinc-500 block mt-0.5">
+                          Secret key &mdash; handle with care
+                        </span>
+                      </div>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="text-zinc-600 shrink-0"
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <div className="px-4 py-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-zinc-200">Recovery key</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAdvanced(false);
+                            setKeyRevealed(false);
+                          }}
+                          className="text-[10px] text-red-400/80 hover:text-red-300 transition-colors font-medium"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-red-400 leading-relaxed">
+                        Anyone with this key owns your account and any funds in it. Never share it.
+                      </p>
+                      <div className="bg-amber-400/5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-amber-300/70 break-all leading-relaxed">
+                        {keyRevealed
+                          ? identity.wif
+                          : `${"\u2022".repeat(12)}${identity.wif.slice(-4)}`}
+                      </div>
+                      {!keyRevealed ? (
                         <button
                           type="button"
                           onClick={handleRevealKey}
-                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                          className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
                         >
-                          Hide key
+                          Reveal key
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleCopy}
-                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
-                        >
-                          {copied ? "Copied" : "Copy key"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleRevealKey}
+                            className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                          >
+                            Hide key
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopy}
+                            className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                          >
+                            {copied ? "Copied" : "Copy key"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
