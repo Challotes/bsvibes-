@@ -2,7 +2,7 @@
 
 > What's done, what's next, what's planned. AI agents: update this file when you complete or start a task.
 >
-> Last updated: 2026-04-30
+> Last updated: 2026-05-01
 
 ## Phase 1: Foundation — COMPLETE
 
@@ -234,6 +234,54 @@
   - **Stage 4 — ATTEMPTED + REVERTED (2026-04-16):** built the 3-question intent-led layout ("Is my account backed up?", "I'm on a new device", "I think my keys were exposed") replacing the flat You-modal section list. User rejected the approach during live review — the flat list reads faster and feels less like a support FAQ. Reverted via `git restore` before commit; no artifacts in git history. Flat section list is the settled state. **Do not re-queue.**
   - **Pending-payment badge (still wanted, split out from Stage 4):** on-chip/in-balance "$0.12 · 1 pending" badge with honest tooltip about sub-minute confirmation. Track broadcasts from `useBoot` and client-side transfer paths; clear on next balance-poll delta or 90s timeout. ~30–60min. Natural fit once SSE/optimistic work lands — defer until after `/api/events`.
   - **Stage 5 — Earnings-first hierarchy + polish (DONE 2026-04-17):** Full dropdown restructure informed by parallel designer + researcher agent audits studying Apple, Google, Coinbase, Cash App, Phantom, Stripe, and Revolut patterns. Earnings-first hierarchy: all-time earnings (hero number `text-lg font-semibold`, collapsible chart default-open) → activity (2 visible, "View all N" toggle right-aligned in header, Stripe pattern) → balance (demoted to single row with inline "Add funds" link). Protected security status replaced with inline checkmark next to name (X-verified pattern); unprotected keeps full red banner. Font hierarchy two-tier system: static data zinc-500, interactive elements zinc-100 + underline. Section labels standardized to zinc-400 font-medium. Close buttons unified to SVG icons. "Your identity" → "Manage" button. Activity API limit bumped from 10 to 50. EarningsSparkline header removed (parent handles via toggle).
+  - **Stage 8 — Identity card deep polish (PLANNED, decisions locked 2026-05-01):** Full multi-agent review (designer + marketer + architect + code-auditor) of every word, button, click path, and stage in the identity card + You modal + sub-modals. All decisions confirmed by user; ready to implement in batched order.
+
+    **Architecture:**
+    - **A1** — Manage gate becomes the **locked state of the You modal** (one container, two states). Body cross-fades on unlock: 120ms passphrase fade-out, 200ms `max-height` transition, 150ms rows fade-in. Gold stripe stays pinned. Edge cases: cancel mid-unlock resets cleanly; wrong-passphrase error re-renders without layout shift. Replaces the current two-stacked-modal pattern.
+    - **A2** — `RestoreModal.onSuccess` sets `localStorage.setItem(BACKED_UP_KEY, "1")` + `setBackedUp(true)` (the file the user just restored IS their backup). Then collapse the dropdown backup-banner click handler (`IdentityBar.tsx:1056-1101`) to a single `onClick={handleSaveFile}` path — drop the `if (isProtected)` branch (now unreachable). Architect-validated.
+    - **A3** — Delete dead `backupConfirmed` state + render block (`IdentityBar.tsx:33` and `1335-1361`). Auditor-confirmed dead code from the Stage 6 modal-orchestration refactor cleanup miss.
+    - **Bonus** — Delete `src/components/UpgradeModal.tsx`. Orphaned since Stage 6; not imported anywhere in IdentityBar.
+
+    **Cuts / layout:**
+    - **C1** — Drop the pulsing dot from inside the "Not protected" banner. Red color + label carry urgency without competing with the amber backup pulse.
+    - **C3** — Done-state amber block (in MoveAddressModal) → ***"Recovery file downloaded — it has both keys. Keep it safe (cloud, USB) and remember your passphrase. **Without both, you can't get back in.**"*** (last sentence bolded in amber-300).
+    - **C4** — RestoreModal red body drops the duplicate "This will replace your current identity" sentence (already in header). Becomes just *"Your current recovery file will be saved first."*
+    - **C6** — Show recovery key panel reworked:
+      - Add red warning above masked key: *"Anyone with this key owns your account and any funds in it. Never share it."*
+      - Single `[Reveal key]` button (acknowledgement gate)
+      - On click: key revealed; button toggles to `[Hide]`; `[Copy]` appears alongside
+      - Designer's recommended sequence — warning earns weight as forcing function.
+
+    **Copy:**
+    - **R2** — Restore row subtitle → ***"Imports posts and earnings from a saved key"*** (replaces ambiguous "Move to a saved key — posts and earnings stay on this one").
+    - **R4** — Show recovery key row subtitle → ***"Secret key — handle with care"*** (no terminal punctuation; replaces "View, copy, or manually paste your key").
+    - **R5 partial** — Validation errors:
+      - Keep: *"Passphrase must be at least 8 characters"*, *"Passphrases don't match"*
+      - Change: *"New passphrase must be different from your current one"* → ***"Same as your current passphrase"***
+      - Change: *"Add a memory clue — if you forget your passphrase, this is your only reminder."* → ***"Add a memory clue — it's your only reminder if you forget."***
+    - **R7** — MoveAddressModal passphrase-stage subtitle → ***"Choose a passphrase"*** (replaces "Set a passphrase for your new key"; placeholder carries the constraint).
+    - **R8** — Empty activity state → ***"Your earnings show here — share an idea, or boot posts you like."*** (replaces "Nothing yet — when your posts get featured, earnings appear here"; user clarified that earnings come from being part of contributor splits, not just authoring).
+    - **R10** — Memory clue red helper → ***"Only you should know what this means — it's stored unprotected in your recovery file."*** (replaces "If you forget your passphrase, this is your only reminder. Stored as plain text." — drops "plain text" jargon, splits the two warnings).
+
+    **Explicitly rejected (do not relitigate):**
+    - **C2** — Three "Move it somewhere safe (phone, cloud, USB)..." instances stay identical. Designer-validated: temporally distant, consistency = recognisable safety mantra. Mid-wizard version already has differentiated consequence sentence.
+    - **C5** — Currency toggle keeps "🐐 Goat / 💵 Noob" labels. Designer-validated: emotional framing is load-bearing, not decorative.
+    - **R1** — Passphrase row subtitle stays "Move to a fresh key — earnings and posts stay synced". Both agents validated: subtitle teaches the rotation-but-posts-follow consequence pre-emptively, prevents wizard surprise.
+    - **R3** — ALL-CAPS section labels stay (ALL-TIME EARNINGS / ACTIVITY / BALANCE). Designer + marketer validated: standard pattern in dense info UIs (Stripe, Linear, Vercel); 10-11px label-size all-caps does not shout.
+    - **Passphrase row label** — stays "Passphrase" (not "Upgrade", "Secure", "Protect"). User chose to live with the noun-vs-verb-pattern critique; "Passphrase" is the most literal label possible.
+
+    **Deferred until A1 implementation:**
+    - **R6 / R9** — Manage gate header + subtitle copy. Will finalize during A1 (locked-state) implementation since the layout/context shifts.
+
+    **Implementation order (resume here):**
+    1. **A3 + Bonus** — Pure cleanup (dead `backupConfirmed` + delete UpgradeModal). Zero risk.
+    2. **R5, R7, R8, R10, R4** — Small copy tweaks. Low risk.
+    3. **R2** — Restore row subtitle.
+    4. **C1, C3, C4** — Cuts.
+    5. **C6 revised** — Show recovery key panel rework.
+    6. **A2** — RestoreModal sets backedUp + collapse banner click handler.
+    7. **A1** — Locked-state You modal (biggest structural change; R6/R9 finalized during this).
+
   - **Stage 7 — Manage gate + combined backup + done-state polish (DONE 2026-04-30):** Single-passphrase gate on the You modal: verify once on entry, all eligible actions (Passphrase, Move) unlocked while modal is open; session destroyed on close OR tab blur (password-manager pattern). You modal collapsed Change Passphrase + Move rows into a single "Passphrase" row that opens MoveAddressModal — eliminates the two-flow ambiguity (both called the same primitives anyway). Restore row gets a parallel "Move to a saved key" subtitle. **Combined recovery file:** stage-3 download now contains BOTH `wif_encrypted` (new key) and `oldWif_encrypted` (old key under new passphrase) — one file, one passphrase, supersedes the temporary stage-1 file. Note copy reframed: "Use your passphrase to reveal both keys. The previous key is included for recovering any funds left on the old address." **Auto-close timing fix:** wizard `onComplete` now updates identity state only (parent doesn't unmount the wizard); `onClose` (Continue button / X / backdrop on done) is the single dismissal path — user sees all status updates, sats-moved confirmation, and the safeguard reminder before exiting. **Memory clue input** gets `autoComplete="off"` + `autoCorrect/Capitalize="off"` + `spellCheck={false}` on all three modals (Move/Change/Upgrade) — browsers no longer surface previously-entered clues. **Done-state safeguard copy** (extended amber block with the critical sentence bolded in `text-amber-300`): file-and-passphrase mutual dependency made explicit — *"Without both, you cannot recover your account."* Designer agent recommended amber over red: red after green checkmarks reads as contradiction in a system where red means active error. **Address → key** copy refinements throughout the wizard. **Em-dash entity fix:** three JSX text nodes still using `—` literal escape replaced with `&mdash;` (matches the `&apos;` precedent already in those lines).
   - **Stage 6 — Amber brand + modal restructure + sweep hardening (DONE 2026-04-17):** Full amber rebrand (#f59e0b) across identity card, You modal, UpgradeModal, ChangePassphraseModal, MoveAddressModal — single accent color, gold top stripe, `#0f0f0f` backgrounds. You modal restructured as a clean launcher: Restore extracted to standalone RestoreModal; Move goes straight to MoveAddressModal (no inline expansion); only recovery key stays inline (read-only). **Sweep hardening:** both `sweepFunds` and `autoTransferFunds` switched from direct WoC to `/api/unspent` proxy (retry + cache + stale fallback); "no UTXOs" now returns `noFunds: true` flag instead of silent empty return; sweep failure blocks rotation with retry/proceed UI in MoveAddressModal; `sweepFunds` exported for independent retry. **Rotation lock:** `_rotationInProgress` flag in `identity.ts` prevents concurrent Move + Upgrade race condition. **Pre-rotation chain verification:** new `verifyMigrationChain` server action walks migration table before any rotation, warns if posts would be orphaned. **Merged Move + Passphrase:** MoveAddressModal now collects passphrase first, calls `upgradeIdentity` instead of `resetIdentity` — every rotation produces an encrypted key. "Not protected" banner opens MoveAddressModal directly. Plaintext key rotation (`resetIdentity`) removed from primary UI. **Mandatory memory clue** on all passphrase flows. **Activity key fix:** added index to React key to prevent duplicate-key errors when multiple payouts share the same timestamp.
   - **What to preserve (architect red-team):** C9 backup-warning dot semantics, deferred-commit pattern in `commitUpgrade`, `getIdentity()` plaintext-preferred fallback ordering (subtle H5 regression surface), migration signature chain.

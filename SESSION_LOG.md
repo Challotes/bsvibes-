@@ -2,6 +2,34 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-01 — Stage 8 Planning Session (no code changes)
+
+Category: planning, multi-agent UX review
+
+Deep review of every word, button, click path, and stage in the identity card + You modal + sub-modals. No code modified — full session was reviewing copy + architecture + flow with parallel agent feedback (designer, marketer, architect, code-auditor) and locking decisions for Stage 8.
+
+**What was reviewed:** identity chip, dropdown (header / backup banner / not-protected banner / earnings hero / activity / balance / Manage button), manage gate, You modal (Save row / Passphrase row / Restore row / Show recovery key row), MoveAddressModal (every stage), RestoreModal, error/validation states.
+
+**Key findings driving Stage 8:**
+- Manage gate as a stacked modal is heavy — user proposed treating it as the locked state of the You modal itself (one container, two states). Designer endorsed enthusiastically.
+- `backupConfirmed` state is dead code from Stage 6 cleanup miss. Auditor confirmed safe to delete.
+- `UpgradeModal.tsx` is orphaned since Stage 6 — not imported anywhere.
+- `RestoreModal.onSuccess` doesn't set `BACKED_UP_KEY` — the only legitimate path to `isProtected && !backedUp` state. Architect-flagged.
+- Dropdown backup-banner click handler has a 3+ click detour for protected users that's largely unreachable post-Stage 7. Collapse the branch.
+- Show recovery key row needs a forcing-function warning before the Show/Copy controls, not as decoration.
+- Several copy items (Restore subtitle pronoun ambiguity, plain-text jargon in memory clue helper, validation error length, MoveAddressModal subtitle redundancy) need precision.
+
+**Decisions explicitly rejected after agent re-validation:**
+- Three "Move it somewhere safe..." repetitions stay identical (temporal distance argument validated)
+- Currency toggle keeps "Goat/Noob" emotional framing (load-bearing)
+- Passphrase row subtitle stays — pre-empts wizard surprise
+- ALL-CAPS section labels stay (Stripe/Linear/Vercel pattern)
+- Passphrase row label stays "Passphrase" (user chose noun over marketer's verb-led pattern)
+
+**No code changes this session.** Full implementation plan with batched order documented in ROADMAP.md under "Stage 8 — Identity card deep polish (PLANNED, decisions locked 2026-05-01)". User to resume implementation in next session starting with batch 1 (A3 + UpgradeModal deletion).
+
+Files changed: `ROADMAP.md`, `SESSION_LOG.md` (this entry).
+
 ## 2026-04-30 — Manage Gate + Combined Backup + Done-State Polish (Stage 7)
 
 Category: UX, security, copy
