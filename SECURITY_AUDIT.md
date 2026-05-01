@@ -21,10 +21,10 @@
 **Risk:** Attacker can fake boot confirmations, inflate contribution weight, game fairness system at zero cost.
 **Fix:** (2026-04-03) Full fix: replay protection (txid dedup check + application-level SELECT before insert), rate limiting (10/min/IP), and on-chain output verification (parses WoC tx vout, compares addresses/amounts against recalculated split with 2 sat tolerance). DB-level uniqueness is composite `UNIQUE(txid, recipient_address)` at db.ts:117 — replay protection relies on the app-level check, not the index alone. **Upgrade (2026-04-14):** output verification no longer fetches from WoC. Client sends `rawTx`; server validates `hash(rawTx)===txid` (self-authenticating — can't be spoofed), parses P2PKH outputs locally from the raw bytes, and re-broadcasts via ARC as safety net. Eliminates 5–30s WoC indexing lag and removes a rate-limit chokepoint. Explicit `TX_CONFLICT` vs `ARC_UNAVAILABLE` error codes distinguish fatal from retriable. Trust boundary: the server accepts client bytes but the hash binding makes forgery computationally infeasible, so security posture is unchanged.
 
-### C4: Auto-download backup only has NEW key when fund transfer fails
-**File:** src/app/IdentityBar.tsx lines 171-185
+### C4: Auto-download backup only has NEW key when fund transfer fails — FIXED
+**File:** src/components/MoveAddressModal.tsx (rotation flow), src/services/bsv/backup-template.ts
 **Risk:** User told "old key is in backup file" but backup contains new key. Stranded funds unrecoverable.
-**Fix:** Include old WIF in backup when transfer fails, or don't remove plaintext key until transfer succeeds.
+**Fix:** (2026-04-30, Stage 7) Combined recovery file pattern. The stage-3 download from MoveAddressModal now contains BOTH keys: `wif_encrypted` (new key) and `oldWif_encrypted` (old key, also encrypted under the new passphrase). One file, one passphrase, recovers both addresses. Earlier Stage 6 work removed plaintext rotation from the primary UI (`resetIdentity` no longer reachable from the dropdown — every rotation runs through MoveAddressModal and produces an encrypted key). Sweep-failure paths in MoveAddressModal also block rotation with retry/proceed UI rather than silently committing the new key, so "transfer failed but backup only has new key" is no longer reachable on the primary path. Done-state copy ("Recovery file downloaded — it has both keys. Keep it safe... Without both, you can't get back in.") makes the dual-key contract explicit to the user.
 
 ### C5: Free boot consumes grant even when broadcast fails — FIXED
 **File:** src/services/fairness/boot-orchestrator.ts lines 92-150
@@ -100,7 +100,7 @@
 - M3: Migration signature has no timestamp validation
 - M4: Rate limiter is in-memory, resets on restart
 - M5: /api/earnings exposes full financial history unauthenticated
-- M6: WIF reveal has no auto-hide timeout
+- M6: WIF reveal has no auto-hide timeout. **Partial mitigation (2026-05-01, Stage 8 C6):** the Show-recovery-key panel now requires an explicit `[Reveal key]` click to expose the WIF (no longer revealed by default), and shows a red warning above the masked key (*"Anyone with this key owns your account and any funds in it. Never share it."*). Replaces the previous always-visible-until-Hide pattern. Auto-hide timer still TODO.
 - M7: /api/boot-shares triggers full weight calc with no cache — FIXED (30s TTL cache added)
 - M8: Posts during upgrade window may be unsigned
 
