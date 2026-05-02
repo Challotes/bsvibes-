@@ -2,6 +2,26 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-03 — Locked state: ambient pill + idea preservation
+
+Category: UX, architecture
+
+User pushback on the locked card from yesterday: "the main unlock on locked site looks huge ... the passphrase section could almost be unnoticible until the user wants to take an actual action ... maybe we should allow the user to type their thought before entering the passphrase, by time they type their passphrase their idea could be gone."
+
+Designer + architect agents brainstormed alternatives. Converged on an ambient pill that matches the identity-chip bounding box. Single commit (`4f4230a`).
+
+**IdentityChip locked branch.** Replaced the 280px passphrase card with a `🔒 Sign in` pill (rounded-full, amber border, same padding as identity chip). Click expands a small popover anchored below: input + "Enter" button + "Need a hint?" text link. Hint reveal is two-step (click "Need a hint?" → hint shows inline in amber). Dropped the 💡 lightbulb entirely. Shake (from `LockedClickCatcher`) auto-expands the popover for 8s — a 28px element shaking alone would be invisible; the expand makes it unmissable. Autofocus only on user-clicked expand, never on shake-triggered expand (mobile focus-trap concern: would steal focus from a textarea the user is mid-typing).
+
+**PostForm idea preservation.** Textarea is now ENABLED when `needsUnlock && !identity`. Placeholder stays `"Share an idea..."` — the lock doesn't pre-announce itself. `submitForm` when locked: sets `pendingSubmitRef`, calls `signalLockedAttempt()` (chip shakes + expands), early-returns WITHOUT calling `onPostCreated` (no phantom post in feed). New `useEffect`: when identity arrives AND `pendingSubmitRef` is set, auto-submits the buffered draft via `performSubmit`. Pure instant submit — no "Sending..." beat (designer call). `performSubmit` extracted + wrapped in `useCallback` so the auto-submit effect can depend on it cleanly without stale-closure risk.
+
+**Verbiage:** "Sign in" (chip) + "Enter" (button), per designer. Both "Login" (implies server account) and "Unlock" (carceral framing) rejected for the BSV builder mental model. Password manager precedent: 1Password, Bitwarden.
+
+**References that validated the pattern:** 1Password locked vault (closest analogue — ambient lock, browsable content, single-line auth row on first action), macOS screen saver, Notion offline mode, Slack offline typing.
+
+Pre-commit code-auditor pass verified all critical paths: textarea content survives the unlock flow (uncontrolled ref, PostForm doesn't unmount), no phantom post (early-return BEFORE `onPostCreated`), no green-flash on locked attempt (`setJustPosted` only inside `performSubmit`), single-fire on auto-submit (`pendingSubmitRef` cleared before call), no auto-collapse timer leaks, mobile focus trap avoided.
+
+Files changed: `src/app/IdentityBar.tsx`, `src/app/PostForm.tsx`, CLAUDE.md, DECISIONS.md.
+
 ## 2026-05-02 (cont.) — Unlock UI rebrand + global shake catcher
 
 Category: UX, architecture
