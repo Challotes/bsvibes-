@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { EarningsSparkline } from "@/components/EarningsSparkline";
+import { GoatModeToast } from "@/components/GoatModeToast";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { RestoreModal } from "@/components/RestoreModal";
 import { useIdentityContext } from "@/contexts/IdentityContext";
@@ -14,6 +15,7 @@ import { isIdentityEncrypted, unlockIdentity } from "@/services/bsv/identity";
 import { FundAddress } from "./FundAddress";
 
 const BACKED_UP_KEY = "bsvibes_identity_backed_up";
+const GOAT_WELCOME_SHOWN_KEY = "bsvibes_goat_welcome_shown";
 
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
@@ -47,7 +49,13 @@ export function IdentityChip(): React.JSX.Element | null {
     []
   );
   const bsvPrice = useBsvPrice();
-  const { toggle: toggleCurrency, isGoat } = useCurrencyMode();
+  const {
+    toggle: toggleCurrency,
+    isGoat,
+    hasUserChosen: hasChosenCurrency,
+    setModeProgrammatically: setCurrencyMode,
+  } = useCurrencyMode();
+  const [showGoatToast, setShowGoatToast] = useState(false);
 
   // Save recovery file state
   const [downloading, setDownloading] = useState(false);
@@ -109,6 +117,7 @@ export function IdentityChip(): React.JSX.Element | null {
     setShowAdvanced(false);
     setKeyRevealed(false);
     setCopied(false);
+    setActivityExpanded(false);
   }, []);
 
   const loadStoredHint = useCallback(() => {
@@ -138,6 +147,21 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(encrypted);
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
+
+  // Auto-flip currency display to Goat (sats) the first time a user becomes
+  // protected, IF they have not explicitly toggled. Their explicit choice (if
+  // they later flip back to Noob) is honored permanently. The welcome toast
+  // shows once ever, gated by GOAT_WELCOME_SHOWN_KEY.
+  useEffect(() => {
+    if (!isProtected) return;
+    if (hasChosenCurrency) return;
+    if (isGoat) return;
+    setCurrencyMode("goat");
+    if (localStorage.getItem(GOAT_WELCOME_SHOWN_KEY) !== "1") {
+      setShowGoatToast(true);
+      localStorage.setItem(GOAT_WELCOME_SHOWN_KEY, "1");
+    }
+  }, [isProtected, hasChosenCurrency, isGoat, setCurrencyMode]);
 
   useEffect(() => {
     if (!identity?.address) return;
@@ -556,6 +580,8 @@ export function IdentityChip(): React.JSX.Element | null {
         />
       )}
 
+      <GoatModeToast visible={showGoatToast} onDismiss={() => setShowGoatToast(false)} />
+
       {/* ── Manage Identity modal ── */}
       {showManage && (
         <div
@@ -744,7 +770,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden="true"
-                      className={isProtected ? "text-amber-400" : "text-red-400"}
+                      className={isProtected ? "text-zinc-400" : "text-red-400"}
                     >
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                       {isProtected && <path d="m9 12 2 2 4-4" />}
@@ -1155,7 +1181,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 <button
                   type="button"
                   onClick={() => {
-                    setOpen(false);
+                    closeDropdown();
                     openMoveModal("");
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 bg-red-950/20 hover:bg-red-950/40 transition-colors cursor-pointer text-left"
@@ -1326,7 +1352,7 @@ export function IdentityChip(): React.JSX.Element | null {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setOpen(false);
+                      closeDropdown();
                       setShowDeposit(true);
                     }}
                     className="text-[11px] text-amber-400 hover:text-amber-300 underline-offset-2 hover:underline transition-colors"
