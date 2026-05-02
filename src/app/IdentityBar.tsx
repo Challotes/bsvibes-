@@ -164,13 +164,19 @@ export function IdentityChip(): React.JSX.Element | null {
   // ambient pill unmissable; auto-collapse after 8s of no interaction.
   // Do NOT autofocus the input on shake-triggered expand (mobile focus-trap
   // would steal focus from the textarea the user is typing in).
+  // If the user is already focused on the unlock input, skip arming the
+  // collapse timer — they're engaged and a background shake (e.g. wrong-
+  // passphrase, accidental tap elsewhere) shouldn't dismiss them mid-type.
   useEffect(() => {
     if (shakeKey === 0) return;
     setUnlockShaking(true);
     setUnlockExpanded(true);
     const shakeTimer = setTimeout(() => setUnlockShaking(false), 550);
+    const inputFocused = document.activeElement === unlockInputRef.current;
     if (unlockCollapseTimerRef.current) clearTimeout(unlockCollapseTimerRef.current);
-    unlockCollapseTimerRef.current = setTimeout(() => setUnlockExpanded(false), 8000);
+    if (!inputFocused) {
+      unlockCollapseTimerRef.current = setTimeout(() => setUnlockExpanded(false), 8000);
+    }
     return () => {
       clearTimeout(shakeTimer);
     };
@@ -537,7 +543,19 @@ export function IdentityChip(): React.JSX.Element | null {
                   type="password"
                   placeholder="Passphrase"
                   value={unlockPassphrase}
+                  onFocus={() => {
+                    // Engaged user — cancel any pending auto-collapse so a
+                    // background shake doesn't dismiss the popover mid-type.
+                    if (unlockCollapseTimerRef.current) {
+                      clearTimeout(unlockCollapseTimerRef.current);
+                      unlockCollapseTimerRef.current = null;
+                    }
+                  }}
                   onChange={(e) => {
+                    if (unlockCollapseTimerRef.current) {
+                      clearTimeout(unlockCollapseTimerRef.current);
+                      unlockCollapseTimerRef.current = null;
+                    }
                     setUnlockPassphrase(e.target.value);
                     setUnlockError("");
                   }}
