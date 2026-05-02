@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { BootToast } from "@/components/BootToast";
+import { LockedClickCatcher } from "@/components/LockedClickCatcher";
 import { BootProvider, useBootContext } from "@/contexts/BootContext";
 import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
 import { useFeedPolling } from "@/hooks/useFeedPolling";
@@ -329,6 +330,7 @@ export function Feed({
   return (
     <BootProvider>
       <IdentityProvider>
+        <LockedClickCatcher />
         <FeedContent initialPosts={initialPosts} initialBootboard={initialBootboard} />
       </IdentityProvider>
     </BootProvider>

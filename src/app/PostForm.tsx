@@ -23,7 +23,7 @@ export function PostForm({
   const [hasContent, setHasContent] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const { identity, sign } = useIdentityContext();
+  const { identity, needsUnlock, sign } = useIdentityContext();
 
   // Clean up recognition on unmount
   useEffect(() => {
@@ -139,7 +139,13 @@ export function PostForm({
           ref={textareaRef}
           name="content"
           aria-label="Share an idea"
-          placeholder={!identity ? "Setting up your identity..." : "Share an idea..."}
+          placeholder={
+            needsUnlock && !identity
+              ? "Locked — enter passphrase to post"
+              : !identity
+                ? "Setting up your identity..."
+                : "Share an idea..."
+          }
           maxLength={1000}
           disabled={!identity}
           onKeyDown={handleKeyDown}

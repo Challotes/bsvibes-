@@ -6,7 +6,11 @@ import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { GoatModeToast } from "@/components/GoatModeToast";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { RestoreModal } from "@/components/RestoreModal";
-import { useIdentityContext } from "@/contexts/IdentityContext";
+import {
+  useIdentityContext,
+  useIdentityShake,
+  useIdentityShakeKey,
+} from "@/contexts/IdentityContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
@@ -76,7 +80,9 @@ export function IdentityChip(): React.JSX.Element | null {
   const [unlockError, setUnlockError] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [storedHint, setStoredHint] = useState<string | null>(null);
-  const [showUnlockHint, setShowUnlockHint] = useState(false);
+  const [unlockShaking, setUnlockShaking] = useState(false);
+  const { signalLockedAttempt } = useIdentityShake();
+  const { shakeKey } = useIdentityShakeKey();
 
   // Activity / chart expand
   const [activityExpanded, setActivityExpanded] = useState(false);
@@ -147,6 +153,17 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(encrypted);
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
+
+  // Shake the locked-out unlock UI when a producer (PostForm, BootButton, etc.)
+  // signals an action was blocked by needsUnlock. shakeKey is a monotonic counter
+  // from IdentityShakeContext; rapid retriggers within the 550ms window collapse
+  // to a single shake (acceptable — user gets the message either way).
+  useEffect(() => {
+    if (shakeKey === 0) return;
+    setUnlockShaking(true);
+    const t = setTimeout(() => setUnlockShaking(false), 550);
+    return () => clearTimeout(t);
+  }, [shakeKey]);
 
   // Auto-flip currency display to Goat (sats) the first time a user becomes
   // protected, IF they have not explicitly toggled. Their explicit choice (if
@@ -320,6 +337,7 @@ export function IdentityChip(): React.JSX.Element | null {
       const unlocked = await unlockIdentity(unlockPassphrase);
       if (!unlocked) {
         setUnlockError("Wrong passphrase — try again");
+        signalLockedAttempt();
       } else {
         reAuthPassphraseRef.current = unlockPassphrase;
         updateIdentity(unlocked);
@@ -441,12 +459,16 @@ export function IdentityChip(): React.JSX.Element | null {
 
   if (needsUnlock && !identity) {
     return (
-      <div className="relative">
+      <div className="relative" data-unlock-ui="true">
+        {/* data-unlock-ui — LockedClickCatcher exclusion. Do not rename. */}
         <div
-          className="w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
-          style={{ backgroundColor: "#18181b" }}
+          className={`w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-amber-400/20 rounded-xl shadow-2xl overflow-hidden ${
+            unlockShaking ? "animate-[shake_0.5s_ease-in-out]" : ""
+          }`}
+          style={{ backgroundColor: "#0f0f0f" }}
         >
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800 bg-zinc-900/60">
+          <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-400/10">
             <svg
               width="13"
               height="13"
@@ -457,16 +479,16 @@ export function IdentityChip(): React.JSX.Element | null {
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
-              className="text-emerald-500 shrink-0"
+              className="text-amber-400/70 shrink-0"
             >
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="text-xs text-zinc-300 font-medium">
+            <span className="text-sm font-semibold text-zinc-100">
               Enter your passphrase to unlock
             </span>
           </div>
-          <div className="px-3 py-3 space-y-2">
+          <div className="px-4 py-4 space-y-2.5">
             <input
               type="password"
               placeholder="Passphrase"
@@ -478,21 +500,11 @@ export function IdentityChip(): React.JSX.Element | null {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleUnlock();
               }}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
             />
             {storedHint && (
-              <div className="text-[10px] text-zinc-600">
-                {showUnlockHint ? (
-                  <span className="text-zinc-400">Clue: {storedHint}</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowUnlockHint(true)}
-                    className="hover:text-zinc-400 transition-colors underline underline-offset-2"
-                  >
-                    Need a reminder?
-                  </button>
-                )}
+              <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
+                <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
               </div>
             )}
             {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
@@ -500,7 +512,7 @@ export function IdentityChip(): React.JSX.Element | null {
               type="button"
               onClick={handleUnlock}
               disabled={!unlockPassphrase || unlocking}
-              className="w-full bg-white text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {unlocking ? "Unlocking..." : "Unlock"}
             </button>

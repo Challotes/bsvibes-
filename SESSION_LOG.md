@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-02 (cont.) — Unlock UI rebrand + global shake catcher
+
+Category: UX, architecture
+
+Two-part change.
+
+**Cold-load unlock UI restyled to match the You modal locked-state.** The `needsUnlock && !identity` branch in `IdentityChip` was missed in the Stage 6 amber rebrand — still used emerald lock icon, zinc-800 borders, and a white-on-black button. Now: `border-amber-400/20`, gold top stripe, `#0f0f0f` bg, lock icon `text-amber-400/70`, header `text-sm font-semibold text-zinc-100` (was `text-xs text-zinc-300 font-medium`), input `border-amber-400/15` with amber focus, primary button amber. "Need a reminder?" toggle removed entirely — the hint shows immediately as the You-modal `💡` amber-left-border treatment (designer call: cold-load is more stressful, not less). PostForm placeholder also gains "Locked — enter passphrase to post" copy when `needsUnlock && !identity`.
+
+**Global shake-on-locked-action.** New `LockedClickCatcher` component (mounted inside `IdentityProvider` in `Feed.tsx`) registers a `document.addEventListener("pointerdown", ..., {capture: true})` whenever `needsUnlock && !identity`. On a pointerdown landing on an interactive element (`button, a[href], input, textarea, select, label, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])`) outside the unlock card (excluded via `data-unlock-ui="true"` on the unlock card root) it calls `signalLockedAttempt()` from the new sibling `IdentityShakeContext`. IdentityChip subscribes to the resulting `shakeKey` counter and applies `animate-[shake_0.5s_ease-in-out]` for 550ms. Wrong-passphrase entry on the unlock UI also fires the same shake — free reuse of the physical signal, error text differentiates the semantic. Animation reuses the existing `@keyframes shake` from `globals.css` (already used by `Bootboard` for holder-change).
+
+**Architecture rationale (recorded in DECISIONS.md):** chose global pointerdown-capture over per-site wiring after both architect and code-auditor reviewed alternatives. Per-site approach was prototyped, audited, then rejected because it (a) leaks lock-state coupling into every identity-required feature, (b) forces "looks-disabled-but-clickable" hacks that contradict `disabled={!identity}` honesty, (c) requires every new feature to remember the wiring forever. Auditor caught a critical bug in the global-capture spec — using `click` capture would silently fail because disabled form controls suppress click events per HTML5 spec; switched to `pointerdown` (W3C Pointer Events DO fire on disabled elements). Sibling `IdentityShakeContext` split into `useIdentityShake` (stable callback) + `useIdentityShakeKey` (counter) prevents counter mutation from re-rendering unrelated consumers. Opt-out via `data-bypass-lock-shake` for future features needing a different signal.
+
+Files changed: `src/components/LockedClickCatcher.tsx` (new), `src/contexts/IdentityContext.tsx` (sibling shake context), `src/app/IdentityBar.tsx` (unlock UI restyle + `data-unlock-ui` + shake subscription + wrong-passphrase signal), `src/app/Feed.tsx` (mount), `src/app/PostForm.tsx` (placeholder copy only), CLAUDE.md, DECISIONS.md.
+
 ## 2026-05-02 — You modal polish: icon color, activity reset, goat-default
 
 Category: UX, behavior
