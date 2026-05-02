@@ -54,7 +54,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Header.tsx` — Top bar with logo, genesis nav, identity chip
 - `src/app/PostList.tsx` — Post rendering, BootButton, Genesis anchor
 - `src/app/PostForm.tsx` — Compose box (enter-to-post, voice-to-text, agent chat trigger)
-- `src/app/IdentityBar.tsx` — Identity chip + You modal. Amber brand theme (#f59e0b). Earnings-first hierarchy: all-time earnings (hero) → activity (2 visible, "View all" toggle) → balance (demoted, inline "Add funds" link). Protected state = inline checkmark (X-verified pattern); unprotected = red banner (static dot, no pulse) → opens MoveAddressModal (combined passphrase + move flow). **Locked-state You modal:** the You modal opens locked for protected users (`manageAuthed === false`) showing a passphrase prompt as the body. On unlock, the body cross-fades to the rows (Save / Passphrase / Restore / Show recovery key). One container, two states; same modal, body swap with `animate-[fadeIn_0.2s_ease-out]`. Session destroyed on modal close OR tab blur (password-manager pattern). Show recovery key + Restore still re-prompt (defense-in-depth on highest-stakes paths — see DECISIONS.md). Move + Change Passphrase rows merged into a single "Passphrase" row. Show recovery key panel: red warning (*"Anyone with this key owns your account and any funds in it. Never share it."*) + acknowledgement-gated Reveal → side-by-side Hide/Copy. Earnings poll 30s — full feed when dropdown open, summary only when closed.
+- `src/app/IdentityBar.tsx` — Identity chip + You modal. Amber brand theme (#f59e0b). Earnings-first hierarchy: all-time earnings (hero) → activity (2 visible, "View all" toggle) → balance (demoted, inline "Add funds" link). Protected state = inline checkmark (X-verified pattern); unprotected = red banner (static dot, no pulse) → opens MoveAddressModal (combined passphrase + move flow). **Locked-state You modal:** the You modal opens locked for protected users (`manageAuthed === false`) showing a passphrase prompt as the body. On unlock, the body cross-fades to the rows (Save / Passphrase / Restore / Show recovery key). One container, two states; same modal, body swap with `animate-[fadeIn_0.2s_ease-out]`. Session destroyed on modal close OR tab blur (password-manager pattern). Show recovery key + Restore still re-prompt (defense-in-depth on highest-stakes paths — see DECISIONS.md). Move + Change Passphrase rows merged into a single "Passphrase" row. Show recovery key panel: red warning (*"Anyone with this key owns your account and any funds in it. Never share it."*) + acknowledgement-gated Reveal → side-by-side Hide/Copy. Earnings poll 30s — full feed when dropdown open, summary only when closed. Passphrase row icon goes neutral (zinc-400) when protected — color is reserved for active warnings (red unprotected, amber for unsaved backup). `closeDropdown` resets all sub-disclosures (`showAdvanced`, `keyRevealed`, `copied`, `activityExpanded`) so reopen always starts in default state. Currency display auto-flips to Goat (sats) the first time a user becomes protected via the `useCurrencyMode` protection-aware default; one-time `GoatModeToast` surfaces the change.
 - `src/components/RestoreModal.tsx` — Standalone restore-from-device modal (extracted from IdentityBar). Handles plain WIF, encrypted WIF, pending restore confirmation, auto-backup of current identity.
 - `src/app/Bootboard.tsx` — Pay-to-feature spotlight (live timer, shake/glow animations)
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
@@ -70,6 +70,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/components/EarningsSparkline.tsx` — Step-function area chart (pure SVG)
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon
 - `src/components/BootToast.tsx` — Transient boot error toast (retry action, auto-dismiss)
+- `src/components/GoatModeToast.tsx` — One-time celebratory toast on first auto-flip to Goat Mode after upgrade (gated by `bsvibes_goat_welcome_shown` localStorage flag)
 
 ### BSV Services
 
@@ -112,7 +113,7 @@ All on-chain payloads are JSON inside OP_FALSE OP_RETURN outputs:
 - `src/hooks/useFeedPolling.ts` — Polls /api/posts every 5s (pauses on hidden tab)
 - `src/hooks/useScrollTracker.ts` — Scroll position, unread tracking
 - `src/hooks/useBsvPrice.ts` — BSV/USD price (cached 5 min)
-- `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle
+- `src/hooks/useCurrencyMode.ts` — Noob Mode ($) / Goat Mode (sats) toggle. Default is protection-aware: protected accounts default to Goat, unprotected default to Noob. User's explicit toggle is honored forever once set (`hasUserChosen` derived from localStorage presence). `setModeProgrammatically` lets the parent drive an in-session live switch without persisting or marking the user as having chosen — used for the post-upgrade auto-flip.
 - `src/types/index.ts` — Shared types (Post, BootboardData, Identity, etc.)
 
 ## Request Flows

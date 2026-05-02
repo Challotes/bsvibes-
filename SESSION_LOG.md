@@ -2,6 +2,22 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-02 — You modal polish: icon color, activity reset, goat-default
+
+Category: UX, behavior
+
+Three bundled changes to the identity card after live brand-discussion + designer + architect + code-auditor passes. Single commit (`e5a1573`).
+
+**Passphrase icon neutralized when protected.** Previously stayed amber after upgrade — kept drawing attention to a settled state. Now `text-zinc-400` when protected, `text-red-400` when unprotected. Color is reserved for active warnings (red unprotected, amber unsaved-backup). User design call after agent debate; settled middle path between full-amber and current.
+
+**closeDropdown also resets activityExpanded.** "View all N" sub-disclosure was the only one that persisted across reopen, inconsistent with `showAdvanced`/`keyRevealed`/`copied`. Two stray `setOpen(false)` paths (Not protected banner click, Add funds link) routed through `closeDropdown` for consistent reset semantics. Architect-reviewer audited all 30 useState entries in `IdentityChip` to confirm no other state needed touching — `chartExpanded` (default-true) deliberately excluded; `addressCopied`/`transferStatus` are minor sister-inconsistencies left for a future pass.
+
+**Currency display defaults to Goat on protected accounts.** `useCurrencyMode` gained protection-aware default (reads `bfn_keypair_enc` synchronously in lazy initializer to avoid `$ → sats` first-paint flash), `hasUserChosen` flag (derived from localStorage presence of `bsvibes_currency_mode`), and `setModeProgrammatically` (in-session switch that does NOT mark as chosen, so reload still re-applies the protection-aware default). New `GoatModeToast` (positive amber styling, auto-dismiss 6s) fires once ever — gated by `bsvibes_goat_welcome_shown` — when a user transitions from unprotected to protected without having toggled. User's explicit toggle (in either direction) is honored forever once set. Code-auditor pre-commit pass verified: no infinite loop, state coherence holds across reload, hydration-safe in client boundary, multi-tab race is cosmetic and acceptable.
+
+Brand discussion sidebar (no code): explored renaming BSVibes → OpenCook for builder-targeted positioning. User owns `opencook.fun`; .ai is taken by a Solana token launchpad but considered low-traffic and not blocking. Rebrand mechanics deferred until launch. No DECISIONS.md entry yet — name not yet ratified, deferred.
+
+Files changed: `src/app/IdentityBar.tsx`, `src/hooks/useCurrencyMode.ts`, `src/components/GoatModeToast.tsx` (new), CLAUDE.md, DECISIONS.md.
+
 ## 2026-05-01 (cont.) — Documentation audit pass (5 batches)
 
 Category: documentation
