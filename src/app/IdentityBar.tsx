@@ -81,6 +81,10 @@ export function IdentityChip(): React.JSX.Element | null {
   const [unlocking, setUnlocking] = useState(false);
   const [storedHint, setStoredHint] = useState<string | null>(null);
   const [unlockShaking, setUnlockShaking] = useState(false);
+  const [unlockExpanded, setUnlockExpanded] = useState(false);
+  const [hintRevealed, setHintRevealed] = useState(false);
+  const unlockInputRef = useRef<HTMLInputElement>(null);
+  const unlockCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { signalLockedAttempt } = useIdentityShake();
   const { shakeKey } = useIdentityShakeKey();
 
@@ -154,16 +158,35 @@ export function IdentityChip(): React.JSX.Element | null {
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
 
-  // Shake the locked-out unlock UI when a producer (PostForm, BootButton, etc.)
-  // signals an action was blocked by needsUnlock. shakeKey is a monotonic counter
-  // from IdentityShakeContext; rapid retriggers within the 550ms window collapse
-  // to a single shake (acceptable — user gets the message either way).
+  // Shake AND auto-expand the locked-out chip when a producer (PostForm,
+  // BootButton, etc.) signals an action was blocked by needsUnlock. shakeKey is
+  // a monotonic counter from IdentityShakeContext. The expand makes the small
+  // ambient pill unmissable; auto-collapse after 8s of no interaction.
+  // Do NOT autofocus the input on shake-triggered expand (mobile focus-trap
+  // would steal focus from the textarea the user is typing in).
   useEffect(() => {
     if (shakeKey === 0) return;
     setUnlockShaking(true);
-    const t = setTimeout(() => setUnlockShaking(false), 550);
-    return () => clearTimeout(t);
+    setUnlockExpanded(true);
+    const shakeTimer = setTimeout(() => setUnlockShaking(false), 550);
+    if (unlockCollapseTimerRef.current) clearTimeout(unlockCollapseTimerRef.current);
+    unlockCollapseTimerRef.current = setTimeout(() => setUnlockExpanded(false), 8000);
+    return () => {
+      clearTimeout(shakeTimer);
+    };
   }, [shakeKey]);
+
+  // Cleanup auto-collapse timer on unmount
+  useEffect(() => {
+    return () => {
+      if (unlockCollapseTimerRef.current) clearTimeout(unlockCollapseTimerRef.current);
+    };
+  }, []);
+
+  // Reset hint reveal when popover closes
+  useEffect(() => {
+    if (!unlockExpanded) setHintRevealed(false);
+  }, [unlockExpanded]);
 
   // Auto-flip currency display to Goat (sats) the first time a user becomes
   // protected, IF they have not explicitly toggled. Their explicit choice (if
@@ -458,66 +481,96 @@ export function IdentityChip(): React.JSX.Element | null {
   // ── Unlock prompt ──────────────────────────────────────────────────────
 
   if (needsUnlock && !identity) {
+    // Ambient locked state. Pill matches the identity-chip's bounding box (no
+    // Header layout shift). Click expands a popover with the passphrase input;
+    // shake (from LockedClickCatcher) ALSO auto-expands so a small element is
+    // unmissable. Auto-collapse after 8s of no interaction.
     return (
       <div className="relative" data-unlock-ui="true">
         {/* data-unlock-ui — LockedClickCatcher exclusion. Do not rename. */}
-        <div
-          className={`w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-amber-400/20 rounded-xl shadow-2xl overflow-hidden ${
+        <button
+          type="button"
+          onClick={() => {
+            const next = !unlockExpanded;
+            setUnlockExpanded(next);
+            if (next) {
+              // User-initiated expand: autofocus is safe (no other input being typed).
+              setTimeout(() => unlockInputRef.current?.focus(), 50);
+              if (unlockCollapseTimerRef.current) {
+                clearTimeout(unlockCollapseTimerRef.current);
+                unlockCollapseTimerRef.current = null;
+              }
+            }
+          }}
+          className={`relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-amber-400/30 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-amber-300 hover:border-amber-400/60 transition-colors ${
             unlockShaking ? "animate-[shake_0.5s_ease-in-out]" : ""
           }`}
-          style={{ backgroundColor: "#0f0f0f" }}
         >
-          <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-400/10">
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="text-amber-400/70 shrink-0"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span className="text-sm font-semibold text-zinc-100">
-              Enter your passphrase to unlock
-            </span>
-          </div>
-          <div className="px-4 py-4 space-y-2.5">
-            <input
-              type="password"
-              placeholder="Passphrase"
-              value={unlockPassphrase}
-              onChange={(e) => {
-                setUnlockPassphrase(e.target.value);
-                setUnlockError("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleUnlock();
-              }}
-              className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
-            />
-            {storedHint && (
-              <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
-                <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="shrink-0"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>Sign in</span>
+        </button>
+
+        {unlockExpanded && (
+          <div
+            className="absolute right-0 top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-amber-400/20 rounded-xl shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]"
+            style={{ backgroundColor: "#0f0f0f" }}
+          >
+            <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+            <div className="px-3 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={unlockInputRef}
+                  type="password"
+                  placeholder="Passphrase"
+                  value={unlockPassphrase}
+                  onChange={(e) => {
+                    setUnlockPassphrase(e.target.value);
+                    setUnlockError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleUnlock();
+                  }}
+                  className="flex-1 bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+                />
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  disabled={!unlockPassphrase || unlocking}
+                  className="bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {unlocking ? "..." : "Enter"}
+                </button>
               </div>
-            )}
-            {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
-            <button
-              type="button"
-              onClick={handleUnlock}
-              disabled={!unlockPassphrase || unlocking}
-              className="w-full bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {unlocking ? "Unlocking..." : "Unlock"}
-            </button>
+              {storedHint &&
+                (hintRevealed ? (
+                  <p className="text-[11px] text-amber-400/90 leading-relaxed">{storedHint}</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setHintRevealed(true)}
+                    className="text-[11px] text-zinc-500 hover:text-amber-400/90 underline underline-offset-2 transition-colors"
+                  >
+                    Need a hint?
+                  </button>
+                ))}
+              {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

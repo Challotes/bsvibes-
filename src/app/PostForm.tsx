@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useIdentityContext, useIdentityShake } from "@/contexts/IdentityContext";
 import { AgentChat } from "./AgentChat";
 import { createPost } from "./actions";
 
@@ -24,6 +24,10 @@ export function PostForm({
   const [justPosted, setJustPosted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { identity, needsUnlock, sign } = useIdentityContext();
+  const { signalLockedAttempt } = useIdentityShake();
+  // Set when the user tries to submit while locked. Drives auto-submit once
+  // identity arrives so the typed thought isn't lost to the unlock flow.
+  const pendingSubmitRef = useRef(false);
 
   // Clean up recognition on unmount
   useEffect(() => {
@@ -41,39 +45,69 @@ export function PostForm({
     wasPendingRef.current = isPending;
   }, [isPending]);
 
+  const performSubmit = useCallback(
+    (currentIdentity: NonNullable<typeof identity>, content: string): void => {
+      if (!formRef.current) return;
+      const formData = new FormData(formRef.current);
+      formData.set("author", currentIdentity.name);
+      formData.set("content", content);
+
+      const tempId = Date.now();
+      onPostCreated?.(content, currentIdentity.name, tempId);
+      formRef.current.reset();
+      setHasContent(false);
+      setJustPosted(true);
+      setTimeout(() => setJustPosted(false), 1500);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.focus();
+      }
+
+      startTransition(async () => {
+        const sig = await sign(content);
+        if (sig) {
+          formData.set("signature", sig.signature);
+          formData.set("pubkey", sig.pubkey);
+        }
+        const result = await createPost(formData);
+        if (!result.ok) {
+          onPostRejected?.(tempId, result.reason);
+        }
+      });
+    },
+    [onPostCreated, onPostRejected, sign]
+  );
+
   function submitForm(): void {
-    if (!identity || !formRef.current) return;
+    if (!formRef.current) return;
     const formData = new FormData(formRef.current);
     const content = formData.get("content");
     if (typeof content !== "string" || !content.trim()) return;
-
-    formData.set("author", identity.name);
-
-    // Show optimistic post and clear form IMMEDIATELY — don't wait for signing or server
     const trimmed = content.trim();
-    const tempId = Date.now();
-    onPostCreated?.(trimmed, identity.name, tempId);
-    formRef.current?.reset();
-    setHasContent(false);
-    setJustPosted(true);
-    setTimeout(() => setJustPosted(false), 1500);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.focus();
+
+    // Locked: buffer + shake + auto-expand the unlock chip. Do NOT call
+    // onPostCreated — would create a phantom post that never sends.
+    // pendingSubmitRef triggers auto-submit once identity arrives.
+    if (!identity) {
+      if (needsUnlock) {
+        pendingSubmitRef.current = true;
+        signalLockedAttempt();
+      }
+      return;
     }
 
-    startTransition(async () => {
-      const sig = await sign(trimmed);
-      if (sig) {
-        formData.set("signature", sig.signature);
-        formData.set("pubkey", sig.pubkey);
-      }
-      const result = await createPost(formData);
-      if (!result.ok) {
-        onPostRejected?.(tempId, result.reason);
-      }
-    });
+    performSubmit(identity, trimmed);
   }
+
+  // Auto-submit the buffered draft once identity arrives after a locked attempt.
+  useEffect(() => {
+    if (!identity) return;
+    if (!pendingSubmitRef.current) return;
+    pendingSubmitRef.current = false;
+    const content = textareaRef.current?.value.trim() ?? "";
+    if (!content) return;
+    performSubmit(identity, content);
+  }, [identity, performSubmit]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -140,14 +174,10 @@ export function PostForm({
           name="content"
           aria-label="Share an idea"
           placeholder={
-            needsUnlock && !identity
-              ? "Locked — enter passphrase to post"
-              : !identity
-                ? "Setting up your identity..."
-                : "Share an idea..."
+            !identity && !needsUnlock ? "Setting up your identity..." : "Share an idea..."
           }
           maxLength={1000}
-          disabled={!identity}
+          disabled={!identity && !needsUnlock}
           onKeyDown={handleKeyDown}
           className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide transition-colors duration-300 ${
             justPosted
