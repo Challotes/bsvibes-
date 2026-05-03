@@ -92,6 +92,8 @@ export function IdentityChip(): React.JSX.Element | null {
   const [manageGatePass, setManageGatePass] = useState("");
   const [manageGateError, setManageGateError] = useState("");
   const [manageGateLoading, setManageGateLoading] = useState(false);
+  // Reminder click-to-reveal for the locked-state body
+  const [hintRevealed, setHintRevealed] = useState(false);
   // Restore modal
   const [showRestoreModal, setShowRestoreModal] = useState(false);
 
@@ -272,6 +274,7 @@ export function IdentityChip(): React.JSX.Element | null {
     setManageGatePass("");
     setManageGateError("");
     setManageGateLoading(false);
+    setHintRevealed(false);
     reAuthPassphraseRef.current = "";
   }
 
@@ -544,11 +547,20 @@ export function IdentityChip(): React.JSX.Element | null {
                     }}
                     className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
                   />
-                  {storedHint && (
-                    <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
-                      <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
-                    </div>
-                  )}
+                  {storedHint &&
+                    (hintRevealed ? (
+                      <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
+                        <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setHintRevealed(true)}
+                        className="text-[11px] text-zinc-500 hover:text-amber-400/90 underline underline-offset-2 transition-colors"
+                      >
+                        Need a reminder?
+                      </button>
+                    ))}
                   {manageGateError && <p className="text-[11px] text-red-400">{manageGateError}</p>}
                   <div className="flex gap-2 pt-1">
                     <button
