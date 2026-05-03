@@ -25,9 +25,6 @@ export function PostForm({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { identity, needsUnlock, sign } = useIdentityContext();
   const { signalLockedAttempt } = useIdentityShake();
-  // Set when the user tries to submit while locked. Drives auto-submit once
-  // identity arrives so the typed thought isn't lost to the unlock flow.
-  const pendingSubmitRef = useRef(false);
 
   // Clean up recognition on unmount
   useEffect(() => {
@@ -85,29 +82,14 @@ export function PostForm({
     if (typeof content !== "string" || !content.trim()) return;
     const trimmed = content.trim();
 
-    // Locked: buffer + shake + auto-expand the unlock chip. Do NOT call
-    // onPostCreated — would create a phantom post that never sends.
-    // pendingSubmitRef triggers auto-submit once identity arrives.
+    // Universal contract: locked users get shake feedback; they retap after signing in.
     if (!identity) {
-      if (needsUnlock) {
-        pendingSubmitRef.current = true;
-        signalLockedAttempt();
-      }
+      signalLockedAttempt();
       return;
     }
 
     performSubmit(identity, trimmed);
   }
-
-  // Auto-submit the buffered draft once identity arrives after a locked attempt.
-  useEffect(() => {
-    if (!identity) return;
-    if (!pendingSubmitRef.current) return;
-    pendingSubmitRef.current = false;
-    const content = textareaRef.current?.value.trim() ?? "";
-    if (!content) return;
-    performSubmit(identity, content);
-  }, [identity, performSubmit]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -199,8 +181,7 @@ export function PostForm({
           <button
             type="button"
             onClick={submitForm}
-            disabled={!identity}
-            className="absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 bg-amber-500 text-black rounded-full p-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-amber-400"
+            className="absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400"
             title="Post"
           >
             <svg
@@ -221,8 +202,7 @@ export function PostForm({
           <button
             type="button"
             onClick={toggleMic}
-            disabled={!identity}
-            className={`absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 rounded-full p-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 rounded-full p-2 transition-colors ${
               isListening
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"

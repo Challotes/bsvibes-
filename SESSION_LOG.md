@@ -2,6 +2,27 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-03 (cont.) — Universal "transaction action requires sign-in" pattern
+
+Category: UX, architecture
+
+User wanted a universal pattern that scales to any future transaction action across any site built on the toolkit. After two rounds of agent brainstorming, the answer was much simpler than the first attempt at it.
+
+**First attempt (rejected mid-flight).** Started a wholesale refactor adding `requestUnlock(): Promise<Identity>` on IdentityContext + a `useGuardedAction(fn)` hook + a centered `UnlockModal` + cached-chip pattern + BootContext synchronous-claim rewrite. Touched ~7 files. User stopped it: "we're doing unnecessary work here." Reverted via `git checkout -- <files>` + `rm UnlockModal.tsx`. Working tree cleanly back at `48264b3`.
+
+**Second attempt (shipped).** User reframed: drop the auto-replay machinery entirely. Telegram/X/Slack convention is tap-twice — none auto-replay after auth. Both architect and code-auditor agreed: without auto-replay, the whole `useGuardedAction` / `requestUnlock` abstraction collapses to dead code (a promise nobody awaits is a function call). The minimal universal pattern is one line: `if (!identity) { signalLockedAttempt(); return; }` at the top of every transaction-action handler. `LockedClickCatcher` stays mounted as the safety net for any future surface that forgets the explicit guard.
+
+**Pre-implementation audit confirmed nothing to revert.** Auditor verified the four recent commits (`295e6fa` `4f4230a` `8e1d534` `48264b3`) are sound — `LockedClickCatcher`, sibling shake contexts, ambient pill, 8s-timer fix all stay. Only the auto-replay block in PostForm needed removal. Confirmed via grep that nothing from the first-attempt refactor leaked into committed code (no `requestUnlock`, `useGuardedAction`, `UnlockModal`, `bootingPostIdRef`, or cached-chip references anywhere in `src/`).
+
+**Diff** — three files, subtractive:
+- `src/app/PostForm.tsx`: deleted `pendingSubmitRef` + auto-submit `useEffect`. Locked-submit branch is now just `signalLockedAttempt(); return;`. Dropped `disabled={!identity}` from send and mic buttons. Kept `disabled={!identity && !needsUnlock}` on textarea (gates "still loading" state, not lock state).
+- `src/app/PostList.tsx`: BootButton's `canBoot` no longer requires identity. `handleBoot()` early-returns + signals shake when locked. Imported `useIdentityShake`.
+- `src/app/Bootboard.tsx`: Same pattern in HistoryRow's `handleReboot()`. Dropped `!identity` from disabled clause.
+
+`tsc --noEmit` clean, `biome check` clean. `LockedClickCatcher` and IdentityBar untouched.
+
+Files changed: `src/app/PostForm.tsx`, `src/app/PostList.tsx`, `src/app/Bootboard.tsx`, CLAUDE.md, DECISIONS.md.
+
 ## 2026-05-03 — Locked state: ambient pill + idea preservation
 
 Category: UX, architecture

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
 import { useBootContext } from "@/contexts/BootContext";
-import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useIdentityContext, useIdentityShake } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import type { BootboardData } from "@/types";
 
@@ -41,6 +41,7 @@ function HistoryRow({
   onFundNeeded?: (address: string, balance?: number) => void;
 }) {
   const { identity } = useIdentityContext();
+  const { signalLockedAttempt } = useIdentityShake();
   const { bootingPostId, throttled } = useBootContext();
   const { boot } = useBoot({ onBooted, onFundNeeded });
 
@@ -49,7 +50,12 @@ function HistoryRow({
   const isBlocked = anyBooting || throttled;
 
   function handleReboot() {
-    if (!identity || isBlocked) return;
+    if (isBlocked) return;
+    // Universal contract: locked users get shake feedback; they retap after signing in.
+    if (!identity) {
+      signalLockedAttempt();
+      return;
+    }
     boot(entry.post_id, identity);
   }
 
@@ -58,7 +64,7 @@ function HistoryRow({
       <button
         type="button"
         onClick={handleReboot}
-        disabled={isBlocked || !identity}
+        disabled={isBlocked}
         className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:cursor-not-allowed border ${
           isThisBooting
             ? "text-amber-400 border-amber-500/40"
