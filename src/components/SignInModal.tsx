@@ -10,7 +10,8 @@ import { unlockIdentity } from "@/services/bsv/identity";
  * action (via requireIdentity()). On success the modal closes and the caller
  * is expected to retap their action — no auto-replay.
  *
- * Styling mirrors the existing amber-themed locked UI in IdentityBar.
+ * Container, header, body, and button row mirror the You modal's locked-state
+ * passphrase gate so both unlock surfaces feel like the same component.
  */
 export function SignInModal(): React.JSX.Element | null {
   const { signInOpen, closeSignIn, updateIdentity } = useIdentityContext();
@@ -19,16 +20,14 @@ export function SignInModal(): React.JSX.Element | null {
   const [error, setError] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
-  const [hintRevealed, setHintRevealed] = useState(false);
   const [storedHint, setStoredHint] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load hint once on first open
+  // Load hint and autofocus on open
   useEffect(() => {
     if (signInOpen) {
       setStoredHint(getStoredHint() ?? null);
-      // Auto-focus
       const id = requestAnimationFrame(() => inputRef.current?.focus());
       return () => cancelAnimationFrame(id);
     }
@@ -62,7 +61,6 @@ export function SignInModal(): React.JSX.Element | null {
       setPassphrase("");
       setError("");
       setUnlocking(false);
-      setHintRevealed(false);
     }
   }, [signInOpen]);
 
@@ -101,18 +99,44 @@ export function SignInModal(): React.JSX.Element | null {
         onClick={closeSignIn}
       />
 
-      <div
-        key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
-        className={`relative z-10 w-[calc(100vw-2rem)] sm:w-72 max-w-72 rounded-xl border border-amber-400/20 shadow-2xl overflow-hidden ${
-          shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : ""
-        }`}
-        style={{ backgroundColor: "#0f0f0f" }}
-      >
-        {/* Gold top stripe */}
-        <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+      <div className="relative z-10 w-full flex items-center justify-center">
+        <div
+          key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
+          className={`w-full max-w-sm rounded-xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden ${
+            shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : ""
+          }`}
+          style={{ backgroundColor: "#0f0f0f" }}
+        >
+          {/* Gold top stripe */}
+          <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
 
-        <div className="px-3 py-3 space-y-2">
-          <div className="flex items-center gap-2">
+          {/* Header — mirrors You modal */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-amber-400/10">
+            <p className="text-sm font-semibold text-zinc-100">Sign in</p>
+            <button
+              type="button"
+              onClick={closeSignIn}
+              className="text-zinc-500 hover:text-zinc-200 transition-colors ml-3"
+              aria-label="Close"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body — mirrors You modal locked-state */}
+          <div className="px-4 py-4 space-y-3">
             <input
               ref={inputRef}
               type="password"
@@ -123,34 +147,34 @@ export function SignInModal(): React.JSX.Element | null {
                 setError("");
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleUnlock();
+                if (e.key === "Enter" && passphrase) handleUnlock();
               }}
-              className="flex-1 bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+              className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
             />
-            <button
-              type="button"
-              onClick={handleUnlock}
-              disabled={!passphrase || unlocking}
-              className="bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {unlocking ? "..." : "Enter"}
-            </button>
-          </div>
-
-          {storedHint &&
-            (hintRevealed ? (
-              <p className="text-[11px] text-amber-400/90 leading-relaxed">{storedHint}</p>
-            ) : (
+            {storedHint && (
+              <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
+                <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+              </div>
+            )}
+            {error && <p className="text-[11px] text-red-400">{error}</p>}
+            <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setHintRevealed(true)}
-                className="text-[11px] text-zinc-500 hover:text-amber-400/90 underline underline-offset-2 transition-colors"
+                onClick={closeSignIn}
+                className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
               >
-                Need a hint?
+                Cancel
               </button>
-            ))}
-
-          {error && <p className="text-[11px] text-red-400">{error}</p>}
+              <button
+                type="button"
+                onClick={handleUnlock}
+                disabled={!passphrase || unlocking}
+                className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {unlocking ? "Signing in..." : "Sign in"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
