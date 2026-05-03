@@ -21,7 +21,6 @@ export function PostForm({
   const [isPending, startTransition] = useTransition();
   const [isListening, setIsListening] = useState(false);
   const [hasContent, setHasContent] = useState(false);
-  const [isMultiline, setIsMultiline] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
   const [resumeNudge, setResumeNudge] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -58,7 +57,6 @@ export function PostForm({
       onPostCreated?.(content, currentIdentity.name, tempId);
       formRef.current.reset();
       setHasContent(false);
-      setIsMultiline(false);
       setJustPosted(true);
       setTimeout(() => setJustPosted(false), 1500);
       if (textareaRef.current) {
@@ -186,7 +184,7 @@ export function PostForm({
           maxLength={1000}
           disabled={!identity && !needsUnlock}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-zinc-900 border rounded-3xl px-4 py-2.5 pr-14 sm:px-5 sm:py-3 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
+          className={`w-full bg-zinc-900 border rounded-3xl px-4 py-3 pr-14 sm:px-5 sm:py-3.5 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[52px] sm:min-h-[60px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
             resumeNudge ? "" : "transition-colors duration-300"
           } ${
             justPosted
@@ -202,21 +200,15 @@ export function PostForm({
           onInput={(e) => {
             const el = e.currentTarget;
             el.style.height = "auto";
-            const sh = el.scrollHeight;
-            el.style.height = `${Math.min(sh, 200)}px`;
+            el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
             setHasContent(el.value.trim().length > 0);
-            // Threshold: single-line content's scrollHeight is ~40-46px depending
-            // on breakpoint; >50 means it has grown past one line.
-            setIsMultiline(sh > 50);
           }}
         />
         {hasContent ? (
           <button
             type="button"
             onClick={submitForm}
-            className={`absolute right-2 sm:right-2.5 ${
-              isMultiline ? "bottom-2 sm:bottom-2.5" : "top-1/2 -translate-y-1/2"
-            } bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400`}
+            className="absolute right-3 bottom-[9px] sm:bottom-[13px] bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400"
             title="Post"
           >
             <svg
@@ -237,9 +229,7 @@ export function PostForm({
           <button
             type="button"
             onClick={toggleMic}
-            className={`absolute right-2 sm:right-2.5 ${
-              isMultiline ? "bottom-2 sm:bottom-2.5" : "top-1/2 -translate-y-1/2"
-            } rounded-full p-2 transition-colors ${
+            className={`absolute right-3 bottom-[9px] sm:bottom-[13px] rounded-full p-2 transition-colors ${
               isListening
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
