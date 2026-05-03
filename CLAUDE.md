@@ -71,7 +71,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/components/icons/BootIcon.tsx` — Boot emoji icon
 - `src/components/BootToast.tsx` — Transient boot error toast (retry action, auto-dismiss)
 - `src/components/GoatModeToast.tsx` — One-time celebratory toast on first auto-flip to Goat Mode after upgrade (gated by `bsvibes_goat_welcome_shown` localStorage flag)
-- `src/components/SignInModal.tsx` — Centered modal opened by `requireIdentity()`. Mounted inside `<IdentityProvider>` in `Feed.tsx`. Body: passphrase input + Enter button + "Need a hint?" two-step reveal. On success calls `unlockIdentity()` + `updateIdentity()` then `closeSignIn()`. Wrong-passphrase fires local shake (NOT context). Closes on backdrop click, Escape, OR tab blur (password-manager parity — clears all input state). No auto-replay: caller retaps action after signing in.
+- `src/components/SignInModal.tsx` — Centered modal opened by `requireIdentity()`. Mounted inside `<IdentityProvider>` in `Feed.tsx`. Container mirrors the You modal locked-state: `max-w-sm`, gold top stripe, `border-amber-400/20`, header with "Sign in" title + close X. Body: full-width passphrase input, "Need a reminder?" two-step click-to-reveal hint (`💡 {hint}` in amber left-border treatment), Cancel + Sign in buttons in a `flex-1` row. On success calls `unlockIdentity()` + `updateIdentity()` then `closeSignIn()`. Wrong-passphrase fires local shake (NOT context) + "Wrong passphrase, try again." error. Closes on backdrop click, Escape, OR tab blur (password-manager parity — clears all input state). No auto-replay: caller retaps action after signing in.
 
 ### Universal pattern: transaction action requires sign-in
 
