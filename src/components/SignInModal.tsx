@@ -103,7 +103,7 @@ export function SignInModal(): React.JSX.Element | null {
 
       <div
         key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
-        className={`relative z-10 w-full max-w-sm rounded-xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.7)] overflow-hidden ${
+        className={`relative z-10 w-[calc(100vw-2rem)] sm:w-72 max-w-72 rounded-xl border border-amber-400/20 shadow-2xl overflow-hidden ${
           shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : ""
         }`}
         style={{ backgroundColor: "#0f0f0f" }}
@@ -111,50 +111,7 @@ export function SignInModal(): React.JSX.Element | null {
         {/* Gold top stripe */}
         <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-amber-400/10">
-          <div className="flex items-center gap-2">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="text-amber-400 shrink-0"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <p className="text-sm font-semibold text-zinc-100">Sign in to continue</p>
-          </div>
-          <button
-            type="button"
-            onClick={closeSignIn}
-            className="text-zinc-500 hover:text-zinc-200 transition-colors ml-3"
-            aria-label="Close"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-4 py-4 space-y-3">
+        <div className="px-3 py-3 space-y-2">
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -168,24 +125,21 @@ export function SignInModal(): React.JSX.Element | null {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleUnlock();
               }}
-              className="flex-1 bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+              className="flex-1 bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
             />
             <button
               type="button"
               onClick={handleUnlock}
               disabled={!passphrase || unlocking}
-              className="bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {unlocking ? "..." : "Enter"}
             </button>
           </div>
 
-          {/* Hint — two-step reveal */}
           {storedHint &&
             (hintRevealed ? (
-              <p className="text-[11px] text-amber-400/90 leading-relaxed border-l-2 border-amber-500/60 pl-2 py-0.5">
-                {storedHint}
-              </p>
+              <p className="text-[11px] text-amber-400/90 leading-relaxed">{storedHint}</p>
             ) : (
               <button
                 type="button"
