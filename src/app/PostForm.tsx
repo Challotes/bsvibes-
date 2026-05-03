@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useIdentityContext, useIdentityShake } from "@/contexts/IdentityContext";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { AgentChat } from "./AgentChat";
 import { createPost } from "./actions";
 
@@ -23,8 +23,7 @@ export function PostForm({
   const [hasContent, setHasContent] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const { identity, needsUnlock, sign } = useIdentityContext();
-  const { signalLockedAttempt } = useIdentityShake();
+  const { identity, needsUnlock, sign, requireIdentity } = useIdentityContext();
 
   // Clean up recognition on unmount
   useEffect(() => {
@@ -82,11 +81,8 @@ export function PostForm({
     if (typeof content !== "string" || !content.trim()) return;
     const trimmed = content.trim();
 
-    // Universal contract: locked users get shake feedback; they retap after signing in.
-    if (!identity) {
-      signalLockedAttempt();
-      return;
-    }
+    // Opens SignInModal if locked; caller retaps after signing in.
+    if (!requireIdentity() || !identity) return;
 
     performSubmit(identity, trimmed);
   }

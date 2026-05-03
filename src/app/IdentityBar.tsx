@@ -6,16 +6,12 @@ import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { GoatModeToast } from "@/components/GoatModeToast";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { RestoreModal } from "@/components/RestoreModal";
-import {
-  useIdentityContext,
-  useIdentityShake,
-  useIdentityShakeKey,
-} from "@/contexts/IdentityContext";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
-import { isIdentityEncrypted, unlockIdentity } from "@/services/bsv/identity";
+import { getStoredAnonName, isIdentityEncrypted, unlockIdentity } from "@/services/bsv/identity";
 import { FundAddress } from "./FundAddress";
 
 const BACKED_UP_KEY = "bsvibes_identity_backed_up";
@@ -24,7 +20,7 @@ const GOAT_WELCOME_SHOWN_KEY = "bsvibes_goat_welcome_shown";
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading, needsUnlock, updateIdentity } = useIdentityContext();
+  const { identity, isLoading, needsUnlock, updateIdentity, openSignIn } = useIdentityContext();
   const [open, setOpen] = useState(false);
 
   // Security state
@@ -75,18 +71,8 @@ export function IdentityChip(): React.JSX.Element | null {
   const [copied, setCopied] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
 
-  // Unlock state (when needsUnlock)
-  const [unlockPassphrase, setUnlockPassphrase] = useState("");
-  const [unlockError, setUnlockError] = useState("");
-  const [unlocking, setUnlocking] = useState(false);
+  // Hint for the manage modal (stored-hint from encrypted store)
   const [storedHint, setStoredHint] = useState<string | null>(null);
-  const [unlockShaking, setUnlockShaking] = useState(false);
-  const [unlockExpanded, setUnlockExpanded] = useState(false);
-  const [hintRevealed, setHintRevealed] = useState(false);
-  const unlockInputRef = useRef<HTMLInputElement>(null);
-  const unlockCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { signalLockedAttempt } = useIdentityShake();
-  const { shakeKey } = useIdentityShakeKey();
 
   // Activity / chart expand
   const [activityExpanded, setActivityExpanded] = useState(false);
@@ -157,42 +143,6 @@ export function IdentityChip(): React.JSX.Element | null {
     setIsProtected(encrypted);
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
-
-  // Shake AND auto-expand the locked-out chip when a producer (PostForm,
-  // BootButton, etc.) signals an action was blocked by needsUnlock. shakeKey is
-  // a monotonic counter from IdentityShakeContext. The expand makes the small
-  // ambient pill unmissable; auto-collapse after 8s of no interaction.
-  // Do NOT autofocus the input on shake-triggered expand (mobile focus-trap
-  // would steal focus from the textarea the user is typing in).
-  // If the user is already focused on the unlock input, skip arming the
-  // collapse timer — they're engaged and a background shake (e.g. wrong-
-  // passphrase, accidental tap elsewhere) shouldn't dismiss them mid-type.
-  useEffect(() => {
-    if (shakeKey === 0) return;
-    setUnlockShaking(true);
-    setUnlockExpanded(true);
-    const shakeTimer = setTimeout(() => setUnlockShaking(false), 550);
-    const inputFocused = document.activeElement === unlockInputRef.current;
-    if (unlockCollapseTimerRef.current) clearTimeout(unlockCollapseTimerRef.current);
-    if (!inputFocused) {
-      unlockCollapseTimerRef.current = setTimeout(() => setUnlockExpanded(false), 8000);
-    }
-    return () => {
-      clearTimeout(shakeTimer);
-    };
-  }, [shakeKey]);
-
-  // Cleanup auto-collapse timer on unmount
-  useEffect(() => {
-    return () => {
-      if (unlockCollapseTimerRef.current) clearTimeout(unlockCollapseTimerRef.current);
-    };
-  }, []);
-
-  // Reset hint reveal when popover closes
-  useEffect(() => {
-    if (!unlockExpanded) setHintRevealed(false);
-  }, [unlockExpanded]);
 
   // Auto-flip currency display to Goat (sats) the first time a user becomes
   // protected, IF they have not explicitly toggled. Their explicit choice (if
@@ -356,29 +306,6 @@ export function IdentityChip(): React.JSX.Element | null {
     }
   }
 
-  // ── Unlock ──────────────────────────────────────────────────────────────
-
-  async function handleUnlock(): Promise<void> {
-    if (!unlockPassphrase) return;
-    setUnlocking(true);
-    setUnlockError("");
-    try {
-      const unlocked = await unlockIdentity(unlockPassphrase);
-      if (!unlocked) {
-        setUnlockError("Wrong passphrase — try again");
-        signalLockedAttempt();
-      } else {
-        reAuthPassphraseRef.current = unlockPassphrase;
-        updateIdentity(unlocked);
-        setUnlockPassphrase("");
-      }
-    } catch {
-      setUnlockError("Something went wrong — try again");
-    } finally {
-      setUnlocking(false);
-    }
-  }
-
   // ── Save recovery file ─────────────────────────────────────────────────
 
   function handleSaveFile(): void {
@@ -484,116 +411,10 @@ export function IdentityChip(): React.JSX.Element | null {
 
   if (isLoading) return null;
 
-  // ── Unlock prompt ──────────────────────────────────────────────────────
-
-  if (needsUnlock && !identity) {
-    // Ambient locked state. Pill matches the identity-chip's bounding box (no
-    // Header layout shift). Click expands a popover with the passphrase input;
-    // shake (from LockedClickCatcher) ALSO auto-expands so a small element is
-    // unmissable. Auto-collapse after 8s of no interaction.
-    return (
-      <div className="relative" data-unlock-ui="true">
-        {/* data-unlock-ui — LockedClickCatcher exclusion. Do not rename. */}
-        <button
-          type="button"
-          onClick={() => {
-            const next = !unlockExpanded;
-            setUnlockExpanded(next);
-            if (next) {
-              // User-initiated expand: autofocus is safe (no other input being typed).
-              setTimeout(() => unlockInputRef.current?.focus(), 50);
-              if (unlockCollapseTimerRef.current) {
-                clearTimeout(unlockCollapseTimerRef.current);
-                unlockCollapseTimerRef.current = null;
-              }
-            }
-          }}
-          className={`relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-amber-400/30 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-amber-300 hover:border-amber-400/60 transition-colors ${
-            unlockShaking ? "animate-[shake_0.5s_ease-in-out]" : ""
-          }`}
-        >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            className="shrink-0"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          <span>Sign in</span>
-        </button>
-
-        {unlockExpanded && (
-          <div
-            className="absolute right-0 top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-72 max-w-72 border border-amber-400/20 rounded-xl shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]"
-            style={{ backgroundColor: "#0f0f0f" }}
-          >
-            <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-            <div className="px-3 py-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={unlockInputRef}
-                  type="password"
-                  placeholder="Passphrase"
-                  value={unlockPassphrase}
-                  onFocus={() => {
-                    // Engaged user — cancel any pending auto-collapse so a
-                    // background shake doesn't dismiss the popover mid-type.
-                    if (unlockCollapseTimerRef.current) {
-                      clearTimeout(unlockCollapseTimerRef.current);
-                      unlockCollapseTimerRef.current = null;
-                    }
-                  }}
-                  onChange={(e) => {
-                    if (unlockCollapseTimerRef.current) {
-                      clearTimeout(unlockCollapseTimerRef.current);
-                      unlockCollapseTimerRef.current = null;
-                    }
-                    setUnlockPassphrase(e.target.value);
-                    setUnlockError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleUnlock();
-                  }}
-                  className="flex-1 bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
-                />
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  disabled={!unlockPassphrase || unlocking}
-                  className="bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {unlocking ? "..." : "Enter"}
-                </button>
-              </div>
-              {storedHint &&
-                (hintRevealed ? (
-                  <p className="text-[11px] text-amber-400/90 leading-relaxed">{storedHint}</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setHintRevealed(true)}
-                    className="text-[11px] text-zinc-500 hover:text-amber-400/90 underline underline-offset-2 transition-colors"
-                  >
-                    Need a hint?
-                  </button>
-                ))}
-              {unlockError && <p className="text-[11px] text-red-400">{unlockError}</p>}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (!identity) return null;
+  // When locked (needsUnlock && !identity), show the chip with the cached name
+  // from the encrypted store. Click opens the You modal, which gates on the
+  // manage-passphrase flow. Transaction actions open SignInModal instead.
+  const displayName = identity?.name ?? getStoredAnonName() ?? "...";
 
   const showWarningDot = backedUp === false;
 
@@ -666,7 +487,7 @@ export function IdentityChip(): React.JSX.Element | null {
       <GoatModeToast visible={showGoatToast} onDismiss={() => setShowGoatToast(false)} />
 
       {/* ── Manage Identity modal ── */}
-      {showManage && (
+      {showManage && identity && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
@@ -1042,10 +863,16 @@ export function IdentityChip(): React.JSX.Element | null {
       )}
 
       <div ref={dropdownRef} className="relative">
-        {/* Chip */}
+        {/* Chip — when locked, click opens SignInModal instead of dropdown */}
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            if (needsUnlock && !identity) {
+              openSignIn();
+              return;
+            }
+            setOpen((v) => !v);
+          }}
           className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
         >
           {/* Static protection-status dot. Hidden while the pulsing backup
@@ -1057,7 +884,7 @@ export function IdentityChip(): React.JSX.Element | null {
               className={`w-2 h-2 rounded-full ${isProtected ? "bg-amber-400" : "bg-red-500"}`}
             />
           )}
-          <span className="text-zinc-300">{identity.name}</span>
+          <span className="text-zinc-300">{displayName}</span>
           {balanceSats !== null && balanceSats > 0 && (
             <AnimatedBalance
               sats={balanceSats}
@@ -1075,7 +902,7 @@ export function IdentityChip(): React.JSX.Element | null {
           )}
         </button>
 
-        {open && (
+        {open && identity && (
           <div
             className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 border border-amber-400/20 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-50 overflow-hidden max-h-[85vh] overflow-y-auto"
             style={{ backgroundColor: "#0f0f0f" }}
@@ -1089,7 +916,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${isProtected ? "bg-amber-400" : "bg-red-500"}`}
                   />
-                  <span className="text-sm font-semibold text-white">{identity.name}</span>
+                  <span className="text-sm font-semibold text-white">{displayName}</span>
                   {isProtected && (
                     <svg
                       width="12"

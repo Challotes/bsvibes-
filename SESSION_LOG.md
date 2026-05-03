@@ -2,6 +2,38 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-03 (cont. 2) — Sign-in trigger rewrite: centered modal, no global catcher
+
+Category: UX, architecture (supersedes the same-day ambient-pill + universal-contract decisions)
+
+User refined the spec across multiple iterations: site should look 100% signed-in even when locked, read-only actions (AI chat, scrolling, reading) must NEVER trigger sign-in, and the trigger must be co-located with the action that needs the wallet. After three rounds of architect + designer + code-auditor review, the answer was Design 1: per-handler `requireIdentity()` guard + centered `<SignInModal>` triggered only by transaction handlers.
+
+**The decisive realisation:** the global `LockedClickCatcher` was firing on every interactive pointerdown — including chip clicks, menu opens, and any future read-only interaction — which violates the "reading is silent" principle the user articulated. No "is this interactive" heuristic can distinguish read from write reliably; the catcher had to go.
+
+**Rejected paths (all considered with agent review):**
+- `requestIdentity(): Promise<Identity>` with auto-replay — user explicitly ruled out auto-replay ("just let them sign in and attempt again"), which collapses the promise to dead code.
+- `Wallet` capability abstraction wrapping `clientSideBoot`/`signPost` — wrong altitude, would refactor the most security-sensitive code in the repo to save one line per future feature; a thin façade is a one-afternoon migration if scale ever demands it.
+- Marker attribute (`data-needs-wallet`) + narrowed catcher — keeps the global listener tax and requires rewiring every button's disabled state.
+
+**Shipped diff (~7 files modified, 1 new, 1 deleted, mostly deletion):**
+- `src/services/bsv/identity.ts` — added `getStoredAnonName()` reading `bfn_keypair_enc.name` plaintext (no decryption).
+- `src/contexts/IdentityContext.tsx` — full rewrite: deleted `IdentityShakeSignalContext` + `IdentityShakeKeyContext` + `useIdentityShake` + `useIdentityShakeKey` + `signalLockedAttempt` + sibling-Provider wrappers. Added `signInOpen`, `openSignIn()`, `closeSignIn()`, `requireIdentity(): boolean`, plus `useRequiresIdentity()` ergonomic hook.
+- `src/components/SignInModal.tsx` (new) — centered modal, passphrase input + Enter + "Need a hint?" two-step reveal. Wrong-passphrase shake is LOCAL state. Closes on backdrop / Escape / tab blur (password-manager parity, clears input).
+- `src/app/IdentityBar.tsx` — deleted ambient pill, popover, all unlock-related state (`unlockPassphrase`, `unlockShaking`, `unlockExpanded`, `unlockCollapseTimerRef`, etc.), the shake-from-context subscription, the 8s auto-collapse timer, the `data-unlock-ui` markers. Chip now always renders the cached anon name (`getStoredAnonName()`) when no `identity`. Click on locked chip routes to `openSignIn()`.
+- `src/app/PostForm.tsx`, `src/app/PostList.tsx`, `src/app/Bootboard.tsx` — replaced `signalLockedAttempt()` calls with `requireIdentity()`. Pattern: `if (!requireIdentity() || !identity) return;` (the `|| !identity` is a TypeScript narrowing guard).
+- `src/app/Feed.tsx` — replaced `<LockedClickCatcher />` with `<SignInModal />`.
+- `src/components/LockedClickCatcher.tsx` — deleted entirely.
+
+**Verification:** `tsc --noEmit` clean, `biome check src/` clean, grep for orphan references (`signalLockedAttempt`, `useIdentityShake`, `useIdentityShakeKey`, `LockedClickCatcher`, `data-bypass-lock-shake`, `data-unlock-ui`) returns zero matches in `src/`.
+
+**User journey shipped:**
+1. Locked user lands on site → sees `anon_xxxx` chip, reads feed, opens AI chat, scrolls — completely silent
+2. Types a post, hits Enter → centered modal pops up: "Sign in to continue"
+3. Enters passphrase → `unlockIdentity` + `updateIdentity` fire, modal closes
+4. Retaps Enter → post sends normally
+
+Files changed: `src/services/bsv/identity.ts`, `src/contexts/IdentityContext.tsx`, `src/components/SignInModal.tsx` (new), `src/app/IdentityBar.tsx`, `src/app/PostForm.tsx`, `src/app/PostList.tsx`, `src/app/Bootboard.tsx`, `src/app/Feed.tsx`, `src/components/LockedClickCatcher.tsx` (deleted), CLAUDE.md, DECISIONS.md.
+
 ## 2026-05-03 (cont.) — Universal "transaction action requires sign-in" pattern
 
 Category: UX, architecture

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
 import { useBootContext } from "@/contexts/BootContext";
-import { useIdentityContext, useIdentityShake } from "@/contexts/IdentityContext";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import type { BootboardData } from "@/types";
 
@@ -40,8 +40,7 @@ function HistoryRow({
   onBooted?: () => void;
   onFundNeeded?: (address: string, balance?: number) => void;
 }) {
-  const { identity } = useIdentityContext();
-  const { signalLockedAttempt } = useIdentityShake();
+  const { identity, requireIdentity } = useIdentityContext();
   const { bootingPostId, throttled } = useBootContext();
   const { boot } = useBoot({ onBooted, onFundNeeded });
 
@@ -51,11 +50,8 @@ function HistoryRow({
 
   function handleReboot() {
     if (isBlocked) return;
-    // Universal contract: locked users get shake feedback; they retap after signing in.
-    if (!identity) {
-      signalLockedAttempt();
-      return;
-    }
+    // Opens SignInModal if locked; caller retaps after signing in.
+    if (!requireIdentity() || !identity) return;
     boot(entry.post_id, identity);
   }
 

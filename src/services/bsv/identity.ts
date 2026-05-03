@@ -721,6 +721,24 @@ export function preWarmBsvSdk(): void {
 }
 
 /**
+ * Read the cached anon name from the encrypted identity store WITHOUT
+ * decrypting the WIF. The encrypted store is { encrypted, name, address, hint? }
+ * — name is stored in plaintext so we can show it in the chip even when locked.
+ * Returns null if no encrypted identity exists or the field is missing.
+ */
+export function getStoredAnonName(): string | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(ENCRYPTED_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { name?: string };
+    return typeof parsed.name === "string" ? parsed.name : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Import an identity from a raw WIF string (or a backup JSON file's WIF field).
  * Validates the WIF, derives the address, stores in localStorage (plaintext).
  * Replaces any existing identity — caller is responsible for confirming with the user.

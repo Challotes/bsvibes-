@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { useIdentity } from "@/hooks/useIdentity";
 import type { Identity } from "@/types";
 
@@ -10,40 +10,37 @@ interface IdentityContextValue {
   needsUnlock: boolean;
   sign: (content: string) => Promise<{ signature: string; pubkey: string } | null>;
   updateIdentity: (newIdentity: Identity) => void;
+  // Sign-in modal
+  signInOpen: boolean;
+  openSignIn: () => void;
+  closeSignIn: () => void;
+  requireIdentity: () => boolean;
 }
 
 const IdentityContext = createContext<IdentityContextValue | null>(null);
 
-// Two sibling contexts so producers (PostForm, BootButton, every history row)
-// subscribe only to the stable signaller and don't re-render every time the
-// chip shakes. Only IdentityChip subscribes to the counter context.
-interface IdentityShakeSignalContextValue {
-  signalLockedAttempt: () => void;
-}
-interface IdentityShakeKeyContextValue {
-  shakeKey: number;
-}
-const IdentityShakeSignalContext = createContext<IdentityShakeSignalContextValue | null>(null);
-const IdentityShakeKeyContext = createContext<IdentityShakeKeyContextValue | null>(null);
-
 export function IdentityProvider({ children }: { children: ReactNode }) {
-  const value = useIdentity();
-  const [shakeKey, setShakeKey] = useState(0);
-  const signalLockedAttempt = useCallback(() => setShakeKey((k) => k + 1), []);
-  const signalValue = useMemo<IdentityShakeSignalContextValue>(
-    () => ({ signalLockedAttempt }),
-    [signalLockedAttempt]
-  );
-  const keyValue = useMemo<IdentityShakeKeyContextValue>(() => ({ shakeKey }), [shakeKey]);
-  return (
-    <IdentityContext.Provider value={value}>
-      <IdentityShakeSignalContext.Provider value={signalValue}>
-        <IdentityShakeKeyContext.Provider value={keyValue}>
-          {children}
-        </IdentityShakeKeyContext.Provider>
-      </IdentityShakeSignalContext.Provider>
-    </IdentityContext.Provider>
-  );
+  const identityValue = useIdentity();
+  const [signInOpen, setSignInOpen] = useState(false);
+
+  const openSignIn = useCallback(() => setSignInOpen(true), []);
+  const closeSignIn = useCallback(() => setSignInOpen(false), []);
+
+  const requireIdentity = useCallback((): boolean => {
+    if (identityValue.identity) return true;
+    setSignInOpen(true);
+    return false;
+  }, [identityValue.identity]);
+
+  const contextValue: IdentityContextValue = {
+    ...identityValue,
+    signInOpen,
+    openSignIn,
+    closeSignIn,
+    requireIdentity,
+  };
+
+  return <IdentityContext.Provider value={contextValue}>{children}</IdentityContext.Provider>;
 }
 
 export function useIdentityContext(): IdentityContextValue {
@@ -55,25 +52,18 @@ export function useIdentityContext(): IdentityContextValue {
 }
 
 /**
- * Subscribe to shake signals (PostForm, BootButton, etc.).
- * Stable across renders — never re-renders consumers when a shake fires.
+ * Ergonomic hook for components that need both the identity and a guard.
+ * Usage:
+ *   const { identity, requireIdentity } = useRequiresIdentity();
+ *   function handleAction() {
+ *     if (!requireIdentity()) return;   // opens modal if locked, returns false
+ *     // identity is non-null here
+ *   }
  */
-export function useIdentityShake(): IdentityShakeSignalContextValue {
-  const ctx = useContext(IdentityShakeSignalContext);
-  if (!ctx) {
-    throw new Error("useIdentityShake must be used inside <IdentityProvider>");
-  }
-  return ctx;
-}
-
-/**
- * Read the shake counter (IdentityChip only). Re-renders the consumer on
- * every shake, so don't use this from a list-rendered component.
- */
-export function useIdentityShakeKey(): IdentityShakeKeyContextValue {
-  const ctx = useContext(IdentityShakeKeyContext);
-  if (!ctx) {
-    throw new Error("useIdentityShakeKey must be used inside <IdentityProvider>");
-  }
-  return ctx;
+export function useRequiresIdentity(): {
+  identity: Identity | null;
+  requireIdentity: () => boolean;
+} {
+  const ctx = useIdentityContext();
+  return { identity: ctx.identity, requireIdentity: ctx.requireIdentity };
 }

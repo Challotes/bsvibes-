@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
 import { useBootContext } from "@/contexts/BootContext";
-import { useIdentityContext, useIdentityShake } from "@/contexts/IdentityContext";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import { timeAgo } from "@/lib/utils";
 import type { Post } from "@/types";
@@ -64,8 +64,7 @@ function BootButton({
   onFundNeeded,
   onFreeBootUsed,
 }: BootButtonProps) {
-  const { identity } = useIdentityContext();
-  const { signalLockedAttempt } = useIdentityShake();
+  const { identity, requireIdentity } = useIdentityContext();
   const { bootingPostId, bootStatus, throttled, consolidationWarningDismissed } = useBootContext();
   const { boot } = useBoot({ onBooted, onFundNeeded, onFreeBootUsed });
   const [optimisticBoots, setOptimisticBoots] = useState(0);
@@ -93,11 +92,8 @@ function BootButton({
 
   async function handleBoot() {
     if (!postPubkey || anyBooting || throttled) return;
-    // Universal contract: locked users get shake feedback; they retap after signing in.
-    if (!identity) {
-      signalLockedAttempt();
-      return;
-    }
+    // Opens SignInModal if locked; caller retaps after signing in.
+    if (!requireIdentity() || !identity) return;
     setOptimisticBoots((prev) => prev + 1);
     const result = await boot(postId, identity);
     if (!result.success) {
