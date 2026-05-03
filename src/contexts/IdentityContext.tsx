@@ -14,6 +14,18 @@ interface IdentityContextValue {
   signInOpen: boolean;
   openSignIn: () => void;
   closeSignIn: () => void;
+  /**
+   * Gate for any transaction-requiring action. Returns true if signed in,
+   * otherwise opens <SignInModal> and returns false. Use at the top of every
+   * handler that needs a signed BSV identity (post, boot, tip, future):
+   *
+   *   const { identity, requireIdentity } = useIdentityContext();
+   *   if (!requireIdentity() || !identity) return;
+   *   // identity is non-null here — proceed with sign / spend
+   *
+   * Do NOT call signPost, clientSideBoot, or any other wif-using service
+   * from a UI handler without this gate. See CLAUDE.md "Universal pattern".
+   */
   requireIdentity: () => boolean;
 }
 

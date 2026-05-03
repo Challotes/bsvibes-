@@ -220,6 +220,7 @@ These are non-negotiable. Do not bend them without explicit approval from the us
 4. **Every session that modifies code must end with a git commit.** SESSION_LOG entry written, then commit. No leaving modified files uncommitted at session end.
 5. **Update DECISIONS.md immediately when a decision is made**, not at session end. Decisions made mid-session affect subsequent work.
 6. **No personal information in repo files.** Never write names, emails, usernames, or other identifying information into any committed file. Repo files are public — personal details belong only in memory files (which are local and not committed).
+7. **Transaction handlers must use `requireIdentity()`.** Any handler needing a signed BSV identity (post, boot, tip, any future transaction) begins with `if (!requireIdentity() || !identity) return;` per the "Universal pattern: transaction action requires sign-in" section above. Do not directly call `signPost`, `clientSideBoot`, or any other wif-using service from a UI handler without this gate — it would silently fail when the user is locked instead of opening the SignInModal.
 
 ## Context Management
 
