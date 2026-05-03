@@ -21,6 +21,7 @@ export function PostForm({
   const [isPending, startTransition] = useTransition();
   const [isListening, setIsListening] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  const [isMultiline, setIsMultiline] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
   const [resumeNudge, setResumeNudge] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -57,6 +58,7 @@ export function PostForm({
       onPostCreated?.(content, currentIdentity.name, tempId);
       formRef.current.reset();
       setHasContent(false);
+      setIsMultiline(false);
       setJustPosted(true);
       setTimeout(() => setJustPosted(false), 1500);
       if (textareaRef.current) {
@@ -200,15 +202,21 @@ export function PostForm({
           onInput={(e) => {
             const el = e.currentTarget;
             el.style.height = "auto";
-            el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+            const sh = el.scrollHeight;
+            el.style.height = `${Math.min(sh, 200)}px`;
             setHasContent(el.value.trim().length > 0);
+            // Threshold: single-line content's scrollHeight is ~40-46px depending
+            // on breakpoint; >50 means it has grown past one line.
+            setIsMultiline(sh > 50);
           }}
         />
         {hasContent ? (
           <button
             type="button"
             onClick={submitForm}
-            className="absolute right-2 sm:right-2.5 bottom-2 sm:bottom-2.5 bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400"
+            className={`absolute right-2 sm:right-2.5 ${
+              isMultiline ? "bottom-2 sm:bottom-2.5" : "top-1/2 -translate-y-1/2"
+            } bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400`}
             title="Post"
           >
             <svg
@@ -229,7 +237,9 @@ export function PostForm({
           <button
             type="button"
             onClick={toggleMic}
-            className={`absolute right-2 sm:right-2.5 bottom-2 sm:bottom-2.5 rounded-full p-2 transition-colors ${
+            className={`absolute right-2 sm:right-2.5 ${
+              isMultiline ? "bottom-2 sm:bottom-2.5" : "top-1/2 -translate-y-1/2"
+            } rounded-full p-2 transition-colors ${
               isListening
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
