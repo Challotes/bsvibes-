@@ -184,7 +184,7 @@ export function PostForm({
           maxLength={1000}
           disabled={!identity && !needsUnlock}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-zinc-900 border rounded-3xl px-4 py-3 pr-14 sm:px-5 sm:py-3.5 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[52px] sm:min-h-[60px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
+          className={`block w-full bg-zinc-900 border rounded-3xl px-4 py-3 pr-14 sm:px-5 sm:py-3.5 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[52px] sm:min-h-[60px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
             resumeNudge ? "" : "transition-colors duration-300"
           } ${
             justPosted
