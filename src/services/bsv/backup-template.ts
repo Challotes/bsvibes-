@@ -37,8 +37,8 @@ export interface BackupData {
   note?: string;
 }
 
-/** Escape a value for use inside an HTML attribute (title=). */
-function escapeHtmlAttr(str: string): string {
+/** Escape a value for use in HTML body or attribute. */
+function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -97,41 +97,54 @@ export function generateBackupHtml(data: BackupData): string {
 
   const title = `BSVibes Recovery — ${data.name}`;
   const isPlaintext = Boolean(data.wif) && !data.wif_encrypted;
-  const isCombined = Boolean(data.oldWif_encrypted);
 
-  // ── Address section helper ──────────────────────────────────────────────────
-  // Returns HTML for a public-address display row with Copy button.
-  // labelText: "Current public address" | "Previous public address" | "Public address"
-  // addressValue: the address string (injected via JS)
-  // elementId: unique id for the address code element
-  function addressSectionHtml(labelText: string, elementId: string): string {
+  // ── Per-variant context block ───────────────────────────────────────────────
+  // Sits beneath the metadata card. Tells the user what THIS file is and where
+  // their posts/earnings live. One or two sentences, no jargon, variant-specific.
+  function contextBlockText(): string {
+    if (isPlaintext) {
+      return "This file lets you recover your BSVibes account on any device. Because no passphrase was set, the secret key inside is readable by anyone who opens this file.";
+    }
+    switch (data.pathType) {
+      case "rotation":
+        return "Your account has moved. Posts and earnings now go to the address above. This file holds both keys — your current key, and your previous key in case any funds were in transit during the move.";
+      case "pre-rotation":
+        return "This is a temporary checkpoint from before your account moved. Once the move completes you'll receive an updated file that supersedes this one. Keep this only until then.";
+      case "restore-pre":
+        return "This is a snapshot of the account that was on this device before you restored. If you need to go back, this file is your way in.";
+      default:
+        return "This file lets you recover your BSVibes account on any device. Your posts and earnings are tied to the address above.";
+    }
+  }
+
+  // ── WIF warning helper ──────────────────────────────────────────────────────
+  // Single paragraph in both cases. Previous-key variant explains what
+  // "previous" means (posts/earnings moved, this is funds-in-flight insurance)
+  // while keeping the same severity language as the current-key warning.
+  function wifWarningHtml(isPrevious: boolean): string {
+    if (isPrevious) {
+      return [
+        '      <div class="wif-warning">',
+        "        <p>&#9888; <strong>Previous secret key.</strong> Your posts and earnings have moved to your current address &mdash; this key is only here in case any funds were in transit during the move. Treat it with the same care as your current key: anyone who has it controls that address. Never share it &mdash; not with support, not with friends, not with anyone.</p>",
+        "      </div>",
+      ].join("\n");
+    }
     return [
-      '      <div class="address-section">',
-      `        <div class="address-label">${escapeHtmlAttr(labelText)}</div>`,
-      '        <div class="address-row">',
-      `          <code class="address-value" id="${elementId}"></code>`,
-      `          <button class="copy-btn" onclick="copyAddr('${elementId}', this)">&#128203; Copy</button>`,
-      "        </div>",
+      '      <div class="wif-warning">',
+      "        <p>&#9888; Anyone who has this secret key controls your account and any funds in it. Never share it &mdash; not with support, not with friends, not with anyone.</p>",
       "      </div>",
     ].join("\n");
   }
 
-  // ── WIF warning helper ──────────────────────────────────────────────────────
-  function wifWarningHtml(isPrevious: boolean): string {
-    const lines: string[] = ['      <div class="wif-warning">'];
-    if (isPrevious) {
-      lines.push(
-        "        <p>&#9888; Your previous key. May still hold funds if the transfer was skipped.</p>"
-      );
-    }
-    lines.push(
-      "        <p>&#9888; Anyone who has this key controls your account and any funds in it. Never share it &mdash; not with support, not with friends, not with anyone.</p>"
-    );
-    lines.push("      </div>");
-    return lines.join("\n");
-  }
+  // Metadata card uses "Current address" for rotation files (where the file
+  // contains both a current and previous key) so the meaning of the address
+  // row is unambiguous. All other variants just say "Address".
+  const addressLabel = data.pathType === "rotation" ? "Current address" : "Address";
 
-  // ── Conditional HTML section (body content) ─────────────────────────────────
+  // ── Body section ────────────────────────────────────────────────────────────
+  // The current-key block does NOT repeat the public address — it's already in
+  // the metadata card at the top. The previous-key block DOES show the previous
+  // address, because that's the only place it appears.
   const bodySection = isPlaintext
     ? [
         "    <!-- Plaintext recovery: WIF shown immediately -->",
@@ -139,10 +152,8 @@ export function generateBackupHtml(data: BackupData): string {
         "      &#9888; This file is not encrypted. Anyone who can open it can take your account.",
         "    </div>",
         '    <div class="card" id="plaintext-section">',
-        addressSectionHtml("Public address", "addr-display"),
-        '      <p class="address-note">Public addresses are safe to share &mdash; keep your key private.</p>',
         '      <div class="wif-block">',
-        '        <div class="wif-label">Your Key (WIF)</div>',
+        '        <div class="wif-label">Your secret key (WIF)</div>',
         '        <div class="wif-value" id="wif-display"></div>',
         "      </div>",
         wifWarningHtml(false),
@@ -154,7 +165,7 @@ export function generateBackupHtml(data: BackupData): string {
         data.hint
           ? '      <div class="hint-box"><strong>Memory clue:</strong> <span id="hint-text"></span></div>'
           : "",
-        '      <label for="passphrase-input">Enter your passphrase to reveal your key</label>',
+        '      <label for="passphrase-input">Enter your passphrase to unlock your secret key</label>',
         '      <input type="password" id="passphrase-input" placeholder="Your passphrase" autocomplete="current-password" />',
         '      <button class="primary" id="decrypt-btn" onclick="handleDecrypt()">Decrypt</button>',
         "    </div>",
@@ -168,21 +179,25 @@ export function generateBackupHtml(data: BackupData): string {
         '            <polyline points="2,6 5,9 10,3"></polyline>',
         "          </svg>",
         "        </div>",
-        "        <h3>Decryption successful</h3>",
+        "        <h3>Key unlocked</h3>",
         "      </div>",
         '      <div id="wif-primary-block" style="display:none">',
-        addressSectionHtml("Current public address", "addr-primary"),
-        '        <p class="address-note">Public addresses are safe to share &mdash; your key is encrypted and protected by your passphrase.</p>',
         '        <div class="wif-block">',
-        '          <div class="wif-label">Your Key (WIF)</div>',
+        '          <div class="wif-label">Your secret key (WIF)</div>',
         '          <div class="wif-value" id="wif-primary"></div>',
         "        </div>",
         wifWarningHtml(false),
         "      </div>",
         '      <div id="wif-old-block" style="display:none">',
-        addressSectionHtml("Previous public address", "addr-old"),
+        '        <div class="address-section">',
+        '          <div class="address-label">Previous public address</div>',
+        '          <div class="address-row">',
+        '            <code class="address-value" id="addr-old"></code>',
+        '            <button class="copy-btn" onclick="copyText(\'addr-old\', this)">&#128203; Copy</button>',
+        "          </div>",
+        "        </div>",
         '        <div class="wif-block">',
-        '          <div class="wif-label">Previous Key (WIF) — from before last rotation</div>',
+        '          <div class="wif-label">Previous secret key</div>',
         '          <div class="wif-value" id="wif-old"></div>',
         "        </div>",
         wifWarningHtml(true),
@@ -195,26 +210,11 @@ export function generateBackupHtml(data: BackupData): string {
         "    </div>",
       ].join("\n");
 
-  // ── Conditional JS section ──────────────────────────────────────────────────
-  const jsSection = isPlaintext
+  // ── Variant-specific JS body (injected after the universal helpers) ─────────
+  const variantJs = isPlaintext
     ? [
-        "    // Plaintext recovery: show WIF and address immediately",
+        "    // Plaintext recovery: show WIF immediately",
         "    document.getElementById('wif-display').textContent = BACKUP_DATA.wif || '';",
-        "    document.getElementById('addr-display').textContent = BACKUP_DATA.address || '';",
-        "    function copyAddr(id, btn) {",
-        "      const text = document.getElementById(id).textContent;",
-        "      navigator.clipboard.writeText(text).then(() => {",
-        "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
-        "      }).catch(() => {",
-        "        const el = document.getElementById(id);",
-        "        const range = document.createRange(); range.selectNodeContents(el);",
-        "        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);",
-        "        document.execCommand('copy'); sel.removeAllRanges();",
-        "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
-        "      });",
-        "    }",
       ].join("\n")
     : [
         "    // Show hint if present",
@@ -276,9 +276,8 @@ export function generateBackupHtml(data: BackupData): string {
         "      // Primary key block",
         "      const pb = document.getElementById('wif-primary-block');",
         "      document.getElementById('wif-primary').textContent = primary;",
-        "      document.getElementById('addr-primary').textContent = BACKUP_DATA.address || '';",
         "      pb.style.display = 'block';",
-        "      // Old key block",
+        "      // Previous key block",
         "      const ob = document.getElementById('wif-old-block');",
         "      if (old) {",
         "        document.getElementById('wif-old').textContent = old;",
@@ -297,25 +296,7 @@ export function generateBackupHtml(data: BackupData): string {
         "      else el.innerHTML = '<strong>Decryption failed</strong>Wrong passphrase or corrupted data. Check your passphrase and try again.';",
         "      el.style.display = 'block';",
         "    }",
-        "",
-        "    function copyAddr(id, btn) {",
-        "      const text = document.getElementById(id).textContent;",
-        "      navigator.clipboard.writeText(text).then(() => {",
-        "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
-        "      }).catch(() => {",
-        "        const el = document.getElementById(id);",
-        "        const range = document.createRange(); range.selectNodeContents(el);",
-        "        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);",
-        "        document.execCommand('copy'); sel.removeAllRanges();",
-        "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
-        "      });",
-        "    }",
       ].join("\n");
-
-  // Suppress unused-variable warning for isCombined in the template context
-  void isCombined;
 
   return (
     "<!DOCTYPE html>\n" +
@@ -325,7 +306,7 @@ export function generateBackupHtml(data: BackupData): string {
     '  <meta charset="UTF-8">\n' +
     '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
     "  <title>" +
-    escapeHtmlAttr(title) +
+    escapeHtml(title) +
     "</title>\n" +
     '  <link rel="icon" href="' +
     faviconUri +
@@ -351,36 +332,29 @@ export function generateBackupHtml(data: BackupData): string {
     "    }\n" +
     "    .offline-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }\n" +
     "    .badge-wrap { display: flex; justify-content: center; }\n" +
-    "    .privacy-banner {\n" +
-    "      background: #0d1f1a; border: 1px solid #1a4731; border-radius: 10px;\n" +
-    "      padding: 13px 16px; margin-bottom: 16px;\n" +
-    "      display: flex; align-items: flex-start; gap: 11px;\n" +
-    "    }\n" +
-    "    .privacy-banner-icon {\n" +
-    "      flex-shrink: 0; width: 32px; height: 32px;\n" +
-    "      background: #14532d; border-radius: 8px;\n" +
-    "      display: flex; align-items: center; justify-content: center;\n" +
-    "      margin-top: 1px;\n" +
-    "    }\n" +
-    "    .privacy-banner-icon svg { width: 16px; height: 16px; }\n" +
-    "    .privacy-banner-body { flex: 1; }\n" +
-    "    .privacy-banner-title {\n" +
-    "      font-size: 13px; font-weight: 600; color: #4ade80;\n" +
-    "      margin-bottom: 3px; letter-spacing: 0.01em;\n" +
-    "    }\n" +
-    "    .privacy-banner-desc {\n" +
-    "      font-size: 12px; color: #86efac; line-height: 1.5; opacity: 0.8;\n" +
-    "    }\n" +
     "    .plaintext-banner {\n" +
     "      background: #7f1d1d; border: 1px solid #dc2626; border-radius: 10px;\n" +
     "      padding: 13px 16px; margin-bottom: 16px;\n" +
     "      font-size: 13px; font-weight: 600; color: #fff; line-height: 1.5;\n" +
     "    }\n" +
+    "    .context-block {\n" +
+    "      background: #18181b; border: 1px solid #27272a; border-radius: 10px;\n" +
+    "      padding: 13px 16px; margin-bottom: 14px;\n" +
+    "      font-size: 13px; color: #d4d4d8; line-height: 1.55;\n" +
+    "    }\n" +
     "    .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 24px; margin-bottom: 14px; }\n" +
-    "    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; }\n" +
-    "    .meta-label { color: #71717a; }\n" +
-    "    .meta-value { color: #a1a1aa; font-family: 'SF Mono', 'Fira Code', monospace; word-break: break-all; text-align: right; max-width: 70%; }\n" +
+    "    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; gap: 12px; }\n" +
+    "    .meta-row.with-copy { align-items: center; }\n" +
+    "    .meta-label { color: #71717a; flex-shrink: 0; }\n" +
+    "    .meta-value { color: #a1a1aa; font-family: 'SF Mono', 'Fira Code', monospace; word-break: break-all; text-align: right; flex: 1; }\n" +
     "    .meta-value.name { color: #f4f4f5; font-weight: 600; font-family: inherit; }\n" +
+    "    .meta-copy-btn {\n" +
+    "      background: transparent; border: 1px solid #3f3f46; border-radius: 5px;\n" +
+    "      color: #71717a; font-size: 10px; font-weight: 500; padding: 3px 8px;\n" +
+    "      cursor: pointer; transition: background 0.15s, color 0.15s; flex-shrink: 0;\n" +
+    "    }\n" +
+    "    .meta-copy-btn:hover { background: #27272a; color: #f4f4f5; }\n" +
+    "    .meta-copy-btn.copied { background: #14532d; border-color: #166534; color: #4ade80; }\n" +
     "    label { display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 7px; letter-spacing: 0.01em; }\n" +
     '    input[type="password"] {\n' +
     "      width: 100%; background: #09090b; border: 1px solid #3f3f46;\n" +
@@ -412,13 +386,13 @@ export function generateBackupHtml(data: BackupData): string {
     "    .address-label { font-size: 10px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }\n" +
     "    .address-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\n" +
     "    .address-value { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: #a1a1aa; word-break: break-all; flex: 1; }\n" +
-    "    .address-note { font-size: 11px; color: #52525b; margin-top: 6px; margin-bottom: 14px; line-height: 1.5; font-style: italic; }\n" +
     "    .wif-block { background: #09090b; border: 1px solid #3f3f46; border-radius: 8px; padding: 12px; margin-bottom: 8px; }\n" +
     "    .wif-label { font-size: 10px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }\n" +
     "    .wif-value { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #f4f4f5; word-break: break-all; line-height: 1.6; user-select: all; }\n" +
     "    .wif-warning { margin-top: 8px; margin-bottom: 12px; }\n" +
-    "    .wif-warning p { font-size: 11px; color: #fca5a5; line-height: 1.5; margin-bottom: 4px; }\n" +
+    "    .wif-warning p { font-size: 11px; color: #fca5a5; line-height: 1.55; margin-bottom: 4px; }\n" +
     "    .wif-warning p:last-child { margin-bottom: 0; }\n" +
+    "    .wif-warning strong { color: #fecaca; font-weight: 600; }\n" +
     "    .copy-btn {\n" +
     "      background: #27272a; border: 1px solid #3f3f46; border-radius: 6px;\n" +
     "      color: #a1a1aa; font-size: 11px; font-weight: 500; padding: 5px 11px;\n" +
@@ -438,40 +412,30 @@ export function generateBackupHtml(data: BackupData): string {
     "      border-radius: 8px; padding: 13px; font-size: 13px; color: #fca5a5;\n" +
     "    }\n" +
     "    .error-box strong { color: #f87171; display: block; margin-bottom: 3px; }\n" +
-    "    footer { text-align: center; font-size: 11px; color: #52525b; margin-top: 28px; line-height: 1.6; }\n" +
+    "    footer { text-align: center; font-size: 11px; color: #52525b; margin-top: 28px; line-height: 1.7; }\n" +
     "    footer a { color: #71717a; text-decoration: none; }\n" +
     "    footer a:hover { color: #a1a1aa; }\n" +
+    "    .footer-stamp { color: #3f3f46; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; letter-spacing: 0.02em; margin-bottom: 4px; }\n" +
     "  </style>\n" +
     "</head>\n" +
     "<body>\n" +
     '  <div class="container">\n' +
     '    <div class="logo"><span>BS</span>Vibes</div>\n' +
     "    <h1>Recovery File</h1>\n" +
-    '    <p class="subtitle">This file contains your encrypted identity.<br>Keep it somewhere safe.</p>\n' +
+    '    <p class="subtitle">Keep this file somewhere only you can find it.</p>\n' +
     '    <div class="badge-wrap"><div class="offline-badge">Works offline — no network calls</div></div>\n' +
     "\n" +
-    (isPlaintext
-      ? ""
-      : '    <div class="privacy-banner">\n' +
-        '      <div class="privacy-banner-icon">\n' +
-        '        <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n' +
-        '          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>\n' +
-        '          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>\n' +
-        "        </svg>\n" +
-        "      </div>\n" +
-        '      <div class="privacy-banner-body">\n' +
-        '        <div class="privacy-banner-title">Private &amp; Offline</div>\n' +
-        '        <div class="privacy-banner-desc">This page runs entirely on your device. No data is sent anywhere.</div>\n' +
-        "      </div>\n" +
-        "    </div>\n\n") +
     '    <div class="card">\n' +
     '      <div class="meta-row">\n' +
     '        <span class="meta-label">Name</span>\n' +
     '        <span class="meta-value name" id="meta-name"></span>\n' +
     "      </div>\n" +
-    '      <div class="meta-row">\n' +
-    '        <span class="meta-label">Address</span>\n' +
+    '      <div class="meta-row with-copy">\n' +
+    '        <span class="meta-label">' +
+    addressLabel +
+    "</span>\n" +
     '        <span class="meta-value" id="meta-address"></span>\n' +
+    '        <button class="meta-copy-btn" onclick="copyText(\'meta-address\', this)">Copy</button>\n' +
     "      </div>\n" +
     '      <div class="meta-row">\n' +
     '        <span class="meta-label">Saved</span>\n' +
@@ -479,11 +443,15 @@ export function generateBackupHtml(data: BackupData): string {
     "      </div>\n" +
     "    </div>\n" +
     "\n" +
+    '    <div class="context-block">' +
+    escapeHtml(contextBlockText()) +
+    "</div>\n" +
+    "\n" +
     bodySection +
     "\n" +
     "\n" +
     "    <footer>\n" +
-    "      This file works offline. No data is sent anywhere.<br>\n" +
+    '      <div class="footer-stamp" id="footer-stamp"></div>\n' +
     '      <a href="https://bsvibes.com" target="_blank" rel="noopener">bsvibes.com</a>\n' +
     "    </footer>\n" +
     "  </div>\n" +
@@ -501,14 +469,35 @@ export function generateBackupHtml(data: BackupData): string {
     "        .replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n" +
     "    }\n" +
     "\n" +
+    "    // Universal copy helper — used by both the metadata Address row and any\n" +
+    "    // Copy button inside the variant body (e.g., the previous-address row).\n" +
+    "    function copyText(id, btn) {\n" +
+    "      const text = document.getElementById(id).textContent;\n" +
+    "      const original = btn.textContent;\n" +
+    "      navigator.clipboard.writeText(text).then(() => {\n" +
+    "        btn.textContent = 'Copied!'; btn.classList.add('copied');\n" +
+    "        setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2000);\n" +
+    "      }).catch(() => {\n" +
+    "        const el = document.getElementById(id);\n" +
+    "        const range = document.createRange(); range.selectNodeContents(el);\n" +
+    "        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);\n" +
+    "        document.execCommand('copy'); sel.removeAllRanges();\n" +
+    "        btn.textContent = 'Copied!'; btn.classList.add('copied');\n" +
+    "        setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2000);\n" +
+    "      });\n" +
+    "    }\n" +
+    "\n" +
     "    document.getElementById('meta-name').textContent = BACKUP_DATA.name || '—';\n" +
     "    document.getElementById('meta-address').textContent = BACKUP_DATA.address || '—';\n" +
+    "    let savedDateText = BACKUP_DATA.createdAt || '—';\n" +
     "    try {\n" +
     "      const d = new Date(BACKUP_DATA.createdAt);\n" +
-    "      document.getElementById('meta-date').textContent = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });\n" +
-    "    } catch { document.getElementById('meta-date').textContent = BACKUP_DATA.createdAt || '—'; }\n" +
+    "      savedDateText = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });\n" +
+    "    } catch {}\n" +
+    "    document.getElementById('meta-date').textContent = savedDateText;\n" +
+    "    document.getElementById('footer-stamp').textContent = 'Recovery file · ' + BACKUP_DATA.pathType + ' · saved ' + savedDateText;\n" +
     "\n" +
-    jsSection +
+    variantJs +
     "\n" +
     "  </script>\n" +
     "</body>\n" +

@@ -2,6 +2,35 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-04 — Recovery file copy & layout polish (round 2)
+
+Category: UX, copy, recovery-flow polish
+
+User reviewed yesterday's backup overhaul output and flagged three issues: (1) the public address was being shown twice (in the metadata card AND inside each WIF block), (2) the previous-WIF block stacked two warnings that mostly repeated each other, and (3) the file didn't actually explain to the user where their posts/earnings live or what "previous" means. Asked me to dispatch agents to audit the full layout and copy.
+
+**Agents dispatched in parallel:** designer (layout/visual hygiene) + documentation-writer (copy/explainer language). Both converged on the same direction; doc-writer pushed further on copy (kill the green privacy banner, replace generic subtitle, soften "Decryption successful" to "Key unlocked"). User picked recommended bundle (a) with one tweak: apply "secret key" terminology where appropriate (matching the existing `IdentityBar:797` pattern *"Secret key — handle with care"*).
+
+**Shipped (1 file rewrite + 3 doc updates, single commit):**
+- **Layout dedup:** removed the "Current public address" row + address-note italic from inside the current-WIF block (encrypted) and the plaintext WIF card. Address now appears once, in the metadata card, with an inline Copy button. Previous-public-address row stays inside the previous-WIF block (only place it's available).
+- **Per-variant context block** beneath the metadata card. Five variants drafted: `save`-encrypted ("Posts and earnings are tied to the address above"), `save`-plaintext ("Because no passphrase was set, the secret key inside is readable by anyone..."), `rotation` ("Your account has moved. Posts and earnings now go to the address above. This file holds both keys..."), `pre-rotation` ("Temporary checkpoint... an updated file supersedes this one"), `restore-pre` ("Snapshot of the account that was on this device before you restored").
+- **Previous-key warning consolidated** to one paragraph: *"⚠ **Previous secret key.** Your posts and earnings have moved to your current address — this key is only here in case any funds were in transit during the move. Treat it with the same care as your current key: anyone who has it controls that address. Never share it — not with support, not with friends, not with anyone."*
+- **"Secret key" terminology** applied. WIF labels: *"Your secret key (WIF)"* / *"Previous secret key"*. Decrypt label: *"Enter your passphrase to unlock your secret key"*. Current-key warning: *"Anyone who has this secret key controls your account..."*. Pattern: feature/file = "recovery" (recovery file, Show recovery key row), value inside = "secret key".
+- **Subtitle generic-ised** to *"Keep this file somewhere only you can find it."* — context block now does the variant-specific framing.
+- **"Decryption successful" → "Key unlocked"** (warmer, shorter, consistent with the unlock framing of the decrypt label).
+- **Metadata Address label** flips to *"Current address"* on rotation files (where the file contains both current + previous keys), stays as *"Address"* everywhere else.
+- **Green "Private & Offline" banner removed** as cargo. Three places saying "no network calls" (banner, offline badge, footer) was bloat. Offline badge stays; the HTML comment `<!-- No network calls. Verify: View Source. -->` is the actual proof for anyone who cares to verify.
+- **Footer trimmed** to a small monospace stamp `Recovery file · <pathType> · saved <date>` + bsvibes.com link. Stamp helps support tickets ("user sent me a screenshot — what variant?") without taking up real estate.
+- **Universal `copyText(id, btn)` JS helper** hoisted out of the variant-conditional `jsSection` into the always-loaded script block, so both the metadata Address row and the previous-address row use one implementation.
+- **CSS additions:** `.context-block`, `.meta-row.with-copy`, `.meta-copy-btn` + states, `.wif-warning strong`, `.footer-stamp`. **CSS removed:** `.privacy-banner` family (banner gone), `.address-note` (no longer rendered).
+
+**No call-site changes needed** — all 4 callers (MoveAddressModal, ChangePassphraseModal, RestoreModal, IdentityBar) keep the same `BackupData` shape they already pass. Schema is unchanged.
+
+**Verification:** `tsc --noEmit` clean (0 errors), `biome check` clean (after fixing 2 single-vs-double-quote nits the linter caught on the new Copy-button HTML literals).
+
+**Docs updated in same commit:** DECISIONS.md gains "Recovery file copy & layout polish" entry above the existing 2026-05-03 backup overhaul entry; CLAUDE.md `backup-template.ts` paragraph rewritten to reflect the new layout structure + don't-do list.
+
+**Ruled out / deferred:** sr-only h2 headings for screen reader navigation (low priority, can ship later as a standalone a11y pass).
+
 ## 2026-05-03 (cont. 3) — Backup file audit & overhaul
 
 Category: Security, UX, recovery-flow hardening
