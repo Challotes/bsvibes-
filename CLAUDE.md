@@ -60,7 +60,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 - `src/app/Manifesto.tsx` — Vision TLDR block above Genesis
 - `src/app/Genesis.tsx` — Founding conversation (always visible, NOT collapsible)
 - `src/app/AgentChat.tsx` — AI Q&A modal (streaming via /api/agent)
-- `src/app/FundAddress.tsx` — Deposit address panel (QR/copy)
+- `src/app/FundAddress.tsx` — Centered Deposit modal matching the You modal / SignInModal shell (`max-w-sm`, gold top stripe, `border-amber-400/20`, `#0f0f0f` bg). Body: 180px QR code (`qrcode.react` SVG, white-on-black, scannable across all wallets), balance + boot cost breakdown (when bootPrice context exists with shortfall in amber), click-to-copy address row, primary Copy Address button. Closes on backdrop click + close X.
 - `src/app/layout.tsx` — Root layout (metadata, fonts, IdentityProvider wrapper)
 - `src/app/error.tsx` — Error boundary
 - `src/components/PassphrasePrompt.tsx` — Reusable passphrase input with hint display
