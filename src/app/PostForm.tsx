@@ -184,7 +184,7 @@ export function PostForm({
           maxLength={1000}
           disabled={!identity && !needsUnlock}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-zinc-900 border rounded-full px-4 py-2.5 pr-14 sm:px-5 sm:py-3 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
+          className={`w-full bg-zinc-900 border rounded-3xl px-4 py-2.5 pr-14 sm:px-5 sm:py-3 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
             resumeNudge ? "" : "transition-colors duration-300"
           } ${
             justPosted
@@ -208,7 +208,7 @@ export function PostForm({
           <button
             type="button"
             onClick={submitForm}
-            className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400"
+            className="absolute right-2 sm:right-2.5 bottom-2 sm:bottom-2.5 bg-amber-500 text-black rounded-full p-2 transition-colors hover:bg-amber-400"
             title="Post"
           >
             <svg
@@ -229,7 +229,7 @@ export function PostForm({
           <button
             type="button"
             onClick={toggleMic}
-            className={`absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 rounded-full p-2 transition-colors ${
+            className={`absolute right-2 sm:right-2.5 bottom-2 sm:bottom-2.5 rounded-full p-2 transition-colors ${
               isListening
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
