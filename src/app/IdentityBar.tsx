@@ -327,16 +327,14 @@ export function IdentityChip(): React.JSX.Element | null {
   function doDownloadPlaintext() {
     if (!identity) return;
     setDownloading(true);
-    downloadBackup(
-      {
-        name: identity.name,
-        address: identity.address,
-        wif: identity.wif,
-        createdAt: new Date().toISOString(),
-        hint: getStoredHint(),
-      },
-      `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`
-    );
+    downloadBackup({
+      name: identity.name,
+      address: identity.address,
+      wif: identity.wif,
+      pathType: "save",
+      createdAt: new Date().toISOString(),
+      hint: getStoredHint(),
+    });
     setJustDownloaded(true);
     // Stay in You modal — inline confirmation appears on the Save row.
     setTimeout(() => setDownloading(false), 1000);
@@ -360,17 +358,15 @@ export function IdentityChip(): React.JSX.Element | null {
         encryptedWif = await encryptWif(identity.wif, passphrase);
       }
 
-      downloadBackup(
-        {
-          name: identity.name,
-          address: identity.address,
-          wif_encrypted: encryptedWif,
-          createdAt: new Date().toISOString(),
-          note: "Use your passphrase to restore.",
-          hint: getStoredHint(),
-        },
-        `bsvibes-${identity.name}-${new Date().toISOString().slice(0, 10)}.html`
-      );
+      downloadBackup({
+        name: identity.name,
+        address: identity.address,
+        wif_encrypted: encryptedWif,
+        pathType: "save",
+        createdAt: new Date().toISOString(),
+        note: "Use your passphrase to restore.",
+        hint: getStoredHint(),
+      });
       setJustDownloaded(true);
       // Stay in You modal — inline confirmation appears on the Save row.
     } catch {

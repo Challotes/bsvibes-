@@ -30,6 +30,8 @@ export interface BackupData {
   wif?: string; // plaintext — shown immediately, no passphrase needed
   wif_encrypted?: string; // AES-256-GCM encrypted — requires passphrase to reveal
   oldWif_encrypted?: string; // previous key after rotation (encrypted)
+  oldAddress?: string; // present only for combined files (rotation) when old address differs
+  pathType: "save" | "rotation" | "pre-rotation" | "restore-pre";
   hint?: string; // memory clue (plaintext, stored verbatim)
   createdAt: string;
   note?: string;
@@ -42,6 +44,40 @@ function escapeHtmlAttr(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/**
+ * Builds the filename for a backup download.
+ *
+ * Pattern: bsvibes-<pathType>-<anon_name>-<addr6>[-to-<newAddr6>]-<YYYY-MM-DD-HHmm>.html
+ *
+ * addr6 = address.slice(1, 7)  (skip leading '1' of P2PKH, take next 6 chars)
+ * For combined files (oldAddress present): oldAddr6-to-newAddr6
+ * For single-key files: just newAddr6
+ */
+function buildFilename(data: BackupData): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  const datePart = `${yyyy}-${mm}-${dd}-${hh}${min}`;
+
+  const newAddr6 = data.address.slice(1, 7);
+
+  let addrPart: string;
+  if (data.oldAddress) {
+    const oldAddr6 = data.oldAddress.slice(1, 7);
+    addrPart = `${oldAddr6}-to-${newAddr6}`;
+  } else {
+    addrPart = newAddr6;
+  }
+
+  // Sanitise anon name: keep alphanumeric + underscore, replace others with hyphen
+  const safeName = data.name.replace(/[^a-zA-Z0-9_]/g, "-");
+
+  return `bsvibes-${data.pathType}-${safeName}-${addrPart}-${datePart}.html`;
 }
 
 /**
@@ -59,23 +95,57 @@ export function generateBackupHtml(data: BackupData): string {
   // Safe JSON embed — JSON.stringify handles all escaping
   const dataJson = JSON.stringify(data);
 
-  const title = `BSVibes Recovery \u2014 ${data.name}`;
+  const title = `BSVibes Recovery — ${data.name}`;
   const isPlaintext = Boolean(data.wif) && !data.wif_encrypted;
+  const isCombined = Boolean(data.oldWif_encrypted);
 
-  // --- Conditional HTML section (body content) ---
+  // ── Address section helper ──────────────────────────────────────────────────
+  // Returns HTML for a public-address display row with Copy button.
+  // labelText: "Current public address" | "Previous public address" | "Public address"
+  // addressValue: the address string (injected via JS)
+  // elementId: unique id for the address code element
+  function addressSectionHtml(labelText: string, elementId: string): string {
+    return [
+      '      <div class="address-section">',
+      `        <div class="address-label">${escapeHtmlAttr(labelText)}</div>`,
+      '        <div class="address-row">',
+      `          <code class="address-value" id="${elementId}"></code>`,
+      `          <button class="copy-btn" onclick="copyAddr('${elementId}', this)">&#128203; Copy</button>`,
+      "        </div>",
+      "      </div>",
+    ].join("\n");
+  }
+
+  // ── WIF warning helper ──────────────────────────────────────────────────────
+  function wifWarningHtml(isPrevious: boolean): string {
+    const lines: string[] = ['      <div class="wif-warning">'];
+    if (isPrevious) {
+      lines.push(
+        "        <p>&#9888; Your previous key. May still hold funds if the transfer was skipped.</p>"
+      );
+    }
+    lines.push(
+      "        <p>&#9888; Anyone who has this key controls your account and any funds in it. Never share it &mdash; not with support, not with friends, not with anyone.</p>"
+    );
+    lines.push("      </div>");
+    return lines.join("\n");
+  }
+
+  // ── Conditional HTML section (body content) ─────────────────────────────────
   const bodySection = isPlaintext
     ? [
         "    <!-- Plaintext recovery: WIF shown immediately -->",
+        '    <div class="plaintext-banner">',
+        "      &#9888; This file is not encrypted. Anyone who can open it can take your account.",
+        "    </div>",
         '    <div class="card" id="plaintext-section">',
+        addressSectionHtml("Public address", "addr-display"),
+        '      <p class="address-note">Public addresses are safe to share &mdash; keep your key private.</p>',
         '      <div class="wif-block">',
         '        <div class="wif-label">Your Key (WIF)</div>',
         '        <div class="wif-value" id="wif-display"></div>',
-        '        <button class="copy-btn" id="copy-wif-btn" onclick="copyWif()">Copy</button>',
         "      </div>",
-        '      <p style="font-size:11px;color:#71717a;margin-top:10px;line-height:1.5;">',
-        "        This recovery file is not encrypted. Anyone with this file can access your identity.",
-        "        Consider using a passphrase-protected recovery file in future.",
-        "      </p>",
+        wifWarningHtml(false),
         "    </div>",
       ].join("\n")
     : [
@@ -100,15 +170,22 @@ export function generateBackupHtml(data: BackupData): string {
         "        </div>",
         "        <h3>Decryption successful</h3>",
         "      </div>",
-        '      <div id="wif-primary-block" class="wif-block" style="display:none">',
-        '        <div class="wif-label">Your Key (WIF)</div>',
-        '        <div class="wif-value" id="wif-primary"></div>',
-        '        <button class="copy-btn" onclick="copyValue(\'wif-primary\', this)">Copy</button>',
+        '      <div id="wif-primary-block" style="display:none">',
+        addressSectionHtml("Current public address", "addr-primary"),
+        '        <p class="address-note">Public addresses are safe to share &mdash; your key is encrypted and protected by your passphrase.</p>',
+        '        <div class="wif-block">',
+        '          <div class="wif-label">Your Key (WIF)</div>',
+        '          <div class="wif-value" id="wif-primary"></div>',
+        "        </div>",
+        wifWarningHtml(false),
         "      </div>",
-        '      <div id="wif-old-block" class="wif-block" style="display:none">',
-        '        <div class="wif-label">Previous Key (WIF) \u2014 from before last rotation</div>',
-        '        <div class="wif-value" id="wif-old"></div>',
-        '        <button class="copy-btn" onclick="copyValue(\'wif-old\', this)">Copy</button>',
+        '      <div id="wif-old-block" style="display:none">',
+        addressSectionHtml("Previous public address", "addr-old"),
+        '        <div class="wif-block">',
+        '          <div class="wif-label">Previous Key (WIF) — from before last rotation</div>',
+        '          <div class="wif-value" id="wif-old"></div>',
+        "        </div>",
+        wifWarningHtml(true),
         "      </div>",
         "    </div>",
         "",
@@ -118,24 +195,24 @@ export function generateBackupHtml(data: BackupData): string {
         "    </div>",
       ].join("\n");
 
-  // --- Conditional JS section ---
+  // ── Conditional JS section ──────────────────────────────────────────────────
   const jsSection = isPlaintext
     ? [
-        "    // Plaintext recovery: show WIF immediately",
+        "    // Plaintext recovery: show WIF and address immediately",
         "    document.getElementById('wif-display').textContent = BACKUP_DATA.wif || '';",
-        "    function copyWif() {",
-        "      const btn = document.getElementById('copy-wif-btn');",
-        "      const text = BACKUP_DATA.wif || '';",
+        "    document.getElementById('addr-display').textContent = BACKUP_DATA.address || '';",
+        "    function copyAddr(id, btn) {",
+        "      const text = document.getElementById(id).textContent;",
         "      navigator.clipboard.writeText(text).then(() => {",
         "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);",
+        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
         "      }).catch(() => {",
-        "        const el = document.getElementById('wif-display');",
+        "        const el = document.getElementById(id);",
         "        const range = document.createRange(); range.selectNodeContents(el);",
         "        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);",
         "        document.execCommand('copy'); sel.removeAllRanges();",
         "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);",
+        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
         "      });",
         "    }",
       ].join("\n")
@@ -191,17 +268,26 @@ export function generateBackupHtml(data: BackupData): string {
         "    function setLoading(on) {",
         "      const btn = document.getElementById('decrypt-btn');",
         "      const spinner = document.getElementById('spinner');",
-        "      btn.disabled = on; btn.textContent = on ? 'Decrypting\u2026' : 'Decrypt';",
+        "      btn.disabled = on; btn.textContent = on ? 'Decrypting…' : 'Decrypt';",
         "      spinner.style.display = on ? 'block' : 'none';",
         "    }",
         "",
         "    function showSuccess(primary, old) {",
+        "      // Primary key block",
         "      const pb = document.getElementById('wif-primary-block');",
         "      document.getElementById('wif-primary').textContent = primary;",
+        "      document.getElementById('addr-primary').textContent = BACKUP_DATA.address || '';",
         "      pb.style.display = 'block';",
+        "      // Old key block",
         "      const ob = document.getElementById('wif-old-block');",
-        "      if (old) { document.getElementById('wif-old').textContent = old; ob.style.display = 'block'; }",
-        "      else ob.style.display = 'none';",
+        "      if (old) {",
+        "        document.getElementById('wif-old').textContent = old;",
+        "        const addrOldEl = document.getElementById('addr-old');",
+        "        if (addrOldEl) addrOldEl.textContent = BACKUP_DATA.oldAddress || '';",
+        "        ob.style.display = 'block';",
+        "      } else {",
+        "        ob.style.display = 'none';",
+        "      }",
         "      document.getElementById('result-section').style.display = 'block';",
         "    }",
         "",
@@ -212,20 +298,24 @@ export function generateBackupHtml(data: BackupData): string {
         "      el.style.display = 'block';",
         "    }",
         "",
-        "    function copyValue(id, btn) {",
+        "    function copyAddr(id, btn) {",
         "      const text = document.getElementById(id).textContent;",
         "      navigator.clipboard.writeText(text).then(() => {",
         "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);",
+        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
         "      }).catch(() => {",
-        "        const range = document.createRange(); range.selectNodeContents(document.getElementById(id));",
+        "        const el = document.getElementById(id);",
+        "        const range = document.createRange(); range.selectNodeContents(el);",
         "        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);",
         "        document.execCommand('copy'); sel.removeAllRanges();",
         "        btn.textContent = 'Copied!'; btn.classList.add('copied');",
-        "        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);",
+        "        setTimeout(() => { btn.textContent = '\\u{1F4CB} Copy'; btn.classList.remove('copied'); }, 2000);",
         "      });",
         "    }",
       ].join("\n");
+
+  // Suppress unused-variable warning for isCombined in the template context
+  void isCombined;
 
   return (
     "<!DOCTYPE html>\n" +
@@ -281,6 +371,11 @@ export function generateBackupHtml(data: BackupData): string {
     "    .privacy-banner-desc {\n" +
     "      font-size: 12px; color: #86efac; line-height: 1.5; opacity: 0.8;\n" +
     "    }\n" +
+    "    .plaintext-banner {\n" +
+    "      background: #7f1d1d; border: 1px solid #dc2626; border-radius: 10px;\n" +
+    "      padding: 13px 16px; margin-bottom: 16px;\n" +
+    "      font-size: 13px; font-weight: 600; color: #fff; line-height: 1.5;\n" +
+    "    }\n" +
     "    .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 24px; margin-bottom: 14px; }\n" +
     "    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; }\n" +
     "    .meta-label { color: #71717a; }\n" +
@@ -313,13 +408,21 @@ export function generateBackupHtml(data: BackupData): string {
     "      animation: spin 0.7s linear infinite; margin: 0 auto 14px;\n" +
     "    }\n" +
     "    @keyframes spin { to { transform: rotate(360deg); } }\n" +
+    "    .address-section { margin-bottom: 12px; }\n" +
+    "    .address-label { font-size: 10px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }\n" +
+    "    .address-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\n" +
+    "    .address-value { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: #a1a1aa; word-break: break-all; flex: 1; }\n" +
+    "    .address-note { font-size: 11px; color: #52525b; margin-top: 6px; margin-bottom: 14px; line-height: 1.5; font-style: italic; }\n" +
     "    .wif-block { background: #09090b; border: 1px solid #3f3f46; border-radius: 8px; padding: 12px; margin-bottom: 8px; }\n" +
     "    .wif-label { font-size: 10px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }\n" +
-    "    .wif-value { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #f4f4f5; word-break: break-all; line-height: 1.6; }\n" +
+    "    .wif-value { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #f4f4f5; word-break: break-all; line-height: 1.6; user-select: all; }\n" +
+    "    .wif-warning { margin-top: 8px; margin-bottom: 12px; }\n" +
+    "    .wif-warning p { font-size: 11px; color: #fca5a5; line-height: 1.5; margin-bottom: 4px; }\n" +
+    "    .wif-warning p:last-child { margin-bottom: 0; }\n" +
     "    .copy-btn {\n" +
     "      background: #27272a; border: 1px solid #3f3f46; border-radius: 6px;\n" +
     "      color: #a1a1aa; font-size: 11px; font-weight: 500; padding: 5px 11px;\n" +
-    "      cursor: pointer; transition: background 0.15s, color 0.15s; margin-top: 6px;\n" +
+    "      cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap;\n" +
     "    }\n" +
     "    .copy-btn:hover { background: #3f3f46; color: #f4f4f5; }\n" +
     "    .copy-btn.copied { background: #14532d; border-color: #166534; color: #4ade80; }\n" +
@@ -345,21 +448,22 @@ export function generateBackupHtml(data: BackupData): string {
     '    <div class="logo"><span>BS</span>Vibes</div>\n' +
     "    <h1>Recovery File</h1>\n" +
     '    <p class="subtitle">This file contains your encrypted identity.<br>Keep it somewhere safe.</p>\n' +
-    '    <div class="badge-wrap"><div class="offline-badge">Works offline \u2014 no network calls</div></div>\n' +
+    '    <div class="badge-wrap"><div class="offline-badge">Works offline — no network calls</div></div>\n' +
     "\n" +
-    '    <div class="privacy-banner">\n' +
-    '      <div class="privacy-banner-icon">\n' +
-    '        <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n' +
-    '          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>\n' +
-    '          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>\n' +
-    "        </svg>\n" +
-    "      </div>\n" +
-    '      <div class="privacy-banner-body">\n' +
-    '        <div class="privacy-banner-title">Private &amp; Offline</div>\n' +
-    '        <div class="privacy-banner-desc">This page runs entirely on your device. No data is sent anywhere.</div>\n' +
-    "      </div>\n" +
-    "    </div>\n" +
-    "\n" +
+    (isPlaintext
+      ? ""
+      : '    <div class="privacy-banner">\n' +
+        '      <div class="privacy-banner-icon">\n' +
+        '        <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n' +
+        '          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>\n' +
+        '          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>\n' +
+        "        </svg>\n" +
+        "      </div>\n" +
+        '      <div class="privacy-banner-body">\n' +
+        '        <div class="privacy-banner-title">Private &amp; Offline</div>\n' +
+        '        <div class="privacy-banner-desc">This page runs entirely on your device. No data is sent anywhere.</div>\n' +
+        "      </div>\n" +
+        "    </div>\n\n") +
     '    <div class="card">\n' +
     '      <div class="meta-row">\n' +
     '        <span class="meta-label">Name</span>\n' +
@@ -397,12 +501,12 @@ export function generateBackupHtml(data: BackupData): string {
     "        .replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n" +
     "    }\n" +
     "\n" +
-    "    document.getElementById('meta-name').textContent = BACKUP_DATA.name || '\u2014';\n" +
-    "    document.getElementById('meta-address').textContent = BACKUP_DATA.address || '\u2014';\n" +
+    "    document.getElementById('meta-name').textContent = BACKUP_DATA.name || '—';\n" +
+    "    document.getElementById('meta-address').textContent = BACKUP_DATA.address || '—';\n" +
     "    try {\n" +
     "      const d = new Date(BACKUP_DATA.createdAt);\n" +
     "      document.getElementById('meta-date').textContent = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });\n" +
-    "    } catch { document.getElementById('meta-date').textContent = BACKUP_DATA.createdAt || '\u2014'; }\n" +
+    "    } catch { document.getElementById('meta-date').textContent = BACKUP_DATA.createdAt || '—'; }\n" +
     "\n" +
     jsSection +
     "\n" +
@@ -414,9 +518,11 @@ export function generateBackupHtml(data: BackupData): string {
 
 /**
  * Download a backup as a self-contained HTML file.
+ * The filename is auto-generated from BackupData fields.
  */
-export function downloadBackup(data: BackupData, filename: string): void {
+export function downloadBackup(data: BackupData): void {
   const html = generateBackupHtml(data);
+  const filename = buildFilename(data);
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

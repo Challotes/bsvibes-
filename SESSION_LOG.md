@@ -2,6 +2,34 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-03 (cont. 3) — Backup file audit & overhaul
+
+Category: Security, UX, recovery-flow hardening
+
+User asked for an end-to-end audit of every download/display surface that exposes a WIF key — was every file encrypted with the user's current/new passphrase, what did the file contain, was the filename useful? Spent the session walking through 9 surfaces (You-modal Save plaintext + encrypted, MoveAddressModal stage-1 + stage-3, ChangePassphraseModal completion, RestoreModal pre-overwrite × 2, Show recovery key, post-decrypt result section in the HTML template) and resolving 7 decision topics one at a time with the user.
+
+**Decisions made (paraphrased, see DECISIONS.md "Backup file audit & overhaul" for canonical version):**
+1. **On-demand "Save" downloads stay single-key by design** — the combined-file pattern is rotation-only. Refines the 2026-04-30 "combined recovery file" decision (which was implicitly all paths but practically only ever used at rotation time).
+2. **Public address shown above every WIF in the HTML template**, with a Copy button on the address only.
+3. **Copy buttons removed from every WIF surface in downloaded files** — the address-only Copy + `user-select: all` on the WIF text means a user who really wants the raw key can still triple-click+copy via OS shortcut, but the "one keystroke from clipboard" threat model no longer applies. Show recovery key (in-app) keeps its Copy button — the manage gate + acknowledgement is sufficient defense for in-session reveal.
+4. **Red warning beneath every WIF**: "Anyone who has this key controls your account and any funds in it. Never share it — not with support, not with friends, not with anyone." Previous-key blocks gain an extra "may still hold funds if the transfer was skipped" line above the share warning.
+5. **Plaintext-WIF files get a red banner above the card** ("This file is not encrypted. Anyone who can open it can take your account.") and the privacy-banner is hidden (the red signal would otherwise compete).
+6. **Done-state for ChangePassphraseModal** now matches MoveAddressModal — a `'done'` step with "Download again" + "Got it" buttons and copy explaining the file contains both keys. Replaces the prior auto-close so the user sees completion before dismissing.
+7. **Filename pattern** `bsvibes-<pathType>-<anon_name>-<addr6>[-to-<newAddr6>]-<YYYY-MM-DD-HHmm>.html`. `addr6 = address.slice(1, 7)` (skip leading `1` of P2PKH, take next 6 chars). `-to-` (not `>`) between addresses because Windows reserves `>`. anon_name kept verbatim (sanitised to `[a-zA-Z0-9_]` with `-` fallback) so users can correlate files to identities.
+
+**Shipped diff (5 files, 1 commit):**
+- `src/services/bsv/backup-template.ts` — `BackupData` adds required `pathType` and optional `oldAddress`. `downloadBackup` signature changed to `(data)` only — filename auto-built via new `buildFilename` helper. HTML template gains `addressSectionHtml` + `wifWarningHtml` helpers, `plaintext-banner` / `address-section` / `address-note` / `wif-warning` styles, plaintext-file privacy-banner suppression, and the post-decrypt result section now displays current/previous addresses above each WIF block.
+- `src/components/MoveAddressModal.tsx` — stage-1 backup `pathType: "pre-rotation"`; stage-3 `pathType: "rotation"` with `oldAddress: identity.address`. `combinedBackupRef` captures the rotation `BackupData` for "Download again".
+- `src/components/ChangePassphraseModal.tsx` — added `'done'` step, `doneBackup` state, replaced auto-close with `setStep('done')`. `pathType: "rotation"` with `oldAddress: undefined` (address unchanged) — single-`addr6` filename, dual-key body.
+- `src/components/RestoreModal.tsx` — both pre-overwrite backups use `pathType: "restore-pre"`.
+- `src/app/IdentityBar.tsx` — both Save paths (`doDownloadPlaintext`, `handleSaveEncrypted`) use `pathType: "save"`. No `oldAddress` — single-key files by design.
+
+**Verification:** `tsc --noEmit` clean (0 errors), `biome check` clean on all 5 changed files, all `downloadBackup` call sites grepped — every caller passes `pathType` and no caller passes a filename.
+
+**Docs updated in same commit:** DECISIONS.md (new "Backup file audit & overhaul" entry), CLAUDE.md (refreshed `backup-template.ts`, MoveAddressModal, ChangePassphraseModal, IdentityBar paragraphs).
+
+**Ruled out / deferred:** Re-prompt at Show recovery key reveal (the Reveal acknowledgement gate is sufficient), Copy buttons inside downloaded recovery files (security regression vs. negligible UX loss), `>` separator in filename (Windows-reserved character).
+
 ## 2026-05-03 (cont. 2) — Sign-in trigger rewrite: centered modal, no global catcher
 
 Category: UX, architecture (supersedes the same-day ambient-pill + universal-contract decisions)

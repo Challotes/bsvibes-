@@ -26,9 +26,11 @@ export function ChangePassphraseModal({
   currentIdentity,
   preVerifiedPassphrase,
 }: ChangePassphraseModalProps): React.JSX.Element | null {
-  const [step, setStep] = useState<"verify" | "newpass">(
+  const [step, setStep] = useState<"verify" | "newpass" | "done">(
     preVerifiedPassphrase ? "newpass" : "verify"
   );
+  // Store BackupData from successful change so "Download again" can re-fire it
+  const [doneBackup, setDoneBackup] = useState<Parameters<typeof downloadBackup>[0] | null>(null);
   const [currentPass, setCurrentPass] = useState(preVerifiedPassphrase ?? "");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -45,6 +47,7 @@ export function ChangePassphraseModal({
     setHint("");
     setError("");
     setChainWarning(false);
+    setDoneBackup(null);
     onClose();
   }
 
@@ -133,16 +136,16 @@ export function ChangePassphraseModal({
         name: newIdentity.name,
         address: newIdentity.address,
         wif_encrypted: encryptedWif,
+        // oldAddress intentionally undefined — passphrase rotation keeps the same address
+        pathType: "rotation",
         createdAt: new Date().toISOString(),
         note: "Use your new passphrase to restore.",
       };
       if (hint.trim()) backupPayload.hint = hint.trim();
       backupPayload.oldWif_encrypted = await encryptWif(currentIdentity.wif, newPass);
 
-      downloadBackup(
-        backupPayload,
-        `bsvibes-${newIdentity.name}-${new Date().toISOString().slice(0, 10)}.html`
-      );
+      downloadBackup(backupPayload);
+      setDoneBackup(backupPayload);
 
       let transferMsg: string | null = null;
       if (result.fundTransfer.txid) {
@@ -155,7 +158,7 @@ export function ChangePassphraseModal({
       }
 
       onSuccess(newIdentity, transferMsg);
-      handleClose();
+      setStep("done");
     } catch (e) {
       setError("Something went wrong — try again");
       console.error("BSVibes: passphrase change failed", e);
@@ -218,7 +221,35 @@ export function ChangePassphraseModal({
 
         {/* Body */}
         <div className="px-4 py-4 space-y-3">
-          {step === "verify" ? (
+          {step === "done" ? (
+            <>
+              <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
+                <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                  Your new recovery file should have downloaded &mdash; check your downloads folder
+                  before continuing. This file contains both your old and new key &mdash; keep it
+                  somewhere safe.
+                </p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (doneBackup) downloadBackup(doneBackup);
+                  }}
+                  className="flex-1 bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  Download again
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="flex-1 bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
+            </>
+          ) : step === "verify" ? (
             <>
               <input
                 type="password"

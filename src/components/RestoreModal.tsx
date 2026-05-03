@@ -57,20 +57,17 @@ export function RestoreModal({
     try {
       if (isProtected && currentIdentity) {
         const passForBackup = reAuthPassphrase;
-        const date = new Date().toISOString().slice(0, 10);
         if (passForBackup) {
           const encBackup = await encryptWif(currentIdentity.wif, passForBackup);
-          downloadBackup(
-            {
-              name: currentIdentity.name,
-              address: currentIdentity.address,
-              wif_encrypted: encBackup,
-              createdAt: new Date().toISOString(),
-              note: "Previous identity saved before switching.",
-              hint: getStoredHint(),
-            },
-            `bsvibes-${currentIdentity.name}-${date}.html`
-          );
+          downloadBackup({
+            name: currentIdentity.name,
+            address: currentIdentity.address,
+            wif_encrypted: encBackup,
+            pathType: "restore-pre",
+            createdAt: new Date().toISOString(),
+            note: "Previous identity saved before switching.",
+            hint: getStoredHint(),
+          });
         }
         setPendingRestoreWif(wif);
         setPendingRestoreName(name);
@@ -79,17 +76,15 @@ export function RestoreModal({
       }
 
       if (!isProtected && currentIdentity) {
-        downloadBackup(
-          {
-            name: currentIdentity.name,
-            address: currentIdentity.address,
-            wif: currentIdentity.wif,
-            createdAt: new Date().toISOString(),
-            note: "Previous identity saved before switching.",
-            hint: getStoredHint(),
-          },
-          `bsvibes-${currentIdentity.name}-${new Date().toISOString().slice(0, 10)}.html`
-        );
+        downloadBackup({
+          name: currentIdentity.name,
+          address: currentIdentity.address,
+          wif: currentIdentity.wif,
+          pathType: "restore-pre",
+          createdAt: new Date().toISOString(),
+          note: "Previous identity saved before switching.",
+          hint: getStoredHint(),
+        });
       }
 
       await performImport(wif, name);

@@ -158,6 +158,8 @@ export function MoveAddressModal({
 
   // Store upgradeIdentity result so later stages can use it
   const upgradeResultRef = useRef<Awaited<ReturnType<typeof upgradeIdentity>> | null>(null);
+  // Store the combined BackupData from runRecording so "Download again" can re-fire it
+  const combinedBackupRef = useRef<Parameters<typeof downloadBackup>[0] | null>(null);
 
   // ── Stage runners ──────────────────────────────────────────────────────────
 
@@ -187,30 +189,31 @@ export function MoveAddressModal({
     setErrorStage(null);
     setErrorMessage("");
     try {
-      const oldDate = new Date().toISOString().slice(0, 10);
       if (isProtected && passphrase) {
         const encBackup = await encryptWif(identity.wif, passphrase);
         const backupPayload: BackupData = {
           name: identity.name,
           address: identity.address,
           wif_encrypted: encBackup,
+          pathType: "pre-rotation",
           createdAt: new Date().toISOString(),
           note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
         };
         const hint = getStoredHint();
         if (hint) backupPayload.hint = hint;
-        downloadBackup(backupPayload, `bsvibes-${identity.name}-old-${oldDate}.html`);
+        downloadBackup(backupPayload);
       } else {
         const backupPayload: BackupData = {
           name: identity.name,
           address: identity.address,
           wif: identity.wif,
+          pathType: "pre-rotation",
           createdAt: new Date().toISOString(),
           note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
         };
         const hint = getStoredHint();
         if (hint) backupPayload.hint = hint;
-        downloadBackup(backupPayload, `bsvibes-${identity.name}-old-${oldDate}.html`);
+        downloadBackup(backupPayload);
       }
 
       setStage("saved-confirm");
@@ -358,14 +361,14 @@ export function MoveAddressModal({
         address: newIdentity.address,
         wif_encrypted: encryptedWif,
         oldWif_encrypted: oldWifEncrypted,
+        oldAddress: identity.address,
+        pathType: "rotation",
         createdAt: new Date().toISOString(),
         note: "Use your passphrase to reveal both keys. The previous key is included for recovering any funds left on the old address.",
       };
       if (newHint.trim()) newBackup.hint = newHint.trim();
-      downloadBackup(
-        newBackup,
-        `bsvibes-${newIdentity.name}-${new Date().toISOString().slice(0, 10)}.html`
-      );
+      combinedBackupRef.current = newBackup;
+      downloadBackup(newBackup);
 
       setCompletedSteps(3);
       setStage("done");
@@ -695,20 +698,31 @@ export function MoveAddressModal({
                   )}
                   <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                     <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                      Recovery file downloaded &mdash; it has both keys. Keep it safe (cloud, USB)
-                      and remember your passphrase.{" "}
+                      This file contains both your old and new key &mdash; keep it somewhere safe
+                      (cloud, USB) and remember your passphrase.{" "}
                       <span className="font-semibold text-amber-300">
                         Without both, you can&apos;t get back in.
                       </span>
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="w-full bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
-                  >
-                    Continue
-                  </button>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (combinedBackupRef.current) downloadBackup(combinedBackupRef.current);
+                      }}
+                      className="flex-1 bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                    >
+                      Download again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="flex-1 bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                    >
+                      Got it
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
