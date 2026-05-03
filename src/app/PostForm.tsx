@@ -22,11 +22,12 @@ export function PostForm({
   const [isListening, setIsListening] = useState(false);
   const [hasContent, setHasContent] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
+  const [resumeNudge, setResumeNudge] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { identity, needsUnlock, sign, requireIdentity } = useIdentityContext();
-  // Set when the user tries to submit while locked — drives a quiet
-  // re-focus of the textarea once identity arrives, so the cursor returns
-  // to where they were typing without us auto-submitting on their behalf.
+  // Set when the user tries to submit while locked — drives a focus + amber
+  // border pulse once identity arrives, so the user knows their draft is
+  // waiting and can hit Enter to send.
   const wantedToPostRef = useRef(false);
 
   // Clean up recognition on unmount
@@ -95,13 +96,21 @@ export function PostForm({
     performSubmit(identity, trimmed);
   }
 
-  // After sign-in, return focus to the textarea so the cursor is exactly
-  // where the user was. Only fires when a locked submit was attempted —
+  // After sign-in, focus the textarea + pulse the amber border (only if
+  // there's still text to send). The amber border itself shows whenever
+  // hasContent, so the pulse is a "your draft is still here" reminder, not
+  // a state change. Only fires when a locked submit was attempted —
   // prevents focus-stealing for users who unlock pre-emptively.
   useEffect(() => {
     if (identity && wantedToPostRef.current) {
       wantedToPostRef.current = false;
       textareaRef.current?.focus();
+      const hasText = (textareaRef.current?.value.trim() ?? "").length > 0;
+      if (hasText) {
+        setResumeNudge(true);
+        const timer = setTimeout(() => setResumeNudge(false), 1600);
+        return () => clearTimeout(timer);
+      }
     }
   }, [identity]);
 
@@ -175,10 +184,16 @@ export function PostForm({
           maxLength={1000}
           disabled={!identity && !needsUnlock}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide transition-colors duration-300 ${
+          className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide ${
+            resumeNudge ? "" : "transition-colors duration-300"
+          } ${
             justPosted
               ? "border-green-600/60 focus:border-green-600/60"
-              : "border-zinc-800 focus:border-zinc-700"
+              : resumeNudge && hasContent
+                ? "border-amber-400/60 focus:border-amber-400/60 animate-[nudgePulse_0.8s_ease-in-out_2]"
+                : hasContent
+                  ? "border-amber-400/60 focus:border-amber-400/60"
+                  : "border-zinc-800 focus:border-zinc-700"
           }`}
           style={{ scrollbarWidth: "none" }}
           rows={1}

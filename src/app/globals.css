@@ -71,3 +71,17 @@ body {
     opacity: 1;
   }
 }
+
+/* Throbbing amber border — fires twice (1.6s total) when a locked submit
+   resolves to remind the user their draft is still there. */
+@keyframes nudgePulse {
+  0% {
+    border-color: rgb(251 191 36 / 0.6);
+  }
+  50% {
+    border-color: rgb(251 191 36 / 0.9);
+  }
+  100% {
+    border-color: rgb(251 191 36 / 0.6);
+  }
+}
