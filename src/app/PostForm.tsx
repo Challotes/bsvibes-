@@ -24,6 +24,10 @@ export function PostForm({
   const [justPosted, setJustPosted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { identity, needsUnlock, sign, requireIdentity } = useIdentityContext();
+  // Set when the user tries to submit while locked — drives a quiet
+  // re-focus of the textarea once identity arrives, so the cursor returns
+  // to where they were typing without us auto-submitting on their behalf.
+  const wantedToPostRef = useRef(false);
 
   // Clean up recognition on unmount
   useEffect(() => {
@@ -82,10 +86,24 @@ export function PostForm({
     const trimmed = content.trim();
 
     // Opens SignInModal if locked; caller retaps after signing in.
-    if (!requireIdentity() || !identity) return;
+    if (!identity) {
+      wantedToPostRef.current = true;
+      requireIdentity();
+      return;
+    }
 
     performSubmit(identity, trimmed);
   }
+
+  // After sign-in, return focus to the textarea so the cursor is exactly
+  // where the user was. Only fires when a locked submit was attempted —
+  // prevents focus-stealing for users who unlock pre-emptively.
+  useEffect(() => {
+    if (identity && wantedToPostRef.current) {
+      wantedToPostRef.current = false;
+      textareaRef.current?.focus();
+    }
+  }, [identity]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -160,9 +178,7 @@ export function PostForm({
           className={`w-full bg-zinc-900 border rounded-2xl px-3 py-3 pr-14 sm:px-4 sm:py-4 text-sm sm:text-base resize-none focus:outline-none placeholder:text-zinc-600 min-h-[48px] sm:min-h-[56px] max-h-[200px] disabled:opacity-50 scrollbar-hide transition-colors duration-300 ${
             justPosted
               ? "border-green-600/60 focus:border-green-600/60"
-              : !identity
-                ? "border-zinc-800 animate-pulse"
-                : "border-zinc-800 focus:border-zinc-700"
+              : "border-zinc-800 focus:border-zinc-700"
           }`}
           style={{ scrollbarWidth: "none" }}
           rows={1}

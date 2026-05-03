@@ -156,7 +156,7 @@ export function SignInModal(): React.JSX.Element | null {
             {storedHint &&
               (hintRevealed ? (
                 <div className="border-l-2 border-amber-500/60 pl-2 py-0.5">
-                  <span className="text-[11px] text-amber-400/90">💡 {storedHint}</span>
+                  <span className="text-[11px] text-amber-400/90">Hint: {storedHint}</span>
                 </div>
               ) : (
                 <button
