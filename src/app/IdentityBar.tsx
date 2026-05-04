@@ -440,16 +440,18 @@ export function IdentityChip(): React.JSX.Element | null {
           }}
           onClose={() => {
             // Fires from: Cancel mid-wizard, Continue on done, X icon, or
-            // backdrop click. The You modal stays open in both cases —
-            // matches RestoreModal's behavior, lets the user see their
-            // updated identity state. On successful rotation we re-lock
-            // the You modal (the new passphrase is active; the cached old
-            // re-auth is stale).
+            // backdrop click. On successful rotation we close the You
+            // modal entirely — the user has just seen the wizard's done
+            // state and downloaded the recovery file, so dropping them
+            // back into a freshly-locked You modal adds nothing. They
+            // land on the page with the updated chip. Cancel mid-wizard
+            // (no completion) keeps the You modal open under the old
+            // passphrase. closeManageModal() handles all the gate state
+            // teardown (manageAuthed, gate inputs, reAuthPassphraseRef).
             setShowMoveModal(false);
             setMovePassphrase("");
             if (moveCompletedRef.current) {
-              setManageAuthed(false);
-              reAuthPassphraseRef.current = "";
+              closeManageModal();
             }
             moveCompletedRef.current = false;
           }}
@@ -476,6 +478,13 @@ export function IdentityChip(): React.JSX.Element | null {
             localStorage.setItem(BACKED_UP_KEY, "1");
             setBackedUp(true);
             setShowRestoreModal(false);
+            // Close the You modal too — same logic as MoveAddressModal:
+            // the modal is now showing the previous identity's state,
+            // which is stale and confusing. User lands on the page with
+            // the updated chip. closeManageModal handles all gate state
+            // teardown including reAuthPassphraseRef (stale under the
+            // imported identity).
+            closeManageModal();
           }}
           currentIdentity={identity}
           isProtected={isProtected}

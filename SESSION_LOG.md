@@ -2,6 +2,30 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-04 (cont.) — Close You modal on rotation/restore success
+
+Category: UX, friction reduction
+
+User reported: after clicking the Passphrase row → going through MoveAddressModal → clicking "Got it" on the done state, the wizard closes and the You modal pops up asking for the passphrase again. They asked why and whether other routes had the same problem.
+
+**Root cause** (per architect agent): only the Passphrase route was affected. After successful rotation, `onClose` explicitly cleared `manageAuthed` + `reAuthPassphraseRef.current` because the cached old passphrase was stale under the new one. Documented as intentional in DECISIONS.md "Wizard auto-close split" (2026-04-30/05-01). Other routes (Restore, Save, Show recovery key) didn't re-lock because they didn't change the passphrase.
+
+**First proposal** (architect, round 1): extend `MoveAddressModal.onComplete` signature to `(identity, newPassphrase)` so the parent can update the cached passphrase and keep the manage gate unlocked. Safe but solves at the wrong altitude.
+
+**User's counter** ("after upgrade why not just not show the you modal? why is it even showing?"): close the You modal entirely on rotation success. Sidesteps the cache question — there's no You modal to be locked or unlocked.
+
+**Architect round 2 validation:** ship the user's simpler fix. Rationale: post-completion, the user has nothing useful to do in the You modal — Save is redundant (the rotation file IS the save), Show recovery key + Restore would re-prompt and are nonsensical 3 seconds after rotation. The "load-bearing" half of the original "wizard auto-close split" decision was about making sure the user sees the wizard's done-state (completed steps + sats moved + safeguard copy) — all INSIDE the wizard. Keeping the You modal open underneath was incidental, not principled. Architect also flagged a parity bonus: RestoreModal `onSuccess` should also close the You modal, since otherwise it shows the previous identity's stale state.
+
+**Shipped (1 file + 3 doc updates, single commit):**
+- `src/app/IdentityBar.tsx` (MoveAddressModal `onClose` block at line ~441) — replaced `setManageAuthed(false) + reAuthPassphraseRef.current = ""` with single `closeManageModal()` call when `moveCompletedRef.current === true`. Cancel mid-wizard branch unchanged (You modal stays open under the original passphrase).
+- `src/app/IdentityBar.tsx` (RestoreModal `onSuccess` block at line ~472) — added `closeManageModal()` after the existing `setShowRestoreModal(false)`. Comment notes the parity rationale.
+- DECISIONS.md "Wizard auto-close split" — rewritten to reflect new behavior + recorded the rejected alternative (propagate-new-passphrase) so future agents don't relitigate.
+- CLAUDE.md `MoveAddressModal.tsx` paragraph — updated to mention `closeManageModal()` on success + RestoreModal parity.
+
+**Verification:** `tsc --noEmit` clean (0 errors), `biome check src/app/IdentityBar.tsx` clean (0 errors).
+
+**Dead code noted (NOT deleted):** `src/components/ChangePassphraseModal.tsx` has zero import sites — it was superseded by MoveAddressModal absorbing the change-passphrase flow. Per Hard Rule #2 won't delete without user confirmation. Flagged for a future commit.
+
 ## 2026-05-04 — Recovery file copy & layout polish (round 2)
 
 Category: UX, copy, recovery-flow polish
