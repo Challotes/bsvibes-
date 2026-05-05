@@ -47,6 +47,26 @@ function escapeHtml(str: string): string {
 }
 
 /**
+ * Format the saved date for display. Uses fixed `en-US` locale (not the
+ * runtime default) so the output is stable across server locales — Vercel,
+ * Railway, and Windows dev machines all differ in their default `Intl`
+ * resolution. `generateBackupHtml` runs in the browser today (called from
+ * `downloadBackup`), so this resolves to the user's browser locale by
+ * `new Date().toString()` defaults — but pinning the *display* locale to
+ * `en-US` keeps the rendered file consistent regardless of where it's
+ * opened later.
+ */
+function formatSavedDate(createdAt: string): string {
+  try {
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return createdAt || "—";
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return createdAt || "—";
+  }
+}
+
+/**
  * Builds the filename for a backup download.
  *
  * Pattern: bsvibes-<pathType>-<anon_name>-<addr6>[-to-<newAddr6>]-<YYYY-MM-DD-HHmm>.html
@@ -98,6 +118,13 @@ export function generateBackupHtml(data: BackupData): string {
   const title = `BSVibes Recovery — ${data.name}`;
   const isPlaintext = Boolean(data.wif) && !data.wif_encrypted;
 
+  // Resolved at template-build time so iOS Files Quick Look (which blocks
+  // inline JS in local HTML previews) renders these values without needing
+  // a script to run. Same reason every dynamic field below is interpolated
+  // into HTML rather than injected via `document.getElementById(...).textContent`.
+  const savedDate = formatSavedDate(data.createdAt);
+  const footerStamp = `Recovery file · ${data.pathType} · saved ${savedDate}`;
+
   // ── Per-variant context block ───────────────────────────────────────────────
   // Sits beneath the metadata card. Tells the user what THIS file is and where
   // their posts/earnings live. One or two sentences, no jargon, variant-specific.
@@ -147,23 +174,28 @@ export function generateBackupHtml(data: BackupData): string {
   // address, because that's the only place it appears.
   const bodySection = isPlaintext
     ? [
-        "    <!-- Plaintext recovery: WIF shown immediately -->",
+        "    <!-- Plaintext recovery: WIF rendered statically (works in any HTML viewer, no JS required) -->",
         '    <div class="plaintext-banner">',
         "      &#9888; This file is not encrypted. Anyone who can open it can take your account.",
         "    </div>",
         '    <div class="card" id="plaintext-section">',
         '      <div class="wif-block">',
         '        <div class="wif-label">Your secret key (WIF)</div>',
-        '        <div class="wif-value" id="wif-display"></div>',
+        `        <div class="wif-value">${escapeHtml(data.wif || "")}</div>`,
         "      </div>",
         wifWarningHtml(false),
         "    </div>",
       ].join("\n")
     : [
         "    <!-- Encrypted recovery file: passphrase required -->",
+        "    <noscript>",
+        '      <div class="noscript-banner">',
+        "        <strong>JavaScript is required to unlock this file.</strong> You're previewing this in a viewer that doesn't run JavaScript (e.g. iOS Files, Mail preview, AirDrop preview, macOS Finder Quick Look). Open it in Safari, Chrome, or Firefox to enter your passphrase and reveal your secret key.",
+        "      </div>",
+        "    </noscript>",
         '    <div class="card" id="decrypt-section">',
         data.hint
-          ? '      <div class="hint-box"><strong>Memory clue:</strong> <span id="hint-text"></span></div>'
+          ? `      <div class="hint-box"><strong>Memory clue:</strong> ${escapeHtml(data.hint)}</div>`
           : "",
         '      <label for="passphrase-input">Enter your passphrase to unlock your secret key</label>',
         '      <input type="password" id="passphrase-input" placeholder="Your passphrase" autocomplete="current-password" />',
@@ -211,16 +243,14 @@ export function generateBackupHtml(data: BackupData): string {
       ].join("\n");
 
   // ── Variant-specific JS body (injected after the universal helpers) ─────────
+  // Plaintext files no longer need any JS — WIF, name, address, date are all
+  // rendered statically (works in iOS Quick Look, macOS Finder Quick Look,
+  // email preview, etc.). The Copy button on the metadata Address row still
+  // uses copyText() when JS is available; degrades to long-press select on
+  // Quick Look thanks to `user-select: all` on `.meta-value`.
   const variantJs = isPlaintext
-    ? [
-        "    // Plaintext recovery: show WIF immediately",
-        "    document.getElementById('wif-display').textContent = BACKUP_DATA.wif || '';",
-      ].join("\n")
+    ? "    // No variant JS needed — plaintext fields render statically."
     : [
-        "    // Show hint if present",
-        "    const hintEl = document.getElementById('hint-text');",
-        "    if (hintEl && BACKUP_DATA.hint) hintEl.textContent = BACKUP_DATA.hint;",
-        "",
         "    // Crypto constants — must match src/services/bsv/crypto.ts exactly",
         "    const PBKDF2_ITERATIONS = 100000;",
         "    const SALT_BYTES = 16;",
@@ -337,6 +367,13 @@ export function generateBackupHtml(data: BackupData): string {
     "      padding: 13px 16px; margin-bottom: 16px;\n" +
     "      font-size: 13px; font-weight: 600; color: #fff; line-height: 1.5;\n" +
     "    }\n" +
+    "    /* Shown only when JS is disabled (iOS Quick Look, email previews, etc.) */\n" +
+    "    .noscript-banner {\n" +
+    "      background: #422006; border: 1px solid #b45309; border-radius: 10px;\n" +
+    "      padding: 13px 16px; margin-bottom: 16px;\n" +
+    "      font-size: 13px; color: #fbbf24; line-height: 1.55;\n" +
+    "    }\n" +
+    "    .noscript-banner strong { color: #fde68a; font-weight: 600; }\n" +
     "    .context-block {\n" +
     "      background: #18181b; border: 1px solid #27272a; border-radius: 10px;\n" +
     "      padding: 13px 16px; margin-bottom: 14px;\n" +
@@ -346,7 +383,7 @@ export function generateBackupHtml(data: BackupData): string {
     "    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; gap: 12px; }\n" +
     "    .meta-row.with-copy { align-items: center; }\n" +
     "    .meta-label { color: #71717a; flex-shrink: 0; }\n" +
-    "    .meta-value { color: #a1a1aa; font-family: 'SF Mono', 'Fira Code', monospace; word-break: break-all; text-align: right; flex: 1; }\n" +
+    "    .meta-value { color: #a1a1aa; font-family: 'SF Mono', 'Fira Code', monospace; word-break: break-all; text-align: right; flex: 1; user-select: all; }\n" +
     "    .meta-value.name { color: #f4f4f5; font-weight: 600; font-family: inherit; }\n" +
     "    .meta-copy-btn {\n" +
     "      background: transparent; border: 1px solid #3f3f46; border-radius: 5px;\n" +
@@ -428,18 +465,18 @@ export function generateBackupHtml(data: BackupData): string {
     '    <div class="card">\n' +
     '      <div class="meta-row">\n' +
     '        <span class="meta-label">Name</span>\n' +
-    '        <span class="meta-value name" id="meta-name"></span>\n' +
+    `        <span class="meta-value name">${escapeHtml(data.name)}</span>\n` +
     "      </div>\n" +
     '      <div class="meta-row with-copy">\n' +
     '        <span class="meta-label">' +
     addressLabel +
     "</span>\n" +
-    '        <span class="meta-value" id="meta-address"></span>\n' +
+    `        <span class="meta-value" id="meta-address">${escapeHtml(data.address)}</span>\n` +
     '        <button class="meta-copy-btn" onclick="copyText(\'meta-address\', this)">Copy</button>\n' +
     "      </div>\n" +
     '      <div class="meta-row">\n' +
     '        <span class="meta-label">Saved</span>\n' +
-    '        <span class="meta-value" id="meta-date"></span>\n' +
+    `        <span class="meta-value">${escapeHtml(savedDate)}</span>\n` +
     "      </div>\n" +
     "    </div>\n" +
     "\n" +
@@ -451,7 +488,7 @@ export function generateBackupHtml(data: BackupData): string {
     "\n" +
     "\n" +
     "    <footer>\n" +
-    '      <div class="footer-stamp" id="footer-stamp"></div>\n' +
+    `      <div class="footer-stamp">${escapeHtml(footerStamp)}</div>\n` +
     '      <a href="https://bsvibes.com" target="_blank" rel="noopener">bsvibes.com</a>\n' +
     "    </footer>\n" +
     "  </div>\n" +
@@ -487,16 +524,11 @@ export function generateBackupHtml(data: BackupData): string {
     "      });\n" +
     "    }\n" +
     "\n" +
-    "    document.getElementById('meta-name').textContent = BACKUP_DATA.name || '—';\n" +
-    "    document.getElementById('meta-address').textContent = BACKUP_DATA.address || '—';\n" +
-    "    let savedDateText = BACKUP_DATA.createdAt || '—';\n" +
-    "    try {\n" +
-    "      const d = new Date(BACKUP_DATA.createdAt);\n" +
-    "      savedDateText = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });\n" +
-    "    } catch {}\n" +
-    "    document.getElementById('meta-date').textContent = savedDateText;\n" +
-    "    document.getElementById('footer-stamp').textContent = 'Recovery file · ' + BACKUP_DATA.pathType + ' · saved ' + savedDateText;\n" +
-    "\n" +
+    // Metadata (name, address, saved date) and footer stamp render statically\n
+    // at template-build time — no JS required so iOS Files Quick Look /
+    // macOS Finder Quick Look / email previews can show them. The script
+    // block below is only needed for the encrypted-decrypt flow and the
+    // Copy button on the metadata Address row.
     variantJs +
     "\n" +
     "  </script>\n" +

@@ -2,6 +2,45 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-04 (cont. 3) — Recovery file: static render for iOS Quick Look
+
+Category: Bug fix, recovery-file resilience
+
+User reported: downloaded the recovery HTML on iPhone, opened it from Files app, saw no name, no address, no saved date, no WIF. Static elements (title, subtitle, offline badge, context block) rendered fine, but every dynamic field was blank.
+
+**Root cause:** iOS Files app uses Quick Look (WebKit-based previewer) for HTML, and Quick Look does NOT execute inline JavaScript in local HTML files for security reasons. Same engine + same restriction applies to: iOS Mail preview, Messages preview, AirDrop preview, macOS Finder Quick Look. The previous template populated every dynamic field via `document.getElementById(...).textContent = BACKUP_DATA.X`, which left the file blank in any non-JS viewer.
+
+**Architect agent dispatched** for full validation — confirmed the diagnosis (ruled out CSP/encoding/Blob URL/WebKit version), validated `escapeHtml` is sufficient for body context (self-XSS only threat), recommended fixed `en-US` locale for date stability across server locales, suggested 8 specific refinements all of which were incorporated.
+
+**Shipped (1 file + 3 doc updates):**
+- `src/services/bsv/backup-template.ts` — static-render every renderable field:
+  - `formatSavedDate(createdAt)` helper added; uses `en-US` locale (not `undefined`)
+  - Metadata card: name, address, saved date interpolated at template-build time via `escapeHtml(...)`
+  - Plaintext WIF: interpolated directly into `.wif-value` div (no JS needed for plaintext files at all)
+  - Hint: rendered statically inside encrypted-file decrypt card so iOS users can recognize their file
+  - Footer stamp (`Recovery file · <pathType> · saved <date>`): static
+  - Encrypted ciphertext (`wif_encrypted`, `oldWif_encrypted`, `oldAddress`) stays in JSON for JS-driven decrypt (no other choice — `crypto.subtle` requires JS)
+  - `<noscript>` banner added above the decrypt card on encrypted files: amber/yellow informational treatment, copy explains *"JavaScript is required to unlock this file. You're previewing this in a viewer that doesn't run JavaScript (e.g. iOS Files, Mail preview, AirDrop preview, macOS Finder Quick Look). Open it in Safari, Chrome, or Firefox..."*
+  - `.meta-value` gets `user-select: all` so iOS users can long-press-copy the address even when the JS Copy button is inert in Quick Look
+  - Dead JS removed (the now-pointless `meta-name`/`meta-address`/`meta-date`/`footer-stamp`/`wif-display`/`hint-text` textContent setters)
+  - Plaintext variantJs reduced to a single comment (no JS needed for plaintext at all)
+- DECISIONS.md gains "Recovery file: static render for iOS Quick Look compatibility" entry (above the 2026-05-04 copy/layout polish entry).
+- CLAUDE.md `backup-template.ts` paragraph extended with the static-render-for-Quick-Look section + en-US locale note + `.meta-value` user-select rule.
+
+**Verification:**
+- `tsc --noEmit` clean (0 errors)
+- `biome check` clean on the changed file
+- **Manual smoke test** via tsx: generated both plaintext and encrypted HTML, confirmed via grep that name/address/saved-date/WIF/hint/footer-stamp/noscript-banner all appear in the rendered HTML body (not just in the script-tag JSON). Address found at offset 8459, WIF at 9343, footer stamp at 9672 etc.
+
+**Threat model unchanged.** The WIF was always in the rendered DOM after JS ran AND in the JSON inside `<script>`. Moving it to HTML body adds one more place inside the same file — but anyone with the file already has full access regardless of how they open it. Plaintext red banner (*"This file is not encrypted. Anyone who can open it can take your account."*) renders statically in both old and new templates, so iOS Quick Look users see the warning above the WIF. Architect explicitly signed off with no security regressions.
+
+**Surfaces fixed (strict improvement, no new failure modes):**
+- iOS Files Quick Look — fully fixed for plaintext, partial (everything except decrypted WIF) for encrypted
+- iOS Mail / Messages / AirDrop preview — same engine, same fix
+- macOS Finder Quick Look — same engine, same fix
+- Email webmail attachment previews — strict improvement (most strip JS aggressively)
+- Real browsers (Safari/Chrome/Firefox) — identical UX as today, no regressions
+
 ## 2026-05-04 (cont. 2) — GitHub surface: pill tease + modal footer
 
 Category: UX, positioning, brand surface
