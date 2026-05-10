@@ -207,6 +207,7 @@ Read these to understand the full picture:
 - **FAIRNESS.md** — Revenue distribution model, fairness formula, gaming analysis, phase progression
 - **SECURITY_AUDIT.md** — Full security audit (2026-03-28): 9 criticals fixed, 3 highs fixed, mediums/lows tracked
 - **ROADMAP.md** — What's done, what's next, what's planned
+- **LAUNCH_PLAN.md** — Active launch-prep scratchpad (temporary; will be `git rm`'d at launch-close per memory `project_launch_plan_lifecycle.md`). 12 confirmed decisions, five work buckets, sequenced build plan
 - **FUTURE.md** — Ideas and explorations not yet built (handles, AFP protocol, agents, boot signals)
 - **SESSION_LOG.md** — What happened in each working session
 

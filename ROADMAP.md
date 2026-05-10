@@ -207,6 +207,8 @@
 
 ## Phase 6.5: UX Polish — IN PROGRESS
 
+> Active launch-prep plan with full bucket breakdown and confirmed decisions: see **LAUNCH_PLAN.md**.
+
 - [ ] **Server-side resilience: unified broadcast + read path (`/api/broadcast` proxy + server wallet reuse).** The server wallet (`wallet.ts`, `onchain.ts`, `boot-orchestrator.ts`) currently hits ARC and WoC directly — none of the client-side mitigations apply. An ARC hang freezes the mutex and blocks ALL posts + free boots platform-wide; a dropped 0-conf chain fan-outs into uncached WoC reads. Build-spec:
   - **`/api/broadcast` proxy** with GorillaPool primary → TAAL ARC fallback on 5xx. All client broadcasters wired via `new ARC('/api/broadcast')`. 10s timeout, structured ARC error passthrough (client's 257/258 classification depends on it), rate limit keyed on pubkey not IP. Motivated by GorillaPool outages 2026-04-08 and 2026-04-14.
   - **Server wallet reuses the same proxy** (shared broadcaster module, not duplicate SDK default). `wallet.ts:267` and all server tx paths go through the same failover + timeout discipline as the browser.

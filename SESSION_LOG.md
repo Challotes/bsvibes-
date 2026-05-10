@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-10 — Launch readiness: two-round multi-agent review + LAUNCH_PLAN.md
+
+Category: Planning, architecture
+
+Brainstormed cross-device / mobile launch readiness. Identified gaps: no in-app browser detection, no standalone-mode detection, no `beforeinstallprompt` capture, no service worker, six modals not bottom-sheet on mobile. Ran two rounds of agent review (architect, designer, code-auditor, marketer). Iterated on 12 open questions, converged to 12 confirmed decisions. Architect caught welcome-gate detection inversion (sync pre-hydration check), ITP toast sequencing collision, and TAAL deferral with miner-agnostic result type guardrail. Designer locked per-modal Tailwind class specs. Code-auditor validated QR sync cryptography model (5 required deltas, deferred to Bucket 6). Marketer locked notification and install-pitch copy.
+
+Shipped: `LAUNCH_PLAN.md` (temporary working doc, lifecycle in memory `project_launch_plan_lifecycle.md`). Six strategic decisions promoted into `DECISIONS.md` under new "Platform & Distribution" heading. CLAUDE.md Context Files + ROADMAP.md Phase 6.5 updated with pointers. Next: begin Bucket 1 (mobile modal bottom-sheet refactor, SignInModal first).
+
 ## 2026-05-04 (cont. 3) — Recovery file: static render for iOS Quick Look
 
 Category: Bug fix, recovery-file resilience
