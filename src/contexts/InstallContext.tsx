@@ -13,6 +13,7 @@ import { isSuppressedAt } from "@/lib/install-suppression";
 
 const DISMISSED_UNTIL_KEY = "bsvibes_install_pitch_dismissed_until";
 const ENGAGED_KEY = "bsvibes_install_engaged";
+const BACKED_UP_KEY = "bsvibes_identity_backed_up";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DISMISS_DAYS_DEFAULT = 30;
 
@@ -36,6 +37,19 @@ interface InstallContextValue {
   suppressForDays: (days: number) => void;
   /** Mark the user as having engaged the install path. Permanent. */
   markEngaged: () => void;
+  /**
+   * True if the user has saved a recovery file at least once (mirrored from
+   * the `bsvibes_identity_backed_up` localStorage flag). The install pitch is
+   * gated on this — without a recovery file, a fresh install lands in a new
+   * sandbox with no recovery path. Source of truth for the trigger.
+   */
+  backedUp: boolean;
+  /**
+   * Mark the user as having saved a recovery file. Writes localStorage AND
+   * updates context state so the bottom banner can react mid-session (without
+   * this, the banner would only appear on the next page load). Idempotent.
+   */
+  markBackedUp: () => void;
 }
 
 const InstallContext = createContext<InstallContextValue | null>(null);
@@ -61,10 +75,20 @@ function readEngaged(): boolean {
   }
 }
 
+function readBackedUp(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(BACKED_UP_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function InstallProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [canPromptInstall, setCanPromptInstall] = useState(false);
   const [dismissedUntil, setDismissedUntil] = useState<number | null>(() => readDismissedUntil());
   const [engaged, setEngaged] = useState<boolean>(() => readEngaged());
+  const [backedUp, setBackedUp] = useState<boolean>(() => readBackedUp());
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   // Capture beforeinstallprompt + appinstalled events
@@ -138,6 +162,16 @@ export function InstallProvider({ children }: { children: ReactNode }): React.JS
     setEngaged(true);
   }, []);
 
+  const markBackedUp = useCallback((): void => {
+    try {
+      window.localStorage.setItem(BACKED_UP_KEY, "1");
+    } catch {
+      // localStorage write failed (private browsing quota, etc.) — still flip
+      // in-memory so the banner reacts this session.
+    }
+    setBackedUp(true);
+  }, []);
+
   // Derived on every render. Calling Date.now() here means a mid-session
   // expiry of dismissedUntil only becomes visible on the next render — fine
   // for this use case because consumers only render when something else
@@ -146,7 +180,15 @@ export function InstallProvider({ children }: { children: ReactNode }): React.JS
 
   return (
     <InstallContext.Provider
-      value={{ canPromptInstall, promptInstall, isSuppressed, suppressForDays, markEngaged }}
+      value={{
+        canPromptInstall,
+        promptInstall,
+        isSuppressed,
+        suppressForDays,
+        markEngaged,
+        backedUp,
+        markBackedUp,
+      }}
     >
       {children}
     </InstallContext.Provider>

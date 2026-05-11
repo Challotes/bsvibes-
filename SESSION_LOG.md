@@ -2,6 +2,28 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont. 2) — Bucket 3a task 11: InstallPitch component (inline + bottom banner)
+
+Category: Build, growth surfaces
+
+Wired the install pitch — single message *"Get notified when you earn."* on two surfaces: inline inside the You modal done-state (fires on the save event, not on every modal open), and a thin banner at the bottom of the feed above the compose area (full-width strip, dismissable with X for 30-day suppression).
+
+Component is variant-discriminated (`<InstallPitch variant="inline" | "banner" />`) with shared internal logic + platform-branched CTA. Pure `shouldShowInstallPitch({ backedUp, standalone, installType, suppressed })` helper extracted to `src/lib/install-pitch.ts` mirroring the existing `install-suppression.ts` pattern (8 vitest cases covering the truth table — total tests now 63/63). Architect override on the LAUNCH_PLAN banner spec: rendered INSIDE the existing pinned-bottom container above PostForm via flex layout instead of `fixed bottom-0 z-40` (the spec was written without knowledge of the pinned compose; two `fixed bottom-0` strips would stack).
+
+`InstallContext` extended with `backedUp: boolean` + `markBackedUp()` so the bottom banner reacts mid-session without a page reload — without this, `setItem` in IdentityBar would only become visible to the banner on the next mount. The three IdentityBar save sites (handleCopy, MoveAddressModal.onComplete, RestoreModal.onSuccess) all route through a unified local `markBackedUp()` that propagates to context first (idempotent) THEN flips local `backedUp` + new `justBackedUp` event flag. Inline pitch mounted after the green "Got it" confirmation block, gated on `justBackedUp` (cleared in both close handlers so re-opening the modal shows nothing — fires once per save event, not on every reopen where `backedUp === true`).
+
+Platform branching covers all four installType values:
+- `one-tap` (Android Chrome/Brave/Edge/Samsung, desktop Chrome/Edge): real Install button calling `promptInstall()`. If `canPromptInstall === false` (Chrome's engagement heuristic hasn't fired), falls back to manual menu instructions instead of a dead disabled button.
+- `manual-instructions` (iOS Safari, desktop Safari, Firefox Android): one-line instructions per sub-platform.
+- `open-in-safari` (iOS Brave/Chrome/Firefox): nudge to switch to Safari.
+- `unsupported` / `null` (desktop Firefox, pre-hydration): render nothing.
+
+iOS self-corrects without an `appinstalled` event — after Add to Home Screen, `useStandaloneMode()` returns true, gate fails, pitch hides forever on that device.
+
+Code-auditor dispatched twice (architectural review before write + diff review before commit). Medium finding (markBackedUp early-return ordering + try/catch parity on the IdentityBar startup localStorage read) applied as part of this commit. Low 2 (dead disabled button on one-tap-without-prompt) applied — falls back to manual instructions. Type-check clean, 63/63 tests pass, Biome clean.
+
+Next: Task 12 First earning event toast (wired to /api/earnings polling).
+
 ## 2026-05-11 (cont.) — Bucket 3a task 10: welcome gate detection (sync pre-hydration)
 
 Category: Build, identity flow, state machine

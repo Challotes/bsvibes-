@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { BootToast } from "@/components/BootToast";
 import { HomeScreenWelcomeGate } from "@/components/HomeScreenWelcomeGate";
+import { InstallPitch } from "@/components/InstallPitch";
 import { SignInModal } from "@/components/SignInModal";
 import { BootProvider, useBootContext } from "@/contexts/BootContext";
 import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
@@ -284,6 +285,13 @@ function FeedContent({
 
       {/* Pinned bottom — compose area */}
       <div className="shrink-0">
+        {/* Install pitch banner — full-width strip above the compose. The
+            component self-gates: only shows when recovery file saved, not
+            already standalone, supported platform, not suppressed. X-tap
+            triggers 30d suppression via InstallContext (banner unmounts on
+            next render because isSuppressed flips true). */}
+        <InstallPitch variant="banner" />
+
         <div className="mx-auto max-w-2xl px-4 pb-4 pt-2">
           <PostForm
             onPostCreated={handlePostCreated}

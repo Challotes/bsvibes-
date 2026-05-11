@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { EarningsSparkline } from "@/components/EarningsSparkline";
 import { GoatModeToast } from "@/components/GoatModeToast";
+import { InstallPitch } from "@/components/InstallPitch";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
 import { RestoreModal } from "@/components/RestoreModal";
 import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useInstallContext } from "@/contexts/InstallContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
@@ -21,11 +23,17 @@ const GOAT_WELCOME_SHOWN_KEY = "bsvibes_goat_welcome_shown";
 
 export function IdentityChip(): React.JSX.Element | null {
   const { identity, isLoading, needsUnlock, updateIdentity, openSignIn } = useIdentityContext();
+  const installCtx = useInstallContext();
   const [open, setOpen] = useState(false);
 
   // Security state
   const [isProtected, setIsProtected] = useState(false);
   const [backedUp, setBackedUp] = useState<boolean | null>(null);
+  // Local "save just happened" flag — flips true when markBackedUp() runs, clears
+  // when the You modal closes. Drives the inline install pitch (event-shaped, not
+  // state-shaped — per LAUNCH_PLAN decision #10 the inline fires on the save
+  // event, NOT on every modal open where backedUp is already true).
+  const [justBackedUp, setJustBackedUp] = useState(false);
   // After download fires we wait for the user to explicitly acknowledge
   // ("Got it") before flipping backedUp. Prevents the silent "advanced
   // believing backup was saved" failure mode when the browser didn't
@@ -116,6 +124,7 @@ export function IdentityChip(): React.JSX.Element | null {
     setKeyRevealed(false);
     setCopied(false);
     setActivityExpanded(false);
+    setJustBackedUp(false);
   }, []);
 
   const loadStoredHint = useCallback(() => {
@@ -133,7 +142,14 @@ export function IdentityChip(): React.JSX.Element | null {
   // ── Effects ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    setBackedUp(localStorage.getItem(BACKED_UP_KEY) === "1");
+    try {
+      setBackedUp(localStorage.getItem(BACKED_UP_KEY) === "1");
+    } catch {
+      // localStorage threw (private browsing quota, Safari ITP, etc.) — treat
+      // as "not backed up" so the orange save banner appears and the install
+      // pitch stays gated.
+      setBackedUp(false);
+    }
     const encrypted = isIdentityEncrypted();
     setIsProtected(encrypted);
     loadStoredHint();
@@ -275,6 +291,7 @@ export function IdentityChip(): React.JSX.Element | null {
     setManageGateError("");
     setManageGateLoading(false);
     setHintRevealed(false);
+    setJustBackedUp(false);
     reAuthPassphraseRef.current = "";
   }
 
@@ -377,10 +394,14 @@ export function IdentityChip(): React.JSX.Element | null {
   }
 
   function markBackedUp() {
-    if (!backedUp) {
-      localStorage.setItem(BACKED_UP_KEY, "1");
-      setBackedUp(true);
-    }
+    // Always propagate to context first (idempotent) so a transient localStorage
+    // hiccup at startup that desynced local + context state can't cause the
+    // bottom banner to miss the save event. Then short-circuit on local UI
+    // state if we've already flipped justBackedUp in this session.
+    installCtx.markBackedUp();
+    if (backedUp) return;
+    setBackedUp(true);
+    setJustBackedUp(true);
   }
 
   // ── Advanced: Show/Copy key ────────────────────────────────────────────
@@ -434,8 +455,7 @@ export function IdentityChip(): React.JSX.Element | null {
             // close happens when the user clicks "Continue" → onClose below.
             updateIdentity(newIdentity);
             setIsProtected(true);
-            localStorage.setItem(BACKED_UP_KEY, "1");
-            setBackedUp(true);
+            markBackedUp();
             moveCompletedRef.current = true;
           }}
           onClose={() => {
@@ -475,8 +495,7 @@ export function IdentityChip(): React.JSX.Element | null {
             // backedUp so the dropdown banner doesn't reappear and prompt
             // for a redundant new save on a device that already has the
             // recovery file by definition.
-            localStorage.setItem(BACKED_UP_KEY, "1");
-            setBackedUp(true);
+            markBackedUp();
             setShowRestoreModal(false);
             // Close the You modal too — same logic as MoveAddressModal:
             // the modal is now showing the previous identity's state,
@@ -1128,6 +1147,11 @@ export function IdentityChip(): React.JSX.Element | null {
                 </div>
               </div>
             )}
+
+            {/* ── Inline install pitch — appears once on save event, cleared on
+                 modal close. The component self-gates (hides if already
+                 standalone, suppressed, or platform unsupported). ── */}
+            {justBackedUp && <InstallPitch variant="inline" />}
 
             {/* ── Security warning (unprotected only — protected uses inline checkmark) ── */}
             {!isProtected && (
