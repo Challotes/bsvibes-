@@ -414,322 +414,339 @@ export function MoveAddressModal({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Backdrop is only clickable in done/sweep-failed states — protects mid-flight
+  // stages (creating, recording, etc.) from accidental dismissal that would
+  // leave the user stranded between key rotation steps.
+  const backdropDismissable = isDone || isSweepFailed;
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center">
-      {/* Backdrop — no click-through during active stages */}
-      <div
-        className="absolute inset-0 bg-black/70"
-        onClick={isDone || isSweepFailed ? onClose : undefined}
-        aria-hidden="true"
-      />
+    <>
+      {/* Backdrop — full-screen button. Conditionally dismissable: during
+          active wizard stages tapping outside does nothing (protects the
+          rotation flow from accidental closes). */}
+      {backdropDismissable ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-[70] w-full bg-black/75 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out] cursor-default"
+          aria-label="Close modal"
+          onClick={onClose}
+        />
+      ) : (
+        <div
+          className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Card */}
-      <div className="relative bg-[#0f0f0f] border border-amber-400/20 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100">
-              {isPassphraseStage ? "Protect your new key" : "Moving to a new key"}
-            </h2>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
-              {isPassphraseStage
-                ? "Choose a passphrase"
-                : isDone
-                  ? "All done."
-                  : "Don\u2019t close this window."}
-            </p>
-          </div>
-          {(isDone || isPassphraseStage) && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors text-lg leading-none ml-3"
-              aria-label="Close"
-            >
-              &#x2715;
-            </button>
-          )}
-        </div>
-
-        {/* Passphrase entry — shown before the wizard starts */}
-        {isPassphraseStage ? (
-          <div className="space-y-3">
-            <input
-              type="password"
-              placeholder="New passphrase (min 8 characters)"
-              value={newPass}
-              onChange={(e) => {
-                setNewPass(e.target.value);
-                setPassError("");
-              }}
-              className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
-            />
-            <input
-              type="password"
-              placeholder="Confirm passphrase"
-              value={confirmNewPass}
-              onChange={(e) => {
-                setConfirmNewPass(e.target.value);
-                setPassError("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitPassphrase();
-              }}
-              className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
-            />
-            <div className="border-l-2 border-amber-500/60 pl-2.5 space-y-1">
-              <label
-                htmlFor="move-hint"
-                className="text-[11px] text-amber-400/80 font-medium block"
+      {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop */}
+      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+        <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[85vh] sm:min-h-0 overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-100">
+                {isPassphraseStage ? "Protect your new key" : "Moving to a new key"}
+              </h2>
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                {isPassphraseStage
+                  ? "Choose a passphrase"
+                  : isDone
+                    ? "All done."
+                    : "Don\u2019t close this window."}
+              </p>
+            </div>
+            {(isDone || isPassphraseStage) && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors text-lg leading-none ml-3"
+                aria-label="Close"
               >
-                Memory clue
-              </label>
+                &#x2715;
+              </button>
+            )}
+          </div>
+
+          {/* Passphrase entry — shown before the wizard starts */}
+          {isPassphraseStage ? (
+            <div className="space-y-3">
               <input
-                id="move-hint"
-                type="text"
-                placeholder={`e.g. "blue house + 2019"`}
-                value={newHint}
-                maxLength={100}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
+                type="password"
+                placeholder="New passphrase (min 8 characters)"
+                value={newPass}
                 onChange={(e) => {
-                  setNewHint(e.target.value);
+                  setNewPass(e.target.value);
                   setPassError("");
                 }}
                 className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
               />
-              <p className="text-[10px] text-red-400/90">
-                Only you should know what this means &mdash; it&apos;s stored unprotected in your
-                recovery file.
-              </p>
-            </div>
-            {passError && <p className="text-[11px] text-red-400">{passError}</p>}
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitPassphrase}
-                disabled={newPass.length < 8 || newPass !== confirmNewPass || !newHint.trim()}
-                className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* 3-dot progress indicator */}
-            <div className="flex justify-center gap-2 mb-5">
-              {[1, 2, 3].map((step) => (
-                <div
-                  key={step}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    completedSteps >= step
-                      ? "bg-amber-500"
-                      : activeStep === step && isRunning
-                        ? "bg-amber-400 animate-pulse"
-                        : "bg-zinc-800"
-                  }`}
+              <input
+                type="password"
+                placeholder="Confirm passphrase"
+                value={confirmNewPass}
+                onChange={(e) => {
+                  setConfirmNewPass(e.target.value);
+                  setPassError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitPassphrase();
+                }}
+                className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
+              />
+              <div className="border-l-2 border-amber-500/60 pl-2.5 space-y-1">
+                <label
+                  htmlFor="move-hint"
+                  className="text-[11px] text-amber-400/80 font-medium block"
+                >
+                  Memory clue
+                </label>
+                <input
+                  id="move-hint"
+                  type="text"
+                  placeholder={`e.g. "blue house + 2019"`}
+                  value={newHint}
+                  maxLength={100}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  onChange={(e) => {
+                    setNewHint(e.target.value);
+                    setPassError("");
+                  }}
+                  className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
                 />
-              ))}
+                <p className="text-[10px] text-red-400/90">
+                  Only you should know what this means &mdash; it&apos;s stored unprotected in your
+                  recovery file.
+                </p>
+              </div>
+              {passError && <p className="text-[11px] text-red-400">{passError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitPassphrase}
+                  disabled={newPass.length < 8 || newPass !== confirmNewPass || !newHint.trim()}
+                  className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Continue
+                </button>
+              </div>
             </div>
-
-            {/* Step list */}
-            <div className="space-y-3">
-              {/* Step 1 — Saving */}
-              {completedSteps >= 1 && stage !== "error" ? (
-                <CompletedStep {...COMPLETED_STEPS.saving} />
-              ) : stage === "saving" ? (
-                <ActiveStep
-                  heading="Saving your current key"
-                  description="Downloading a recovery file for your current key\u2026"
-                />
-              ) : stage === "saved-confirm" ? (
-                <div className="space-y-2.5">
-                  <div className="flex items-start gap-2.5">
-                    <CheckIcon />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-zinc-100">
-                        Your file should have downloaded
-                      </p>
-                      <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                        Move it somewhere safe (phone, cloud, USB). If the fund transfer fails, this
-                        file is your recovery.
-                      </p>
-                    </div>
-                  </div>
-                  {chainWarning && (
-                    <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
-                      <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                        {chainWarning} Tap continue again to proceed anyway.
-                      </p>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void confirmSaved()}
-                    className="w-full bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-500/20 transition-colors"
-                  >
-                    Got it — continue
-                  </button>
-                </div>
-              ) : stage === "error" && errorStage === "saving" ? (
-                <ErrorStep
-                  heading="Save failed"
-                  errorMessage={errorMessage}
-                  onRetry={() => void handleRetry()}
-                  onClose={onClose}
-                  partialWarning={false}
-                />
-              ) : null}
-
-              {/* Step 2 — Creating / Sweep */}
-              {completedSteps >= 1 &&
-                (completedSteps >= 2 && stage !== "error" && stage !== "sweep-failed" ? (
-                  <CompletedStep
-                    heading={
-                      sweepWarning
-                        ? "New key ready \u2014 transfer skipped"
-                        : COMPLETED_STEPS.creating.heading
-                    }
-                    description={
-                      sweepWarning
-                        ? "You chose to proceed without transferring funds. They\u2019re safe on your old key \u2014 use your backup file."
-                        : COMPLETED_STEPS.creating.description
-                    }
-                    variant={sweepWarning ? "warn" : undefined}
+          ) : (
+            <>
+              {/* 3-dot progress indicator */}
+              <div className="flex justify-center gap-2 mb-5">
+                {[1, 2, 3].map((step) => (
+                  <div
+                    key={step}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      completedSteps >= step
+                        ? "bg-amber-500"
+                        : activeStep === step && isRunning
+                          ? "bg-amber-400 animate-pulse"
+                          : "bg-zinc-800"
+                    }`}
                   />
-                ) : stage === "creating" ? (
+                ))}
+              </div>
+
+              {/* Step list */}
+              <div className="space-y-3">
+                {/* Step 1 — Saving */}
+                {completedSteps >= 1 && stage !== "error" ? (
+                  <CompletedStep {...COMPLETED_STEPS.saving} />
+                ) : stage === "saving" ? (
                   <ActiveStep
-                    heading="Creating your new key"
-                    description="Generating a fresh keypair and sweeping funds\u2026"
+                    heading="Saving your current key"
+                    description="Downloading a recovery file for your current key\u2026"
                   />
-                ) : stage === "sweep-failed" ? (
-                  <div className="flex items-start gap-2.5">
-                    <WarnIcon />
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-amber-400">Fund transfer failed</p>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        {errorMessage || "Couldn\u2019t move your funds to the new key."}
-                      </p>
-                      <p className="text-[11px] text-zinc-500 leading-relaxed">
-                        Your funds are safe on your old key. You can retry the transfer or proceed
-                        without moving funds.
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => void retrySweep()}
-                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
-                        >
-                          Retry transfer
-                        </button>
-                        <button
-                          type="button"
-                          onClick={proceedWithoutFunds}
-                          className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                        >
-                          Proceed without
-                        </button>
+                ) : stage === "saved-confirm" ? (
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <CheckIcon />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-zinc-100">
+                          Your file should have downloaded
+                        </p>
+                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                          Move it somewhere safe (phone, cloud, USB). If the fund transfer fails,
+                          this file is your recovery.
+                        </p>
                       </div>
                     </div>
+                    {chainWarning && (
+                      <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
+                        <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                          {chainWarning} Tap continue again to proceed anyway.
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void confirmSaved()}
+                      className="w-full bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                    >
+                      Got it — continue
+                    </button>
                   </div>
-                ) : stage === "error" && errorStage === "creating" ? (
+                ) : stage === "error" && errorStage === "saving" ? (
                   <ErrorStep
-                    heading="Creation failed"
+                    heading="Save failed"
                     errorMessage={errorMessage}
                     onRetry={() => void handleRetry()}
                     onClose={onClose}
                     partialWarning={false}
                   />
-                ) : null)}
+                ) : null}
 
-              {/* Step 3 — Recording */}
-              {completedSteps >= 2 &&
-                (completedSteps >= 3 && stage !== "error" ? (
-                  <CompletedStep {...COMPLETED_STEPS.recording} />
-                ) : stage === "recording" ? (
-                  <ActiveStep
-                    heading="Recording the move"
-                    description="Writing an on-chain migration record linking both addresses\u2026"
-                  />
-                ) : stage === "error" && errorStage === "recording" ? (
-                  <ErrorStep
-                    heading="Recording failed"
-                    errorMessage={errorMessage}
-                    onRetry={() => void handleRetry()}
-                    onClose={onClose}
-                    partialWarning={true}
-                  />
-                ) : null)}
-
-              {/* Done state */}
-              {isDone && (
-                <div className="space-y-3 pt-1">
-                  <p className="text-[11px] text-zinc-300 leading-relaxed">
-                    You&apos;re on a fresh key. Same name, same history &mdash; nothing changed for
-                    anyone else.
-                  </p>
-                  {!sweepWarning &&
-                  upgradeResultRef.current?.fundTransfer.transferredSats &&
-                  upgradeResultRef.current.fundTransfer.transferredSats > 0 ? (
-                    <div className="border-l-2 border-emerald-500/60 pl-2.5 py-0.5">
-                      <p className="text-[11px] text-emerald-400/90 leading-relaxed">
-                        {upgradeResultRef.current.fundTransfer.transferredSats.toLocaleString()}{" "}
-                        sats moved to your new key.
-                      </p>
+                {/* Step 2 — Creating / Sweep */}
+                {completedSteps >= 1 &&
+                  (completedSteps >= 2 && stage !== "error" && stage !== "sweep-failed" ? (
+                    <CompletedStep
+                      heading={
+                        sweepWarning
+                          ? "New key ready \u2014 transfer skipped"
+                          : COMPLETED_STEPS.creating.heading
+                      }
+                      description={
+                        sweepWarning
+                          ? "You chose to proceed without transferring funds. They\u2019re safe on your old key \u2014 use your backup file."
+                          : COMPLETED_STEPS.creating.description
+                      }
+                      variant={sweepWarning ? "warn" : undefined}
+                    />
+                  ) : stage === "creating" ? (
+                    <ActiveStep
+                      heading="Creating your new key"
+                      description="Generating a fresh keypair and sweeping funds\u2026"
+                    />
+                  ) : stage === "sweep-failed" ? (
+                    <div className="flex items-start gap-2.5">
+                      <WarnIcon />
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-amber-400">Fund transfer failed</p>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          {errorMessage || "Couldn\u2019t move your funds to the new key."}
+                        </p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">
+                          Your funds are safe on your old key. You can retry the transfer or proceed
+                          without moving funds.
+                        </p>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => void retrySweep()}
+                            className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                          >
+                            Retry transfer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={proceedWithoutFunds}
+                            className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                          >
+                            Proceed without
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  ) : null}
-                  {sweepWarning && (
+                  ) : stage === "error" && errorStage === "creating" ? (
+                    <ErrorStep
+                      heading="Creation failed"
+                      errorMessage={errorMessage}
+                      onRetry={() => void handleRetry()}
+                      onClose={onClose}
+                      partialWarning={false}
+                    />
+                  ) : null)}
+
+                {/* Step 3 — Recording */}
+                {completedSteps >= 2 &&
+                  (completedSteps >= 3 && stage !== "error" ? (
+                    <CompletedStep {...COMPLETED_STEPS.recording} />
+                  ) : stage === "recording" ? (
+                    <ActiveStep
+                      heading="Recording the move"
+                      description="Writing an on-chain migration record linking both addresses\u2026"
+                    />
+                  ) : stage === "error" && errorStage === "recording" ? (
+                    <ErrorStep
+                      heading="Recording failed"
+                      errorMessage={errorMessage}
+                      onRetry={() => void handleRetry()}
+                      onClose={onClose}
+                      partialWarning={true}
+                    />
+                  ) : null)}
+
+                {/* Done state */}
+                {isDone && (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      You&apos;re on a fresh key. Same name, same history &mdash; nothing changed
+                      for anyone else.
+                    </p>
+                    {!sweepWarning &&
+                    upgradeResultRef.current?.fundTransfer.transferredSats &&
+                    upgradeResultRef.current.fundTransfer.transferredSats > 0 ? (
+                      <div className="border-l-2 border-emerald-500/60 pl-2.5 py-0.5">
+                        <p className="text-[11px] text-emerald-400/90 leading-relaxed">
+                          {upgradeResultRef.current.fundTransfer.transferredSats.toLocaleString()}{" "}
+                          sats moved to your new key.
+                        </p>
+                      </div>
+                    ) : null}
+                    {sweepWarning && (
+                      <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
+                        <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                          Funds weren&apos;t moved &mdash; they&apos;re still on your old key. Use
+                          your backup file to recover them.
+                        </p>
+                      </div>
+                    )}
                     <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                       <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                        Funds weren&apos;t moved &mdash; they&apos;re still on your old key. Use
-                        your backup file to recover them.
+                        This file contains both your old and new key &mdash; keep it somewhere safe
+                        (cloud, USB) and remember your passphrase.{" "}
+                        <span className="font-semibold text-amber-300">
+                          Without both, you can&apos;t get back in.
+                        </span>
                       </p>
                     </div>
-                  )}
-                  <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
-                    <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                      This file contains both your old and new key &mdash; keep it somewhere safe
-                      (cloud, USB) and remember your passphrase.{" "}
-                      <span className="font-semibold text-amber-300">
-                        Without both, you can&apos;t get back in.
-                      </span>
-                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (combinedBackupRef.current) downloadBackup(combinedBackupRef.current);
+                        }}
+                        className="flex-1 bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        Download again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                      >
+                        Got it
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (combinedBackupRef.current) downloadBackup(combinedBackupRef.current);
-                      }}
-                      className="flex-1 bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                    >
-                      Download again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="flex-1 bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
-                    >
-                      Got it
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
