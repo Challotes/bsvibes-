@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { EarningsSparkline } from "@/components/EarningsSparkline";
+import { FirstEarningToast } from "@/components/FirstEarningToast";
 import { GoatModeToast } from "@/components/GoatModeToast";
 import { InstallPitch } from "@/components/InstallPitch";
 import { MoveAddressModal } from "@/components/MoveAddressModal";
@@ -512,6 +513,16 @@ export function IdentityChip(): React.JSX.Element | null {
       )}
 
       <GoatModeToast visible={showGoatToast} onDismiss={() => setShowGoatToast(false)} />
+
+      {/* First-earning save prompt — fires once per device when earnedSats > 0
+          and recovery file hasn't been saved. "Save now" opens the You modal
+          (lands the user on the orange Save banner); both buttons set 48h
+          backoff. Once backedUp flips true, this never re-evaluates true. */}
+      <FirstEarningToast
+        earnedSats={earnedSats}
+        backedUp={backedUp}
+        onSaveNow={() => setShowManage(true)}
+      />
 
       {/* ── Manage Identity modal ── */}
       {showManage && identity && (

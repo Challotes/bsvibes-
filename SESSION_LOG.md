@@ -2,6 +2,22 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont. 3) — Bucket 3a task 12: First earning event toast
+
+Category: Build, growth surfaces
+
+Wired the high-stakes save prompt — pill-card toast at `fixed bottom-24 left-1/2` that fires on the user's first non-zero earnings: *"You just earned your first sats. Save your recovery file — if you lose this device without it, they're gone."* with Save now / Later buttons. Both buttons set `bsvibes_first_earning_save_dismissed_until = now + 48h` (architect's correction on LAUNCH_PLAN intent — Save-now needs the same 48h backoff so the toast doesn't re-fire on the next 30s earnings poll if the user abandons the save mid-flow).
+
+Mounted in IdentityBar near the existing `GoatModeToast` — `earnedSats`, `backedUp`, and `setShowManage` are all already in scope, no context refactor needed. `onSaveNow` opens the You modal (works for both protected and unprotected users; direct `handleSaveFile` call doesn't work for protected users without the manage gate). Trigger conditions: `earnedSats > 0 && backedUp === false && dismissed_until < now && !sessionDismissed`. Pre-hydration null guards on both `earnedSats` and `backedUp` prevent SSR mismatch.
+
+Per architect refinement A in LAUNCH_PLAN, trigger wires to the existing `/api/earnings` 30s polling response — NOT to `/api/boot-confirm`. Avoids creating a new emit-site that Bucket 4's `publishPayout()` would have to coordinate with later. 30s detection latency is acceptable for a save prompt (not a real-time signal).
+
+Also fixed a related gap: `HomeScreenWelcomeGate` now calls `markBackedUp()` after successful restore (both plain WIF and decrypted-from-encrypted paths). Without this, welcome-gate restorers would be bounced into the You modal's orange "Save your recovery file" CTA even though the file they just used to restore IS their backup — parity with `RestoreModal.onSuccess`.
+
+Toast and bottom InstallPitch banner are mutually exclusive by `backedUp` state (toast requires `!backedUp`, banner requires `backedUp`). Verified by code-auditor pre-commit review. One Medium finding (narrow legacy-user edge case where `GoatModeToast` and `FirstEarningToast` could share `bottom-24` slot if user is protected but never went through `markBackedUp`) deferred as visual stacking, not a correctness bug. Type-check clean, 63/63 tests pass, Biome clean.
+
+Next: Task 13 iOS post-install ITP toast (one-time, fires on first standalone launch).
+
 ## 2026-05-11 (cont. 2) — Bucket 3a task 11: InstallPitch component (inline + bottom banner)
 
 Category: Build, growth surfaces
