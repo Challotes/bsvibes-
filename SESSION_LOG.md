@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont. 4) — Bucket 3a task 13: iOS post-install ITP toast
+
+Category: Build, iOS-specific resilience UX
+
+Wired the one-time iOS standalone heads-up — fires on a user's first home-screen-icon launch surfacing iOS Intelligent Tracking Prevention reality (Safari may clear saved site data after long inactivity) and reassuring them their recovery file brings everything back. Card-shape (rounded-2xl), 8s auto-dismiss, single "Got it" button (no "Remind me later" — informational, not a save prompt). Detection: `navigator.standalone === true` (iOS-Safari-specific signal, NOT the broader `display-mode: standalone` that includes Android). Flag `bsvibes_ios_storage_notice_shown` set on display (not on dismiss) so backgrounding mid-toast still counts as shown — once per device guaranteed.
+
+Mounted inside `FeedContent` in `Feed.tsx`, which only renders when `awaitingWelcomeGate === false` — satisfies the LAUNCH_PLAN #12 sequencing requirement (welcome gate FIRST, then ITP toast) by mount point alone, no coordination state needed.
+
+Deviation from designer spec: LAUNCH_PLAN called for "Pill — match GoatModeToast exactly" with `rounded-full`, but the copy is structured headline + body + button (three parts) which doesn't fit a single-line pill. Used the `FirstEarningToast` shape instead (rounded-2xl card with stacked content + button). Auditor verified the deviation is correct given the copy structure.
+
+Toast-stacking observation: three toasts (GoatMode, FirstEarning, IosStorage) now share the `fixed bottom-24 left-1/2 z-50` slot. Realistic collision (user upgrades to passphrase mid-iOS-session while ITP toast is up) is very narrow; auditor deferred a coordination layer as not worth the complexity at launch. iPadOS 13+ "desktop mode" may not set `navigator.standalone` — some iPad-installed users won't see this toast. Acceptable for v1. Type-check clean, 63/63 tests pass, Biome clean.
+
+Bucket 3a build complete (tasks 6–13). Next: Task 14 — manual QA on iPhone (deploy via Cloudflare tunnel, full walkthrough of welcome gate, install pitch, first earning toast, ITP toast).
+
 ## 2026-05-11 (cont. 3) — Bucket 3a task 12: First earning event toast
 
 Category: Build, growth surfaces

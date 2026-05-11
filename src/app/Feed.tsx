@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { BootToast } from "@/components/BootToast";
 import { HomeScreenWelcomeGate } from "@/components/HomeScreenWelcomeGate";
 import { InstallPitch } from "@/components/InstallPitch";
+import { IosStorageToast } from "@/components/IosStorageToast";
 import { SignInModal } from "@/components/SignInModal";
 import { BootProvider, useBootContext } from "@/contexts/BootContext";
 import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
@@ -326,6 +327,11 @@ function FeedContent({
 
       {/* Boot failure toast */}
       <BootToast message={bootError} />
+
+      {/* iOS post-install ITP heads-up — fires once on first standalone launch
+          (navigator.standalone === true). Mount point inside FeedContent
+          guarantees post-welcome-gate sequencing per LAUNCH_PLAN #12. */}
+      <IosStorageToast />
     </div>
   );
 }
