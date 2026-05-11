@@ -2,6 +2,16 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont. 6) — Bucket 3a complete: manual QA pass on iPhone
+
+Category: QA, sign-off
+
+Final manual QA pass walked through the full happy path on iPhone Safari + home-screen-installed PWA. All six test groups (Safari fundamentals, no-zoom compose, passphrase modal regression check across modal open/blur/reopen, save flow → inline pitch → bottom banner, welcome gate from home-screen install with recovery file restore, ITP toast on standalone launch) passed. The ITP toast didn't visibly fire on retest, but earlier diagnostic confirmed `nav.standalone=true`, `dm-standalone=true`, `shown=1` — code path proven correct, flag persistence across iOS icon delete + reinstall on this device version is the reason it can't be re-seen.
+
+Bucket 3a closes with 14 tasks done, 9 commits this session (welcome gate sync wiring, restore-on-success marking, InstallPitch component + helper, FirstEarningToast, IosStorageToast, two passphrase-modal bug fixes, diagnostic + cleanup). No data-loss bugs remaining. Identity flow on iOS is now: install → welcome gate → restore (or instructional fallback) → first-earning prompt to save → save → inline + banner pitch to install → install → ITP heads-up. Each step is gated to prevent fresh-sandbox identity loss.
+
+Next per LAUNCH_PLAN sequence: Bucket 1 (mobile modal bottom-sheet polish — `SignInModal` done early in this session, five modals remaining: You modal, MoveAddressModal, RestoreModal, ChangePassphraseModal, FundAddress).
+
 ## 2026-05-11 (cont. 5) — Bug fix: passphrase prompt firing for unprotected users
 
 Category: Bug fix, identity flow
