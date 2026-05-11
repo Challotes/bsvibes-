@@ -80,6 +80,31 @@ function getStoredIdentity(): StoredIdentity | null {
   return parsed as StoredIdentity;
 }
 
+/**
+ * Returns true ONLY when the user is actually protected by a passphrase —
+ * i.e., an encrypted key exists AND no plaintext key is present. If both
+ * exist (interrupted upgrade), the plaintext one is what `getIdentity()`
+ * uses, so the user is effectively UNprotected and should not be routed
+ * to a passphrase prompt for a passphrase they may never have completed
+ * setting up.
+ *
+ * UI callers that gate on "does this user have a passphrase?" must use this
+ * helper, NOT `isIdentityEncrypted()` which only checks for encrypted-store
+ * presence.
+ */
+export function isEffectivelyProtected(): boolean {
+  if (!isIdentityEncrypted()) return false;
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(STORAGE_KEY) === null;
+  } catch {
+    // localStorage threw (private browsing quota, etc.) — fall back to the
+    // narrower signal. The encrypted-store-only check is safer than assuming
+    // protected when we can't read.
+    return true;
+  }
+}
+
 /** Check if the identity is stored in encrypted format. */
 export function isIdentityEncrypted(): boolean {
   if (typeof window === "undefined") return false;

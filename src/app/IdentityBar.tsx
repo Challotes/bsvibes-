@@ -14,7 +14,7 @@ import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
-import { getStoredAnonName, isIdentityEncrypted, unlockIdentity } from "@/services/bsv/identity";
+import { getStoredAnonName, isEffectivelyProtected, unlockIdentity } from "@/services/bsv/identity";
 import { FundAddress } from "./FundAddress";
 
 const BACKED_UP_KEY = "bsvibes_identity_backed_up";
@@ -151,15 +151,18 @@ export function IdentityChip(): React.JSX.Element | null {
       // pitch stays gated.
       setBackedUp(false);
     }
-    const encrypted = isIdentityEncrypted();
-    setIsProtected(encrypted);
+    // isEffectivelyProtected returns true ONLY when encrypted exists AND no
+    // plaintext is present — covers the interrupted-upgrade case where both
+    // keys exist and getIdentity falls back to plaintext. Using the narrower
+    // isIdentityEncrypted() here would incorrectly route users into a
+    // passphrase prompt for a passphrase they may never have set.
+    setIsProtected(isEffectivelyProtected());
     loadStoredHint();
   }, [loadStoredHint]);
 
   useEffect(() => {
     if (!identity) return;
-    const encrypted = isIdentityEncrypted();
-    setIsProtected(encrypted);
+    setIsProtected(isEffectivelyProtected());
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
 
@@ -518,11 +521,7 @@ export function IdentityChip(): React.JSX.Element | null {
           and recovery file hasn't been saved. "Save now" opens the You modal
           (lands the user on the orange Save banner); both buttons set 48h
           backoff. Once backedUp flips true, this never re-evaluates true. */}
-      <FirstEarningToast
-        earnedSats={earnedSats}
-        backedUp={backedUp}
-        onSaveNow={() => setShowManage(true)}
-      />
+      <FirstEarningToast earnedSats={earnedSats} backedUp={backedUp} onSaveNow={openManageModal} />
 
       {/* ── Manage Identity modal ── */}
       {showManage && identity && (

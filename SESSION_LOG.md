@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont. 5) — Bug fix: passphrase prompt firing for unprotected users
+
+Category: Bug fix, identity flow
+
+User reported a passphrase unlock popup appearing "in random places" for an account WITHOUT a passphrase set, including after tapping Save now on the FirstEarningToast. Code-auditor traced the root cause to `IdentityBar.tsx:524` where Task 12 wired `onSaveNow={() => setShowManage(true)}` directly instead of using the existing `openManageModal()` helper. The helper at line 305 has a critical second line — `if (!isProtected) setManageAuthed(true)` — that bypasses the locked-state passphrase prompt for unprotected users. Without that bypass, every unprotected user landing in the You modal via the toast hit the gate for a passphrase they never set, and `unlockIdentity()` against a non-existent encrypted store always failed.
+
+The "random places" recurrence: the toast re-fires every 30s on the earnings poll while `earnedSats > 0 && !backedUp`. Closing the passphrase prompt with the X didn't tick the 48h dismissal flag (only Save now or Later do), so the toast came back on every poll — felt random because users were doing other things between firings.
+
+Secondary fix in same commit: added `isEffectivelyProtected()` helper to identity.ts that returns true ONLY when encrypted key exists AND plaintext key does NOT. Updated IdentityBar's two `isProtected` effects to use the new helper instead of `isIdentityEncrypted()`. This protects against the interrupted-upgrade case where both keys are in localStorage — `getIdentity()` already correctly prefers plaintext in that case, but the UI was still treating the user as protected based on encrypted-store presence alone. Auditor confirmed `isIdentityEncrypted()` internal callers in `getIdentity()` race-handling remain correct with unchanged semantics.
+
+DECISIONS.md updated with a "Two protection helpers, not one" entry explaining why these two helpers exist deliberately and must not be collapsed back into one (the doc comment alone wasn't sticky enough — auditor flagged future contributors would want to merge them).
+
+Type-check clean, 63/63 tests pass, Biome clean.
+
 ## 2026-05-11 (cont. 4) — Bucket 3a task 13: iOS post-install ITP toast
 
 Category: Build, iOS-specific resilience UX
