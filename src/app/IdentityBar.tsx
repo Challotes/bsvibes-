@@ -257,6 +257,12 @@ export function IdentityChip(): React.JSX.Element | null {
   // Destroy manage session on tab blur — same pattern password managers use.
   useEffect(() => {
     if (!manageAuthed) return;
+    // Only destroy the manage gate on tab-blur for genuinely protected users
+    // (those with a real passphrase to re-authenticate). Unprotected users
+    // bypass the gate on open via `openManageModal()` and have no cached
+    // secret to destroy — flipping `manageAuthed` to false would re-render
+    // the locked-state passphrase prompt for a passphrase they never set.
+    if (!isProtected) return;
     function handleVisibility() {
       if (document.visibilityState === "hidden") {
         setManageAuthed(false);
@@ -265,7 +271,7 @@ export function IdentityChip(): React.JSX.Element | null {
     }
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [manageAuthed]);
+  }, [manageAuthed, isProtected]);
 
   // Auto-focus the passphrase input when the You modal opens in locked
   // state. requestAnimationFrame defers focus until after the input is
@@ -565,7 +571,11 @@ export function IdentityChip(): React.JSX.Element | null {
                 </button>
               </div>
 
-              {!manageAuthed ? (
+              {/* Defense-in-depth: locked-state body renders ONLY for genuinely
+                  protected users. Even if `manageAuthed` somehow flips false
+                  for an unprotected user (e.g., future code path), they fall
+                  through to the unlocked rows where they belong. */}
+              {!manageAuthed && isProtected ? (
                 <div key="lock" className="px-4 py-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
                   <input
                     ref={gateInputRef}
