@@ -2,6 +2,25 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-12 — Bucket 1 complete: all modals refactored to bottom-sheet pattern
+
+Category: Mobile polish
+
+Five modals refactored to the in-house bottom-sheet-on-mobile / centered-on-desktop pattern (proven by SignInModal + AgentChat). All use the same Tailwind shape: outer `fixed inset-0 z-[N] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none`, panel `w-full sm:max-w-{sm|md} rounded-t-2xl sm:rounded-2xl pointer-events-auto animate-[slideUp_0.3s_ease-out]`, backdrop is a separate full-screen `<button>` with bg-black/75 + backdrop-blur-sm + fadeIn animation.
+
+Per-modal specifics:
+- **FundAddress** (6ee6441): half-height single-step. Z-60. max-w-sm.
+- **RestoreModal** (e5a896f): full-height wizard. Z-70. max-w-md. min-h-[75vh] sm:min-h-0.
+- **ChangePassphraseModal** (1356669): full-height wizard with flex-col so done-state buttons can pin to bottom via mt-auto. Z-60. max-w-md. min-h-[80vh] sm:min-h-0.
+- **MoveAddressModal** (dea0b4b): full-height wizard. Z-70. max-w-md. min-h-[85vh] sm:min-h-0. Critical preserved logic: backdropDismissable gating (only dismissable in done/sweep-failed stages, ignored during active rotation stages). Implemented as conditional `<button>` vs `<div aria-hidden>` based on stage. moveCompletedRef + onComplete/onClose callbacks untouched.
+- **IdentityBar You modal** (this commit): half-height with max-h-[92vh] overflow-y-auto (tallest modal). Z-60. max-w-sm. Locked-state cross-fade (`!manageAuthed && isProtected ? <lock> : <rows>`) preserved with key-based remount + fadeIn animation. Flattened 3-level nesting (outer flex → relative wrapper → panel) to 2-level (Fragment → outer flex → panel) by removing the redundant relative z-10 middle wrapper.
+
+Each refactor was code-auditor-verified before commit. Type-check clean, 63/63 tests pass, Biome clean across all five files.
+
+LATENT FOOTGUN noted: You modal (z-60) and FundAddress (z-60) tie at the same z-index. Currently safe because FundAddress is only opened from the dropdown context (not the You modal). If a future deposit affordance is added INSIDE the You modal body, FundAddress would render BEHIND it. Either close the You modal first when opening FundAddress, or bump FundAddress to z-[65].
+
+Bucket 1 closes — all six modals (SignInModal earlier + these five) now responsive. Bucket 2 is next per LAUNCH_PLAN sequence (in-app browser splash).
+
 ## 2026-05-11 (cont. 6) — Bucket 3a complete: manual QA pass on iPhone
 
 Category: QA, sign-off

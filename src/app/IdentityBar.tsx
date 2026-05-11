@@ -531,19 +531,21 @@ export function IdentityChip(): React.JSX.Element | null {
 
       {/* ── Manage Identity modal ── */}
       {showManage && identity && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-        >
+        <>
+          {/* Backdrop — full-screen click target for dismiss */}
           <button
             type="button"
-            className="absolute inset-0 w-full cursor-default"
+            className="fixed inset-0 z-[60] w-full bg-black/75 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out] cursor-default"
             aria-label="Close modal"
             onClick={closeManageModal}
           />
-          <div className="relative z-10 w-full flex items-center justify-center">
+
+          {/* Modal — bottom sheet on mobile, centered on desktop. max-h-[92vh]
+              critical — this is the tallest modal (earnings + chart + activity
+              + balance + rows) and overflows on small phones without the cap. */}
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
             <div
-              className="w-full max-w-sm rounded-xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden"
+              className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[92vh] overflow-y-auto"
               style={{ backgroundColor: "#0f0f0f" }}
             >
               <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
@@ -915,7 +917,7 @@ export function IdentityChip(): React.JSX.Element | null {
               )}
             </div>
           </div>
-        </div>
+        </>
       )}
 
       <div ref={dropdownRef} className="relative">
