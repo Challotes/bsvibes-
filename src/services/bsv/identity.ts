@@ -48,6 +48,23 @@ let _cachedPrivateKey: import("@bsv/sdk").PrivateKey | null = null;
  */
 let _sessionIdentity: Identity | null = null;
 
+/**
+ * Clear all session-level caches that hold private-key material in memory.
+ * Called on tab blur in standalone (PWA) mode, mirroring the password-manager
+ * pattern used by the You modal. Without this, a backgrounded standalone tab
+ * keeps the decrypted WIF + PrivateKey in memory indefinitely, which is a
+ * stolen-device exposure window.
+ *
+ * Note: this only clears IN-MEMORY caches. localStorage is untouched — the
+ * encrypted store (or plaintext store) remains, and the user can re-unlock
+ * via the passphrase prompt or simply re-mount with `getIdentity()`.
+ */
+export function clearSessionCaches(): void {
+  _sessionIdentity = null;
+  _cachedWif = null;
+  _cachedPrivateKey = null;
+}
+
 /** Get existing identity from storage (plaintext only). */
 function getStoredIdentity(): StoredIdentity | null {
   if (typeof window === "undefined") return null;
@@ -101,9 +118,19 @@ function getOldIdentityName(): string | null {
   return null;
 }
 
-/** Get or create the user's identity. Returns null if encrypted (needs unlock). */
-export async function getIdentity(): Promise<Identity | null> {
+/**
+ * Get or create the user's identity. Returns null if encrypted (needs unlock).
+ *
+ * @param options.allowAutoGen — defaults to `true` (back-compat with every existing
+ *   call site). When `false`, the function returns null instead of generating a
+ *   fresh keypair when no identity is found. Used by the home-screen welcome gate
+ *   path in `useIdentity` to defer key generation until the user explicitly chooses
+ *   "Restore from your saved file." See LAUNCH_PLAN.md sequencing revision
+ *   (2026-05-11) + DECISIONS.md "Welcome gate fires when standalone-mode + no identity."
+ */
+export async function getIdentity(options?: { allowAutoGen?: boolean }): Promise<Identity | null> {
   if (typeof window === "undefined") return null;
+  const allowAutoGen = options?.allowAutoGen ?? true;
 
   // If session has a decrypted identity, use it
   if (_sessionIdentity) return _sessionIdentity;
@@ -139,6 +166,11 @@ export async function getIdentity(): Promise<Identity | null> {
 
   // Don't generate a new key if an encrypted identity exists — user needs to unlock
   if (isIdentityEncrypted()) return null;
+
+  // Caller (welcome gate in standalone mode) opted out of auto-generation.
+  // Returning null here keeps localStorage clean so the user's restore-from-file
+  // flow is the only path to a populated identity in this sandbox.
+  if (!allowAutoGen) return null;
 
   const oldName = getOldIdentityName();
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { BootToast } from "@/components/BootToast";
+import { HomeScreenWelcomeGate } from "@/components/HomeScreenWelcomeGate";
 import { SignInModal } from "@/components/SignInModal";
 import { BootProvider, useBootContext } from "@/contexts/BootContext";
 import { IdentityProvider, useIdentityContext } from "@/contexts/IdentityContext";
@@ -321,6 +322,28 @@ function FeedContent({
   );
 }
 
+/**
+ * Inner wrapper that reads identity context and renders either the welcome gate
+ * (when standalone + no identity) or the full feed UI. The gate renders BEFORE
+ * any feed UI mounts, so the IdentityBar / Header / PostForm never see a null
+ * identity in the awaiting-gate state.
+ */
+function FeedOrWelcomeGate({
+  initialPosts,
+  initialBootboard,
+}: {
+  initialPosts: Post[];
+  initialBootboard: BootboardData;
+}) {
+  const { awaitingWelcomeGate, acceptRestoredIdentity } = useIdentityContext();
+
+  if (awaitingWelcomeGate) {
+    return <HomeScreenWelcomeGate onRestore={acceptRestoredIdentity} />;
+  }
+
+  return <FeedContent initialPosts={initialPosts} initialBootboard={initialBootboard} />;
+}
+
 export function Feed({
   posts: initialPosts,
   bootboard: initialBootboard,
@@ -333,7 +356,7 @@ export function Feed({
       <IdentityProvider>
         <InstallProvider>
           <SignInModal />
-          <FeedContent initialPosts={initialPosts} initialBootboard={initialBootboard} />
+          <FeedOrWelcomeGate initialPosts={initialPosts} initialBootboard={initialBootboard} />
         </InstallProvider>
       </IdentityProvider>
     </BootProvider>

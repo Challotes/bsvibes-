@@ -2,6 +2,20 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-11 (cont.) — Bucket 3a task 10: welcome gate detection (sync pre-hydration)
+
+Category: Build, identity flow, state machine
+
+Task 10 completes the Bucket 3a identity-flow layer. Wired `HomeScreenWelcomeGate` into the live mount path and rewrote `useIdentity` as a discriminated-union state machine (`loading | needsUnlock | awaitingWelcomeGate | ready`) so the impossible states the old boolean flags allowed (e.g. `loading + needsUnlock`) are no longer representable. `detectStandalone()` extracted as a pure synchronous function callable inside an effect, eliminating the SSR/hydration race where the reactive hook would briefly return false then flip — the previous shape would have let auto-gen fire in the gap.
+
+`getIdentity()` gains an `allowAutoGen?: boolean` option (default true for back-compat). Welcome gate path passes false; cross-tab storage sync passes false (a storage event should never auto-create). `IdentityContext` adds `acceptRestoredIdentity(wif, name?)` as the SINGLE entry point for the gate to commit a restored identity — calls `importIdentity` then `updateIdentity` in lockstep so localStorage + React state can't desync. New `clearSessionCaches()` export from `identity.ts` runs on `visibilitychange → hidden` in standalone mode (password-manager parity), and at the top of the cross-tab `storage` handler so a restore-in-tab-A is observed by tab B against fresh localStorage, not its own stale in-memory cache.
+
+`HomeScreenWelcomeGate` redesigned restore-only with three modes (`buttons | passphrase | no-file`) — the no-file branch is pure-render and does NOT call `localStorage.setItem`, which is the whole point of this fix. `Feed.tsx` adds an inner `FeedOrWelcomeGate` wrapper that reads `awaitingWelcomeGate` from context and short-circuits to the gate BEFORE FeedContent mounts, so IdentityBar/Header/PostForm never see a null identity in the awaiting state.
+
+Code-auditor dispatched twice (pre-write architectural verification + post-write security review of the diff). Final verdict: SAFE TO COMMIT. One High finding (cross-tab session-cache desync risk) applied as a 3-line fix in the same commit — call `clearSessionCaches()` at top of the storage handler. Type-check clean, 55/55 tests pass, Biome clean.
+
+Next: Task 11 InstallPitch component (inline section + bottom banner).
+
 ## 2026-05-11 — Bucket 3a detection layer + iOS Safari polish
 
 Category: Build, iOS polish, architectural foundation
