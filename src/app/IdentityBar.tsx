@@ -19,6 +19,29 @@ import { FundAddress } from "./FundAddress";
 
 const BACKED_UP_KEY = "bsvibes_identity_backed_up";
 const GOAT_WELCOME_SHOWN_KEY = "bsvibes_goat_welcome_shown";
+const PASSPHRASE_NUDGE_DISMISSED_UNTIL_KEY = "bsvibes_passphrase_nudge_dismissed_until";
+const PASSPHRASE_NUDGE_BACKOFF_DAYS = 30;
+
+function isPassphraseNudgeSuppressed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(PASSPHRASE_NUDGE_DISMISSED_UNTIL_KEY);
+    if (raw === null) return false;
+    const until = Number(raw);
+    return Number.isFinite(until) && until > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function suppressPassphraseNudge(): void {
+  try {
+    const until = Date.now() + PASSPHRASE_NUDGE_BACKOFF_DAYS * 24 * 60 * 60 * 1000;
+    window.localStorage.setItem(PASSPHRASE_NUDGE_DISMISSED_UNTIL_KEY, String(until));
+  } catch {
+    // localStorage write failed — nudge will re-appear next session, acceptable.
+  }
+}
 
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
@@ -1110,7 +1133,9 @@ export function IdentityChip(): React.JSX.Element | null {
                     {downloading ? "Saving..." : "Save your recovery file"}
                   </span>
                   <span className="text-[10px] text-amber-400/70 block">
-                    One tap — lets you get back in from any device.
+                    {isProtected
+                      ? "One tap — lets you get back in from any device."
+                      : "One tap to save. Plain text for now — you can lock it later."}
                   </span>
                 </div>
                 <svg
@@ -1129,46 +1154,111 @@ export function IdentityChip(): React.JSX.Element | null {
                 </svg>
               </button>
             )}
-            {backedUp === false && justDownloaded && (
-              <div className="px-3 py-2.5 bg-emerald-500/10 border-b border-emerald-500/30 flex items-start gap-3">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="text-emerald-400 shrink-0 mt-0.5"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-medium text-emerald-300 block">
-                    Your file should have downloaded
-                  </span>
-                  <span className="text-[10px] text-emerald-300/80 block mt-0.5 mb-2 leading-relaxed">
-                    Move it somewhere safe (phone, cloud, USB). It&apos;s the only way back into
-                    your account.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markBackedUp();
-                      setJustDownloaded(false);
-                    }}
-                    className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-3 py-2 text-[11px] font-medium hover:bg-emerald-500/30 transition-colors"
+            {backedUp === false &&
+              justDownloaded &&
+              (!isProtected && !isPassphraseNudgeSuppressed() ? (
+                // C2: passphrase upgrade nudge — replaces the generic "Got it"
+                // confirmation for unprotected users. Each plaintext save is a
+                // new exposure surface, so this fires on every save unless
+                // suppressed via "Not now" (30-day backoff). Both buttons
+                // acknowledge the save (markBackedUp + clear justDownloaded);
+                // Add passphrase additionally opens the Move modal.
+                <div className="px-3 py-2.5 bg-amber-500/10 border-b border-amber-500/30 flex items-start gap-3">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="text-amber-400 shrink-0 mt-0.5"
                   >
-                    Got it
-                  </button>
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-semibold text-amber-300 block">
+                      Add a passphrase?
+                    </span>
+                    <span className="text-[10px] text-amber-400/80 block mt-0.5 mb-2 leading-relaxed">
+                      Your file is plain text right now &mdash; whoever opens it is you. Locking it
+                      with a passphrase means only you can use it.
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markBackedUp();
+                          setJustDownloaded(false);
+                          openMoveModal("");
+                        }}
+                        className="bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-2 text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
+                      >
+                        Add passphrase
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markBackedUp();
+                          setJustDownloaded(false);
+                          suppressPassphraseNudge();
+                        }}
+                        className="bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-[11px] font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                // Protected users (already encrypted) and suppressed users
+                // get the generic confirmation. Still acknowledges the file
+                // download before flipping backedUp = true (silent-failure
+                // protection per the existing pattern).
+                <div className="px-3 py-2.5 bg-emerald-500/10 border-b border-emerald-500/30 flex items-start gap-3">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="text-emerald-400 shrink-0 mt-0.5"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-medium text-emerald-300 block">
+                      Your file should have downloaded
+                    </span>
+                    <span className="text-[10px] text-emerald-300/80 block mt-0.5 mb-2 leading-relaxed">
+                      Move it somewhere safe (phone, cloud, USB). It&apos;s the only way back into
+                      your account.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markBackedUp();
+                        setJustDownloaded(false);
+                      }}
+                      className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-3 py-2 text-[11px] font-medium hover:bg-emerald-500/30 transition-colors"
+                    >
+                      Got it
+                    </button>
+                  </div>
+                </div>
+              ))}
 
             {/* ── Inline install pitch — appears once on save event, cleared on
                  modal close. The component self-gates (hides if already

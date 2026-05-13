@@ -15,16 +15,8 @@ interface MoveAddressModalProps {
   onClose: () => void;
 }
 
-type Stage =
-  | "passphrase"
-  | "saving"
-  | "saved-confirm"
-  | "creating"
-  | "sweep-failed"
-  | "recording"
-  | "done"
-  | "error";
-type ErrorStage = "saving" | "creating" | "recording";
+type Stage = "passphrase" | "creating" | "sweep-failed" | "recording" | "done" | "error";
+type ErrorStage = "creating" | "recording";
 
 interface StepState {
   heading: string;
@@ -32,11 +24,6 @@ interface StepState {
 }
 
 const COMPLETED_STEPS: Record<ErrorStage, StepState> = {
-  saving: {
-    heading: "Old key saved",
-    description:
-      "Temporary safety copy. Your final recovery file at the end replaces this with both keys under one passphrase.",
-  },
   creating: {
     heading: "New key ready",
     description: "Your name, posts, earnings, and future payouts follow automatically.",
@@ -160,10 +147,48 @@ export function MoveAddressModal({
   const upgradeResultRef = useRef<Awaited<ReturnType<typeof upgradeIdentity>> | null>(null);
   // Store the combined BackupData from runRecording so "Download again" can re-fire it
   const combinedBackupRef = useRef<Parameters<typeof downloadBackup>[0] | null>(null);
+  // Pre-rotation backup payload, built in submitPassphrase and held in memory.
+  // We deliberately DON'T fire the download here — it's only emitted from
+  // error states (runCreating / runRecording failure) so the user gets the
+  // safety net when they actually need it. In the happy path, the final
+  // combined recovery file at done-state supersedes this entirely.
+  const preRotationBackupRef = useRef<BackupData | null>(null);
 
   // ── Stage runners ──────────────────────────────────────────────────────────
 
-  function submitPassphrase(): void {
+  async function buildPreRotationBackup(): Promise<BackupData> {
+    if (isProtected && passphrase) {
+      const encBackup = await encryptWif(identity.wif, passphrase);
+      const backupPayload: BackupData = {
+        name: identity.name,
+        address: identity.address,
+        wif_encrypted: encBackup,
+        pathType: "pre-rotation",
+        createdAt: new Date().toISOString(),
+        note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
+      };
+      const hint = getStoredHint();
+      if (hint) backupPayload.hint = hint;
+      return backupPayload;
+    }
+    const backupPayload: BackupData = {
+      name: identity.name,
+      address: identity.address,
+      wif: identity.wif,
+      pathType: "pre-rotation",
+      createdAt: new Date().toISOString(),
+      note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
+    };
+    const hint = getStoredHint();
+    if (hint) backupPayload.hint = hint;
+    return backupPayload;
+  }
+
+  function downloadPreRotationBackup(): void {
+    if (preRotationBackupRef.current) downloadBackup(preRotationBackupRef.current);
+  }
+
+  async function submitPassphrase(): Promise<void> {
     setPassError("");
     if (newPass.length < 8) {
       setPassError("Passphrase must be at least 8 characters");
@@ -181,51 +206,9 @@ export function MoveAddressModal({
       setPassError("Add a memory clue — it's your only reminder if you forget.");
       return;
     }
-    void runSaving();
-  }
-
-  async function runSaving(): Promise<void> {
-    setStage("saving");
-    setErrorStage(null);
-    setErrorMessage("");
-    try {
-      if (isProtected && passphrase) {
-        const encBackup = await encryptWif(identity.wif, passphrase);
-        const backupPayload: BackupData = {
-          name: identity.name,
-          address: identity.address,
-          wif_encrypted: encBackup,
-          pathType: "pre-rotation",
-          createdAt: new Date().toISOString(),
-          note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
-        };
-        const hint = getStoredHint();
-        if (hint) backupPayload.hint = hint;
-        downloadBackup(backupPayload);
-      } else {
-        const backupPayload: BackupData = {
-          name: identity.name,
-          address: identity.address,
-          wif: identity.wif,
-          pathType: "pre-rotation",
-          createdAt: new Date().toISOString(),
-          note: "Previous identity — may hold unconfirmed UTXOs until mempool clears.",
-        };
-        const hint = getStoredHint();
-        if (hint) backupPayload.hint = hint;
-        downloadBackup(backupPayload);
-      }
-
-      setStage("saved-confirm");
-    } catch (e) {
-      setStage("error");
-      setErrorStage("saving");
-      setErrorMessage(e instanceof Error ? e.message : "Failed to save backup. Please try again.");
-    }
-  }
-
-  async function confirmSaved(): Promise<void> {
-    // Pre-rotation chain verification
+    // Pre-rotation chain verification — moved here from the dropped saved-confirm
+    // stage. If unhealthy, surface the warning inline; user can tap submit again
+    // to proceed anyway.
     if (!chainWarning) {
       try {
         const { PrivateKey } = await import("@bsv/sdk");
@@ -238,11 +221,21 @@ export function MoveAddressModal({
           return;
         }
       } catch {
-        // Non-blocking
+        // Non-blocking — proceed if verification fails
       }
     }
     setChainWarning("");
-    setCompletedSteps(1);
+
+    // Build the pre-rotation backup payload in memory. NOT downloaded — only
+    // emitted if rotation fails mid-flight (see error branches below).
+    try {
+      preRotationBackupRef.current = await buildPreRotationBackup();
+    } catch (e) {
+      setPassError(
+        e instanceof Error ? e.message : "Couldn't prepare the rotation. Please try again."
+      );
+      return;
+    }
     void runCreating();
   }
 
@@ -274,7 +267,7 @@ export function MoveAddressModal({
         setSweepWarning(false);
       }
 
-      setCompletedSteps(2);
+      setCompletedSteps(1);
       await runRecording();
     } catch (e) {
       setStage("error");
@@ -305,7 +298,7 @@ export function MoveAddressModal({
       }
 
       setSweepWarning(false);
-      setCompletedSteps(2);
+      setCompletedSteps(1);
       await runRecording();
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : "Sweep retry failed. Please try again.");
@@ -315,7 +308,7 @@ export function MoveAddressModal({
 
   function proceedWithoutFunds(): void {
     setSweepWarning(true);
-    setCompletedSteps(2);
+    setCompletedSteps(1);
     void runRecording();
   }
 
@@ -370,7 +363,7 @@ export function MoveAddressModal({
       combinedBackupRef.current = newBackup;
       downloadBackup(newBackup);
 
-      setCompletedSteps(3);
+      setCompletedSteps(2);
       setStage("done");
       onComplete(result.identity);
     } catch (e) {
@@ -384,10 +377,8 @@ export function MoveAddressModal({
 
   async function handleRetry(): Promise<void> {
     if (!errorStage) return;
-    if (errorStage === "saving") {
-      await runSaving();
-    } else if (errorStage === "creating") {
-      // runCreating() now reuses upgradeResultRef.current if set — safe to retry
+    if (errorStage === "creating") {
+      // runCreating() reuses upgradeResultRef.current if set — safe to retry
       await runCreating();
     } else if (errorStage === "recording") {
       await runRecording();
@@ -397,15 +388,9 @@ export function MoveAddressModal({
   // ── Derived display values ─────────────────────────────────────────────────
 
   const isPassphraseStage = stage === "passphrase";
-  // activeStep: 1=saving, 2=creating/sweep-failed, 3=recording (0 = done / error / passphrase)
+  // activeStep: 1=creating/sweep-failed, 2=recording (0 = done / error / passphrase)
   const activeStep =
-    stage === "saving" || stage === "saved-confirm"
-      ? 1
-      : stage === "creating" || stage === "sweep-failed"
-        ? 2
-        : stage === "recording"
-          ? 3
-          : 0;
+    stage === "creating" || stage === "sweep-failed" ? 1 : stage === "recording" ? 2 : 0;
 
   const isDone = stage === "done";
   const isError = stage === "error";
@@ -490,7 +475,7 @@ export function MoveAddressModal({
                   setPassError("");
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") submitPassphrase();
+                  if (e.key === "Enter") void submitPassphrase();
                 }}
                 className="w-full bg-zinc-900 border border-amber-400/15 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/40"
               />
@@ -533,7 +518,7 @@ export function MoveAddressModal({
                 </button>
                 <button
                   type="button"
-                  onClick={submitPassphrase}
+                  onClick={() => void submitPassphrase()}
                   disabled={newPass.length < 8 || newPass !== confirmNewPass || !newHint.trim()}
                   className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -543,9 +528,9 @@ export function MoveAddressModal({
             </div>
           ) : (
             <>
-              {/* 3-dot progress indicator */}
+              {/* 2-dot progress indicator (New key → Recorded) */}
               <div className="flex justify-center gap-2 mb-5">
-                {[1, 2, 3].map((step) => (
+                {[1, 2].map((step) => (
                   <div
                     key={step}
                     className={`w-2 h-2 rounded-full transition-colors ${
@@ -561,105 +546,58 @@ export function MoveAddressModal({
 
               {/* Step list */}
               <div className="space-y-3">
-                {/* Step 1 — Saving */}
-                {completedSteps >= 1 && stage !== "error" ? (
-                  <CompletedStep {...COMPLETED_STEPS.saving} />
-                ) : stage === "saving" ? (
+                {/* Step 1 — Creating / Sweep (was Step 2 before saving stage removal) */}
+                {completedSteps >= 1 && stage !== "error" && stage !== "sweep-failed" ? (
+                  <CompletedStep
+                    heading={
+                      sweepWarning
+                        ? "New key ready \u2014 transfer skipped"
+                        : COMPLETED_STEPS.creating.heading
+                    }
+                    description={
+                      sweepWarning
+                        ? "You chose to proceed without transferring funds. They\u2019re safe on your old key \u2014 use your backup file."
+                        : COMPLETED_STEPS.creating.description
+                    }
+                    variant={sweepWarning ? "warn" : undefined}
+                  />
+                ) : stage === "creating" ? (
                   <ActiveStep
-                    heading="Saving your current key"
-                    description="Downloading a recovery file for your current key\u2026"
+                    heading="Creating your new key"
+                    description="Generating a fresh keypair and sweeping funds\u2026"
                   />
-                ) : stage === "saved-confirm" ? (
-                  <div className="space-y-2.5">
-                    <div className="flex items-start gap-2.5">
-                      <CheckIcon />
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-zinc-100">
-                          Your file should have downloaded
-                        </p>
-                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                          Move it somewhere safe (phone, cloud, USB). If the fund transfer fails,
-                          this file is your recovery.
-                        </p>
+                ) : stage === "sweep-failed" ? (
+                  <div className="flex items-start gap-2.5">
+                    <WarnIcon />
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-amber-400">Fund transfer failed</p>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        {errorMessage || "Couldn\u2019t move your funds to the new key."}
+                      </p>
+                      <p className="text-[11px] text-zinc-500 leading-relaxed">
+                        Your funds are safe on your old key. You can retry the transfer or proceed
+                        without moving funds.
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => void retrySweep()}
+                          className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
+                        >
+                          Retry transfer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={proceedWithoutFunds}
+                          className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                        >
+                          Proceed without
+                        </button>
                       </div>
                     </div>
-                    {chainWarning && (
-                      <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
-                        <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                          {chainWarning} Tap continue again to proceed anyway.
-                        </p>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void confirmSaved()}
-                      className="w-full bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-500/20 transition-colors"
-                    >
-                      Got it — continue
-                    </button>
                   </div>
-                ) : stage === "error" && errorStage === "saving" ? (
-                  <ErrorStep
-                    heading="Save failed"
-                    errorMessage={errorMessage}
-                    onRetry={() => void handleRetry()}
-                    onClose={onClose}
-                    partialWarning={false}
-                  />
-                ) : null}
-
-                {/* Step 2 — Creating / Sweep */}
-                {completedSteps >= 1 &&
-                  (completedSteps >= 2 && stage !== "error" && stage !== "sweep-failed" ? (
-                    <CompletedStep
-                      heading={
-                        sweepWarning
-                          ? "New key ready \u2014 transfer skipped"
-                          : COMPLETED_STEPS.creating.heading
-                      }
-                      description={
-                        sweepWarning
-                          ? "You chose to proceed without transferring funds. They\u2019re safe on your old key \u2014 use your backup file."
-                          : COMPLETED_STEPS.creating.description
-                      }
-                      variant={sweepWarning ? "warn" : undefined}
-                    />
-                  ) : stage === "creating" ? (
-                    <ActiveStep
-                      heading="Creating your new key"
-                      description="Generating a fresh keypair and sweeping funds\u2026"
-                    />
-                  ) : stage === "sweep-failed" ? (
-                    <div className="flex items-start gap-2.5">
-                      <WarnIcon />
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-amber-400">Fund transfer failed</p>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed">
-                          {errorMessage || "Couldn\u2019t move your funds to the new key."}
-                        </p>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">
-                          Your funds are safe on your old key. You can retry the transfer or proceed
-                          without moving funds.
-                        </p>
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => void retrySweep()}
-                            className="flex-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-400/15 transition-colors"
-                          >
-                            Retry transfer
-                          </button>
-                          <button
-                            type="button"
-                            onClick={proceedWithoutFunds}
-                            className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                          >
-                            Proceed without
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : stage === "error" && errorStage === "creating" ? (
+                ) : stage === "error" && errorStage === "creating" ? (
+                  <div className="space-y-2.5">
                     <ErrorStep
                       heading="Creation failed"
                       errorMessage={errorMessage}
@@ -667,11 +605,25 @@ export function MoveAddressModal({
                       onClose={onClose}
                       partialWarning={false}
                     />
-                  ) : null)}
+                    {/* Deferred pre-rotation backup — only emitted on
+                          failure so the user has a recovery file for their
+                          OLD key if they can't retry to success. Built in
+                          submitPassphrase and held in memory until needed. */}
+                    {preRotationBackupRef.current && (
+                      <button
+                        type="button"
+                        onClick={downloadPreRotationBackup}
+                        className="w-full bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        Download backup of old key
+                      </button>
+                    )}
+                  </div>
+                ) : null}
 
-                {/* Step 3 — Recording */}
-                {completedSteps >= 2 &&
-                  (completedSteps >= 3 && stage !== "error" ? (
+                {/* Step 2 — Recording (was Step 3 before saving stage removal) */}
+                {completedSteps >= 1 &&
+                  (completedSteps >= 2 && stage !== "error" ? (
                     <CompletedStep {...COMPLETED_STEPS.recording} />
                   ) : stage === "recording" ? (
                     <ActiveStep
@@ -679,13 +631,24 @@ export function MoveAddressModal({
                       description="Writing an on-chain migration record linking both addresses\u2026"
                     />
                   ) : stage === "error" && errorStage === "recording" ? (
-                    <ErrorStep
-                      heading="Recording failed"
-                      errorMessage={errorMessage}
-                      onRetry={() => void handleRetry()}
-                      onClose={onClose}
-                      partialWarning={true}
-                    />
+                    <div className="space-y-2.5">
+                      <ErrorStep
+                        heading="Recording failed"
+                        errorMessage={errorMessage}
+                        onRetry={() => void handleRetry()}
+                        onClose={onClose}
+                        partialWarning={true}
+                      />
+                      {preRotationBackupRef.current && (
+                        <button
+                          type="button"
+                          onClick={downloadPreRotationBackup}
+                          className="w-full bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                        >
+                          Download backup of old key
+                        </button>
+                      )}
+                    </div>
                   ) : null)}
 
                 {/* Done state */}
