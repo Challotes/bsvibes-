@@ -414,10 +414,11 @@ export function MoveAddressModal({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  // Backdrop is only clickable in done/sweep-failed states — protects mid-flight
-  // stages (creating, recording, etc.) from accidental dismissal that would
-  // leave the user stranded between key rotation steps.
-  const backdropDismissable = isDone || isSweepFailed;
+  // Backdrop is only clickable in sweep-failed states — protects mid-flight
+  // stages (creating, recording, etc.) from accidental dismissal. Done state
+  // is ALSO locked: user must explicitly tap Download again / Got it to leave,
+  // ensuring they engage with the safeguard reminder before exiting.
+  const backdropDismissable = isSweepFailed;
 
   return (
     <>
@@ -440,7 +441,7 @@ export function MoveAddressModal({
 
       {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop */}
       <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
-        <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[85vh] sm:min-h-0 overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-6">
+        <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[85vh] sm:min-h-0 overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div>

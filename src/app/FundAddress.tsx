@@ -36,7 +36,7 @@ export function FundAddress({ address, bootPrice, balance, onClose }: FundAddres
       {/* Modal — bottom sheet on mobile, centered on desktop */}
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
-          className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out]"
+          className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] pb-[env(safe-area-inset-bottom)] sm:pb-0"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           {/* Gold top stripe */}

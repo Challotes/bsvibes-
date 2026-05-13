@@ -92,7 +92,7 @@ export function IosStorageToast(): React.JSX.Element | null {
           <button
             type="button"
             onClick={() => setVisible(false)}
-            className="ml-auto bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-lg px-3 py-1.5 text-[12px] font-medium hover:bg-zinc-700 transition-colors"
+            className="ml-auto bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-lg px-3 py-2.5 text-[12px] font-medium hover:bg-zinc-700 transition-colors"
           >
             Got it
           </button>

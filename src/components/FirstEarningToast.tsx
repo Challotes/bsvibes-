@@ -137,14 +137,14 @@ export function FirstEarningToast({
           <button
             type="button"
             onClick={handleSaveNow}
-            className="flex-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-[12px] font-medium hover:bg-amber-500/30 transition-colors"
+            className="flex-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-2.5 text-[12px] font-medium hover:bg-amber-500/30 transition-colors"
           >
             Save now
           </button>
           <button
             type="button"
             onClick={handleLater}
-            className="flex-1 bg-transparent text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 text-[12px] font-medium hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+            className="flex-1 bg-transparent text-zinc-400 border border-zinc-700 rounded-lg px-3 py-2.5 text-[12px] font-medium hover:text-zinc-200 hover:border-zinc-500 transition-colors"
           >
             Later
           </button>

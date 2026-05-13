@@ -161,7 +161,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`group flex items-center gap-1.5 text-xs border rounded-full px-2.5 py-1 transition-all mt-1 ${
+        className={`group flex items-center gap-1.5 text-xs border rounded-full px-2.5 py-2 transition-all mt-1 ${
           highlight
             ? "text-amber-300 border-amber-500 bg-amber-500/10 scale-110 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
             : "text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 hover:bg-zinc-900"

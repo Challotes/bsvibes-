@@ -253,7 +253,7 @@ export function RestoreModal({
       {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop */}
       <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
-          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[75vh] sm:min-h-0 overflow-y-auto"
+          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[75vh] sm:min-h-0 overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />

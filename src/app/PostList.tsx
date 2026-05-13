@@ -116,7 +116,7 @@ function BootButton({
         type="button"
         onClick={handleBoot}
         disabled={anyBooting || throttled || !canBoot}
-        className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 transition-all border disabled:cursor-not-allowed ${
+        className={`relative -m-2 p-2 flex items-center gap-1 rounded-full transition-all border disabled:cursor-not-allowed ${
           isDimmed
             ? "opacity-50 text-zinc-600 border-zinc-800"
             : isThisBooting
@@ -212,7 +212,7 @@ export function PostList({
             type="button"
             onClick={onLoadEarlier}
             disabled={isLoadingMore}
-            className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-1.5 rounded border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50"
+            className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2.5 rounded border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50"
           >
             {isLoadingMore ? "Loading..." : "Load earlier posts"}
           </button>
@@ -255,7 +255,7 @@ export function PostList({
                       target="_blank"
                       rel="noopener noreferrer"
                       title="View on chain"
-                      className="inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
+                      className="relative -m-3 p-3 inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
                     >
                       <span className="sr-only">View on chain</span>
                       <svg

@@ -545,7 +545,7 @@ export function IdentityChip(): React.JSX.Element | null {
               + balance + rows) and overflows on small phones without the cap. */}
           <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
             <div
-              className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[92vh] overflow-y-auto"
+              className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
               style={{ backgroundColor: "#0f0f0f" }}
             >
               <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
@@ -554,7 +554,7 @@ export function IdentityChip(): React.JSX.Element | null {
                 <button
                   type="button"
                   onClick={closeManageModal}
-                  className="text-zinc-500 hover:text-zinc-200 transition-colors ml-3"
+                  className="relative -m-3 p-3 text-zinc-500 hover:text-zinc-200 transition-colors"
                   aria-label="Close"
                 >
                   <svg
@@ -931,7 +931,7 @@ export function IdentityChip(): React.JSX.Element | null {
             }
             setOpen((v) => !v);
           }}
-          className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
+          className="relative flex items-center gap-1.5 sm:gap-2 rounded-full bg-zinc-900 border border-zinc-800 px-2 py-2 sm:px-3 sm:py-1.5 text-xs sm:text-sm hover:border-zinc-700 transition-colors"
         >
           {/* Static protection-status dot. Hidden while the pulsing backup
               warning is visible to avoid two overlapping amber dots competing
@@ -1000,7 +1000,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       closeDropdown();
                       openManageModal();
                     }}
-                    className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                    className="relative -m-3 p-3 text-zinc-500 hover:text-zinc-200 transition-colors"
                     aria-label="Manage"
                     title="Manage"
                   >
@@ -1022,7 +1022,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   <button
                     type="button"
                     onClick={closeDropdown}
-                    className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                    className="relative -m-3 p-3 text-zinc-500 hover:text-zinc-200 transition-colors"
                     aria-label="Close"
                   >
                     <svg
@@ -1049,7 +1049,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   setAddressCopied(true);
                   setTimeout(() => setAddressCopied(false), 1500);
                 }}
-                className="flex items-center gap-1.5 ml-4 mt-1 group cursor-copy"
+                className="flex items-center gap-1.5 ml-4 mt-1 py-2 -my-2 group cursor-copy"
               >
                 <span
                   className={`text-xs font-mono ${addressCopied ? "text-emerald-400" : "text-zinc-400"} group-hover:text-zinc-200 transition-colors`}
@@ -1162,7 +1162,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       markBackedUp();
                       setJustDownloaded(false);
                     }}
-                    className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-3 py-1 text-[11px] font-medium hover:bg-emerald-500/30 transition-colors"
+                    className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg px-3 py-2 text-[11px] font-medium hover:bg-emerald-500/30 transition-colors"
                   >
                     Got it
                   </button>
@@ -1229,7 +1229,7 @@ export function IdentityChip(): React.JSX.Element | null {
                     e.stopPropagation();
                     toggleCurrency();
                   }}
-                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-amber-400/25 text-zinc-300 hover:text-white hover:border-amber-400/50 hover:bg-amber-400/5 transition-colors"
+                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-full border border-amber-400/25 text-zinc-300 hover:text-white hover:border-amber-400/50 hover:bg-amber-400/5 transition-colors"
                   title={isGoat ? "Switch to dollar mode" : "Switch to sats mode"}
                 >
                   {isGoat ? <span>🐐 Goat</span> : <span>💵 Noob</span>}
@@ -1238,7 +1238,7 @@ export function IdentityChip(): React.JSX.Element | null {
               <button
                 type="button"
                 onClick={() => setChartExpanded((v) => !v)}
-                className="w-full flex items-center justify-end gap-1 group"
+                className="w-full flex items-center justify-end gap-1 group py-2 -my-1"
               >
                 <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
                   {chartExpanded ? "Hide chart" : "Show chart"}
@@ -1278,7 +1278,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   <button
                     type="button"
                     onClick={() => setActivityExpanded((v) => !v)}
-                    className="text-[11px] text-zinc-100 font-medium underline underline-offset-2 decoration-zinc-600 hover:decoration-zinc-400 transition-colors"
+                    className="relative -my-2 py-2 text-[11px] text-zinc-100 font-medium underline underline-offset-2 decoration-zinc-600 hover:decoration-zinc-400 transition-colors"
                   >
                     {activityExpanded ? "Show less" : `View all ${activity.length}`}
                   </button>
@@ -1355,7 +1355,7 @@ export function IdentityChip(): React.JSX.Element | null {
                       closeDropdown();
                       setShowDeposit(true);
                     }}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 underline-offset-2 hover:underline transition-colors"
+                    className="relative -my-2 py-2 text-[11px] text-amber-400 hover:text-amber-300 underline-offset-2 hover:underline transition-colors"
                   >
                     Add funds
                   </button>

@@ -102,7 +102,7 @@ export function SignInModal(): React.JSX.Element | null {
       <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
           key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
-          className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto ${
+          className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 ${
             shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : "animate-[slideUp_0.3s_ease-out]"
           }`}
           style={{ backgroundColor: "#0f0f0f" }}

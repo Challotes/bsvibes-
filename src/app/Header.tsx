@@ -38,7 +38,7 @@ export function Header({
               <button
                 type="button"
                 onClick={onScrollToGenesis}
-                className="hover:text-amber-400 transition-colors"
+                className="relative -m-3 p-3 hover:text-amber-400 transition-colors"
                 title="Back to Genesis"
               >
                 <svg
@@ -62,7 +62,7 @@ export function Header({
               <button
                 type="button"
                 onClick={onScrollToGenesis}
-                className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-2 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-zinc-800 border border-zinc-700 px-2 py-2 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-zinc-400 shadow-lg hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
               >
                 <svg
                   width="12"

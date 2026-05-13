@@ -160,7 +160,7 @@ function renderContent(
         <button
           type="button"
           onClick={handleInstallTap}
-          className="bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1 text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
+          className="bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
         >
           Install
         </button>

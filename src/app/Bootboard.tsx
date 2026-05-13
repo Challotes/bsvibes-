@@ -61,7 +61,7 @@ function HistoryRow({
         type="button"
         onClick={handleReboot}
         disabled={isBlocked}
-        className={`shrink-0 flex items-center rounded-full px-1 py-0.5 transition-all disabled:cursor-not-allowed border ${
+        className={`relative -m-2 p-2 shrink-0 flex items-center rounded-full transition-all disabled:cursor-not-allowed border ${
           isThisBooting
             ? "text-amber-400 border-amber-500/40"
             : isBlocked
@@ -177,7 +177,7 @@ export function Bootboard({
                 type="button"
                 onClick={() => setExpanded(!expanded)}
                 aria-label={expanded ? "Collapse history" : "Expand history"}
-                className="text-zinc-600 hover:text-zinc-400 transition-colors ml-1"
+                className="relative -m-3 p-3 text-zinc-600 hover:text-zinc-400 transition-colors"
               >
                 <svg
                   width="12"
