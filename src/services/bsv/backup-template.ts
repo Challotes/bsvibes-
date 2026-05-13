@@ -190,7 +190,13 @@ export function generateBackupHtml(data: BackupData): string {
         "    <!-- Encrypted recovery file: passphrase required -->",
         "    <noscript>",
         '      <div class="noscript-banner">',
-        "        <strong>JavaScript is required to unlock this file.</strong> You're previewing this in a viewer that doesn't run JavaScript (e.g. iOS Files, Mail preview, AirDrop preview, macOS Finder Quick Look). Open it in Safari, Chrome, or Firefox to enter your passphrase and reveal your secret key.",
+        "        <strong>Your keys are safe &mdash; but this preview can't decrypt them.</strong>",
+        "        <p>Apple's file preview can't run the code this file needs for decryption. Your recovery key is still securely encrypted with your passphrase.</p>",
+        "        <p><strong>Two ways to access it:</strong></p>",
+        "        <ul>",
+        "          <li><strong>From the BSVibes app:</strong> Open the You menu and tap <em>Restore key from file</em> &mdash; decryption happens inside the app itself.</li>",
+        "          <li><strong>From a browser:</strong> Open this file in Safari, Chrome, or Firefox on any Mac or PC to enter your passphrase and view your recovery key directly.</li>",
+        "        </ul>",
         "      </div>",
         "    </noscript>",
         '    <div class="card" id="decrypt-section">',
@@ -199,7 +205,7 @@ export function generateBackupHtml(data: BackupData): string {
           : "",
         '      <label for="passphrase-input">Enter your passphrase to unlock your secret key</label>',
         '      <input type="password" id="passphrase-input" placeholder="Your passphrase" autocomplete="current-password" />',
-        '      <button class="primary" id="decrypt-btn" onclick="handleDecrypt()">Decrypt</button>',
+        '      <button class="primary" id="decrypt-btn" onclick="handleDecrypt()">Decrypt all</button>',
         "    </div>",
         "",
         '    <div id="spinner" class="spinner"></div>',
@@ -221,13 +227,6 @@ export function generateBackupHtml(data: BackupData): string {
         wifWarningHtml(false),
         "      </div>",
         '      <div id="wif-old-block" style="display:none">',
-        '        <div class="address-section">',
-        '          <div class="address-label">Previous public address</div>',
-        '          <div class="address-row">',
-        '            <code class="address-value" id="addr-old"></code>',
-        '            <button class="copy-btn" onclick="copyText(\'addr-old\', this)">&#128203; Copy</button>',
-        "          </div>",
-        "        </div>",
         '        <div class="wif-block">',
         '          <div class="wif-label">Previous secret key</div>',
         '          <div class="wif-value" id="wif-old"></div>',
@@ -298,7 +297,7 @@ export function generateBackupHtml(data: BackupData): string {
         "    function setLoading(on) {",
         "      const btn = document.getElementById('decrypt-btn');",
         "      const spinner = document.getElementById('spinner');",
-        "      btn.disabled = on; btn.textContent = on ? 'Decrypting…' : 'Decrypt';",
+        "      btn.disabled = on; btn.textContent = on ? 'Decrypting…' : 'Decrypt all';",
         "      spinner.style.display = on ? 'block' : 'none';",
         "    }",
         "",
@@ -311,8 +310,6 @@ export function generateBackupHtml(data: BackupData): string {
         "      const ob = document.getElementById('wif-old-block');",
         "      if (old) {",
         "        document.getElementById('wif-old').textContent = old;",
-        "        const addrOldEl = document.getElementById('addr-old');",
-        "        if (addrOldEl) addrOldEl.textContent = BACKUP_DATA.oldAddress || '';",
         "        ob.style.display = 'block';",
         "      } else {",
         "        ob.style.display = 'none';",
@@ -380,6 +377,10 @@ export function generateBackupHtml(data: BackupData): string {
     "      font-size: 13px; color: #d4d4d8; line-height: 1.55;\n" +
     "    }\n" +
     "    .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 24px; margin-bottom: 14px; }\n" +
+    "    .card-current { background: linear-gradient(135deg, #1a1200 0%, #18181b 60%); border: 1px solid #b45309; border-radius: 12px; padding: 24px; margin-bottom: 12px; }\n" +
+    "    .card-previous { background: #18181b; border: 1px solid #3f3f46; border-radius: 12px; padding: 20px; margin-bottom: 14px; opacity: 0.85; }\n" +
+    "    .card-tagline { color: #d4d4d8; font-size: 13px; margin-top: 12px; line-height: 1.5; }\n" +
+    "    .card-tagline-muted { color: #a1a1aa; font-size: 12px; margin-top: 10px; line-height: 1.5; }\n" +
     "    .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; gap: 12px; }\n" +
     "    .meta-row.with-copy { align-items: center; }\n" +
     "    .meta-label { color: #71717a; flex-shrink: 0; }\n" +
@@ -462,23 +463,53 @@ export function generateBackupHtml(data: BackupData): string {
     '    <p class="subtitle">Keep this file somewhere only you can find it.</p>\n' +
     '    <div class="badge-wrap"><div class="offline-badge">Works offline — no network calls</div></div>\n' +
     "\n" +
-    '    <div class="card">\n' +
-    '      <div class="meta-row">\n' +
-    '        <span class="meta-label">Name</span>\n' +
-    `        <span class="meta-value name">${escapeHtml(data.name)}</span>\n` +
-    "      </div>\n" +
-    '      <div class="meta-row with-copy">\n' +
-    '        <span class="meta-label">' +
-    addressLabel +
-    "</span>\n" +
-    `        <span class="meta-value" id="meta-address">${escapeHtml(data.address)}</span>\n` +
-    '        <button class="meta-copy-btn" onclick="copyText(\'meta-address\', this)">Copy</button>\n' +
-    "      </div>\n" +
-    '      <div class="meta-row">\n' +
-    '        <span class="meta-label">Saved</span>\n' +
-    `        <span class="meta-value">${escapeHtml(savedDate)}</span>\n` +
-    "      </div>\n" +
-    "    </div>\n" +
+    // For combined files (rotation with data.oldAddress), use the prominent
+    // "current key" container and add a second muted "previous key" container.
+    // For all other files, use the standard card. Per D3 design from agent.
+    (data.oldAddress
+      ? '    <div class="card-current">\n' +
+        '      <div class="meta-row">\n' +
+        '        <span class="meta-label">Name</span>\n' +
+        `        <span class="meta-value name">${escapeHtml(data.name)}</span>\n` +
+        "      </div>\n" +
+        '      <div class="meta-row with-copy">\n' +
+        '        <span class="meta-label">' +
+        addressLabel +
+        "</span>\n" +
+        `        <span class="meta-value" id="meta-address">${escapeHtml(data.address)}</span>\n` +
+        '        <button class="meta-copy-btn" onclick="copyText(\'meta-address\', this)">Copy</button>\n' +
+        "      </div>\n" +
+        '      <div class="meta-row">\n' +
+        '        <span class="meta-label">Saved</span>\n' +
+        `        <span class="meta-value">${escapeHtml(savedDate)}</span>\n` +
+        "      </div>\n" +
+        '      <p class="card-tagline">Use this key to access your account.</p>\n' +
+        "    </div>\n" +
+        '    <div class="card-previous">\n' +
+        '      <div class="meta-row with-copy">\n' +
+        '        <span class="meta-label">Previous address</span>\n' +
+        `        <span class="meta-value" id="meta-old-address">${escapeHtml(data.oldAddress)}</span>\n` +
+        '        <button class="meta-copy-btn" onclick="copyText(\'meta-old-address\', this)">Copy</button>\n' +
+        "      </div>\n" +
+        '      <p class="card-tagline-muted">Your previous key &mdash; here in case any funds were in transit during the move.</p>\n' +
+        "    </div>\n"
+      : '    <div class="card">\n' +
+        '      <div class="meta-row">\n' +
+        '        <span class="meta-label">Name</span>\n' +
+        `        <span class="meta-value name">${escapeHtml(data.name)}</span>\n` +
+        "      </div>\n" +
+        '      <div class="meta-row with-copy">\n' +
+        '        <span class="meta-label">' +
+        addressLabel +
+        "</span>\n" +
+        `        <span class="meta-value" id="meta-address">${escapeHtml(data.address)}</span>\n` +
+        '        <button class="meta-copy-btn" onclick="copyText(\'meta-address\', this)">Copy</button>\n' +
+        "      </div>\n" +
+        '      <div class="meta-row">\n' +
+        '        <span class="meta-label">Saved</span>\n' +
+        `        <span class="meta-value">${escapeHtml(savedDate)}</span>\n` +
+        "      </div>\n" +
+        "    </div>\n") +
     "\n" +
     '    <div class="context-block">' +
     escapeHtml(contextBlockText()) +
