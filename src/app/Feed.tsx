@@ -162,6 +162,21 @@ function FeedContent({
     scrollToGenesis,
   } = useScrollTracker({ postCount: serverPosts.length, postIds });
 
+  // iOS Safari scroll-compositor warmup. iOS's auto-scroll-into-view (which
+  // brings the focused textarea above the soft keyboard) skips its
+  // scroll-target search if the page has never had a real scroll event.
+  // Without this, tapping the share-idea textarea WITHOUT first scrolling
+  // the feed leaves the textarea hidden behind the keyboard — the
+  // "scroll-first works, tap-only fails" reproducer. Performing a
+  // 1px scroll-and-revert on mount wakes the compositor invisibly so
+  // every textarea tap from then on triggers iOS's keyboard adjustment.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy(0, 1);
+    el.scrollBy(0, -1);
+  }, [scrollRef]);
+
   const handleAskAgent = useCallback(() => {
     scrollToBottom();
     setAgentHighlight(true);
