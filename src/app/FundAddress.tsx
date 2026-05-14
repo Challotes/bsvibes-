@@ -2,7 +2,6 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
-import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 
 interface FundAddressProps {
   address: string;
@@ -13,7 +12,6 @@ interface FundAddressProps {
 
 export function FundAddress({ address, bootPrice, balance, onClose }: FundAddressProps) {
   const [copied, setCopied] = useState(false);
-  const kbd = useKeyboardOffset();
 
   function handleCopy() {
     navigator.clipboard.writeText(address);
@@ -35,14 +33,11 @@ export function FundAddress({ address, bootPrice, balance, onClose }: FundAddres
         onClick={onClose}
       />
 
-      {/* Modal — centered. No keyboard input here, but shared layout for
-          consistency with the other modals. */}
-      <div
-        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
-        style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
-      >
+      {/* Modal — pinned to top of viewport (iOS-native pattern, shared
+          with the other modals for visual consistency). */}
+      <div className="fixed inset-0 z-[60] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
         <div
-          className="w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto"
+          className="w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[80vh] overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           {/* Gold top stripe */}

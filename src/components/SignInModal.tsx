@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { getStoredHint } from "@/services/bsv/backup-template";
 import { unlockIdentity } from "@/services/bsv/identity";
 
@@ -25,7 +24,6 @@ export function SignInModal(): React.JSX.Element | null {
   const [hintRevealed, setHintRevealed] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const kbd = useKeyboardOffset();
 
   // Load hint and autofocus on open
   useEffect(() => {
@@ -102,16 +100,16 @@ export function SignInModal(): React.JSX.Element | null {
         onClick={closeSignIn}
       />
 
-      {/* Modal — centered. Wrapper stays inset-0; padding-bottom inflates
-          smoothly with the iOS keyboard so items-center re-centers the
-          card without snap. */}
-      <div
-        className="fixed inset-0 z-[80] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
-        style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
-      >
+      {/* Modal — pinned to top of viewport (iOS-native pattern, same as
+          Mail/Messages/Notes/1Password auth sheets). The modal does NOT
+          track the keyboard; it sits high enough that the keyboard
+          slides up beneath it without overlap. iOS auto-scroll-into-view
+          never triggers because the input is already above the keyboard
+          zone. */}
+      <div className="fixed inset-0 z-[80] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
         <div
           key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
-          className={`w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto ${
+          className={`w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto max-h-[80vh] overflow-y-auto ${
             shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : "animate-[slideUp_0.3s_ease-out]"
           }`}
           style={{ backgroundColor: "#0f0f0f" }}

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
-import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, unlockIdentity, upgradeIdentity } from "@/services/bsv/identity";
@@ -39,7 +38,6 @@ export function ChangePassphraseModal({
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [chainWarning, setChainWarning] = useState(false);
-  const kbd = useKeyboardOffset();
 
   function handleClose() {
     setStep(preVerifiedPassphrase ? "newpass" : "verify");
@@ -183,14 +181,11 @@ export function ChangePassphraseModal({
         onClick={handleClose}
       />
 
-      {/* Modal — centered. Wrapper padding-bottom inflates with the iOS
-          keyboard so items-center re-centers smoothly. */}
-      <div
-        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
-        style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
-      >
+      {/* Modal — pinned to top of viewport (iOS-native pattern). Does
+          NOT track the keyboard; sits above where it slides up. */}
+      <div className="fixed inset-0 z-[60] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
         <div
-          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-2xl overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[220px] max-h-[calc(100dvh-3rem)] flex flex-col overflow-y-auto"
+          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-2xl overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[80vh] flex flex-col overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />

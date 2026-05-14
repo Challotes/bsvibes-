@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
-import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, sweepFunds, upgradeIdentity } from "@/services/bsv/identity";
@@ -154,8 +153,6 @@ export function MoveAddressModal({
   // safety net when they actually need it. In the happy path, the final
   // combined recovery file at done-state supersedes this entirely.
   const preRotationBackupRef = useRef<BackupData | null>(null);
-
-  const kbd = useKeyboardOffset();
 
   // ── Stage runners ──────────────────────────────────────────────────────────
 
@@ -427,13 +424,9 @@ export function MoveAddressModal({
         />
       )}
 
-      {/* Modal — centered. Padding-bottom inflates with the iOS keyboard
-          during passphrase stage. */}
-      <div
-        className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
-        style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
-      >
-        <div className="w-full max-w-md rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-5">
+      {/* Modal — pinned to top of viewport (iOS-native pattern). */}
+      <div className="fixed inset-0 z-[70] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
+        <div className="w-full max-w-md rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl max-h-[80vh] overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-5">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div>
