@@ -258,6 +258,16 @@ export function PostForm({
         recognition.start();
       } catch (e) {
         isStartingRef.current = false;
+        // Abort the orphan instance before nulling the ref. Without this,
+        // the addEventListener("start") handler attached above could still
+        // fire if iOS retroactively starts the orphan — flipping isListening
+        // true with a null recognitionRef. abort() definitively halts it
+        // and clears all listeners on the instance.
+        try {
+          recognition.abort();
+        } catch {
+          /* abort on a never-started instance is a no-op per spec */
+        }
         recognitionRef.current = null;
         // iOS throws InvalidStateError if start() is called while already
         // running. Treat as a no-op (the existing instance keeps listening).
