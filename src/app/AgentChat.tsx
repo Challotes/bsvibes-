@@ -154,6 +154,9 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
     e.preventDefault();
     if (!input.trim() || isStreaming) return;
     ask(input.trim());
+    // Dismiss the iOS keyboard after sending — chat UX wants the user
+    // reading the streaming reply, not staring at a focused input.
+    inputRef.current?.blur();
   }
 
   if (!open) {
@@ -298,6 +301,10 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               }}
               placeholder={isStreaming ? "Thinking..." : "Ask something..."}
               disabled={isStreaming}
+              enterKeyHint="send"
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              autoComplete="off"
               className="w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
             />
           </div>

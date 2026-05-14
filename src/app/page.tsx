@@ -7,7 +7,7 @@ export default async function Home() {
   const [posts, bootboard] = await Promise.all([getPosts(), getBootboard()]);
 
   return (
-    <div className="h-screen bg-black text-white overflow-hidden">
+    <div className="h-[100dvh] bg-black text-white overflow-hidden">
       <Feed posts={posts} bootboard={bootboard} />
     </div>
   );
