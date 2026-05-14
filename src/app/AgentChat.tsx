@@ -206,10 +206,14 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
         onClick={() => setOpen(false)}
       />
 
-      {/* Modal */}
+      {/* Modal — bottom-sheet on mobile, centered on desktop. The card is
+          flex-col with max-h capped so the messages list compresses when the
+          iOS keyboard opens, keeping the input row visible above the keyboard.
+          Without this, h-[60vh] on messages stayed fixed, squeezing the input
+          off-screen when the layout viewport shrank. */}
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
         <div
-          className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] shadow-2xl"
+          className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] shadow-2xl flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-label="BSVibes Agent"
@@ -217,7 +221,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           onKeyDown={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
               <span className="text-sm font-medium text-zinc-300">BSVibes Agent</span>
@@ -239,11 +243,14 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
             </button>
           </div>
 
-          {/* Messages */}
+          {/* Messages — flex-1 min-h-0 so it compresses when keyboard
+              shrinks the layout viewport (interactive-widget=resizes-content),
+              keeping the input row visible. min-h-0 is critical: without it
+              the flex child refuses to shrink below content height. */}
           <div
             ref={messagesContainerRef}
             onScroll={handleUserScroll}
-            className="h-[60vh] sm:h-[450px] overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
+            className="flex-1 min-h-0 sm:h-[450px] sm:flex-none overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
             style={{ scrollbarWidth: "none" }}
           >
             {messages.map((msg) => (
@@ -270,7 +277,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
 
           {/* Suggested questions */}
           {messages.length <= 1 && (
-            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+            <div className="shrink-0 px-4 pb-3 flex flex-wrap gap-1.5">
               {SUGGESTED.map((q) => (
                 <button
                   key={q}
@@ -286,7 +293,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           )}
 
           {/* Input */}
-          <div className="border-t border-zinc-800 px-4 py-3">
+          <div className="shrink-0 border-t border-zinc-800 px-4 py-3">
             <input
               ref={inputRef}
               type="text"
@@ -315,7 +322,7 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               half-opacity divider so it reads as a footer tier subordinate
               to the input row above. Safe-area padding so the link doesn't
               sit on the iOS home indicator on bottom-sheet display. */}
-          <div className="border-t border-zinc-800/50 px-4 py-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-3.5 flex justify-center">
+          <div className="shrink-0 border-t border-zinc-800/50 px-4 py-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-3.5 flex justify-center">
             <a
               href="https://github.com/Challotes/bsvibes-"
               target="_blank"

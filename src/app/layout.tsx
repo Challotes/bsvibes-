@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Caveat, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,17 @@ const caveat = Caveat({
   variable: "--font-caveat",
   subsets: ["latin"],
 });
+
+// Use Next.js Viewport API (canonical) so Next.js doesn't inject a
+// competing default viewport meta tag. `interactiveWidget` only works
+// on iOS Safari 16.4+; older versions silently fall back to default.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#f59e0b",
+};
 
 export const metadata: Metadata = {
   title: "BSVibes — A platform that builds itself",
@@ -45,11 +56,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
-        />
-        <meta name="theme-color" content="#f59e0b" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body
