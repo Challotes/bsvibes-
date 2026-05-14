@@ -570,7 +570,7 @@ export function IdentityChip(): React.JSX.Element | null {
               the content scroll inside the card. Padding-bottom inflates
               with the iOS keyboard during locked-state passphrase entry. */}
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-200 ease-out"
+            className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none"
             style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
           >
             <div

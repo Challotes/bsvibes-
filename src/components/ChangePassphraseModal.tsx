@@ -186,7 +186,7 @@ export function ChangePassphraseModal({
       {/* Modal — centered. Wrapper padding-bottom inflates with the iOS
           keyboard so items-center re-centers smoothly. */}
       <div
-        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-200 ease-out"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none"
         style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
       >
         <div

@@ -38,7 +38,7 @@ export function FundAddress({ address, bootPrice, balance, onClose }: FundAddres
       {/* Modal — centered. No keyboard input here, but shared layout for
           consistency with the other modals. */}
       <div
-        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-200 ease-out"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-6 pointer-events-none"
         style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
       >
         <div
