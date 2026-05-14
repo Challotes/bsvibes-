@@ -430,7 +430,7 @@ export function MoveAddressModal({
       {/* Modal — centered. Padding-bottom inflates with the iOS keyboard
           during passphrase stage. */}
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
         style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
       >
         <div className="w-full max-w-md rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-5">

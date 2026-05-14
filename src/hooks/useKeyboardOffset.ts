@@ -3,45 +3,42 @@
 import { useEffect, useState } from "react";
 
 /**
- * Returns the iOS soft-keyboard height in pixels (0 when closed). Reads
- * `window.visualViewport` — the only reliable signal on iOS Safari, since
- * `100dvh` does NOT respond to keyboard open/close, only to browser chrome.
+ * Returns the iOS soft-keyboard height in pixels (0 when closed).
  *
- * The recommended usage is wrapper `padding-bottom` inflation (NOT wrapper
- * resize). The wrapper stays `fixed inset-0` and only its padding-bottom
- * grows when the keyboard opens — `items-center` then re-centers the
- * content via the snap. iOS already animates the keyboard slide; we
- * deliberately do NOT add a CSS transition because that fights iOS's
- * native animation and produces visible lurching.
+ * DEBOUNCED: the actual state update fires ~280ms after the LAST
+ * visualViewport `resize` event. This is the critical design choice.
+ *
+ * Why debounce instead of reactive tracking:
+ *
+ * iOS Safari fires a stream of `resize` events during the keyboard's
+ * ~250-300ms native slide animation. Every reactive update during that
+ * window causes our React render to reposition the modal — items-center
+ * recomputes against the new available space, and the card jumps to a
+ * new pixel position. Across the animation the user sees 2-3 rapid
+ * positional jumps. Throttling, deadbands, and CSS transitions all fail
+ * to eliminate this because the underlying state changes are large
+ * enough (0 → 336px) to break any reasonable filter.
+ *
+ * By debouncing, we update state EXACTLY ONCE, after the keyboard has
+ * settled. The user sees the modal sit still during the keyboard slide
+ * (iOS handles its own animation), then snap into position 280ms after
+ * the slide ends. With a short CSS transition on the wrapper's
+ * padding-bottom, that single snap becomes a quick eased move — no
+ * jump cascade.
+ *
+ * 280ms timing rationale: iOS keyboard slide is ~250ms; we want to fire
+ * slightly after that completes, but not so late the user perceives lag.
  *
  *   const kbd = useKeyboardOffset();
  *   <div
- *     className="fixed inset-0 ... p-6"
+ *     className="fixed inset-0 ... p-6 transition-[padding] duration-150 ease-out"
  *     style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
  *   >
  *
- * Reading details:
- *
- * - Baseline is `document.documentElement.clientHeight`, not
- *   `window.innerHeight`. The latter fluctuates with Safari's URL bar;
- *   the former is stable across browser-chrome transitions in both
- *   Safari (URL bar at bottom) and PWA (no URL bar).
- *
- * - Listens ONLY to the `resize` event, NOT `scroll`. The scroll event
- *   fires 10-15 times during a single keyboard-open animation as iOS
- *   auto-scrolls the focused input into view — listening would cause
- *   re-render storms and visible jank.
- *
- * - Asymmetric deadband: when the keyboard is closed (height ≤ 100px) we
- *   apply tighter throttling (50px) so the initial keyboard-open event
- *   fires. When the keyboard is already open (height > 100px) we apply a
- *   wider deadband (60px) to ignore the iOS QuickType predictions bar
- *   that appears/disappears mid-typing — its ~44-50px height swing would
- *   otherwise visibly shift the modal as the user types.
- *
- * - Initial spurious values during page-load reflow are filtered: any
- *   reading where the implied keyboard exceeds 60% of the screen is
- *   ignored (no real keyboard ever occupies that much).
+ * Baseline uses `document.documentElement.clientHeight` (stable across
+ * Safari URL bar transitions) rather than `window.innerHeight` (which
+ * fluctuates). Spurious values where the implied keyboard exceeds 60%
+ * of screen are ignored (no real keyboard ever occupies that much).
  */
 export function useKeyboardOffset(): number {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -49,25 +46,26 @@ export function useKeyboardOffset(): number {
   useEffect(() => {
     if (typeof window === "undefined" || !window.visualViewport) return;
     const vvp = window.visualViewport;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    function update() {
+    function commit() {
+      timer = null;
       const screenHeight = document.documentElement.clientHeight;
       const next = Math.max(0, screenHeight - vvp.height);
-
-      // Ignore obvious garbage values from page-load reflow.
       if (next > screenHeight * 0.6) return;
-
-      setKeyboardHeight((prev) => {
-        // Asymmetric deadband: tighter when closing in on open, wider
-        // once open to suppress predictions-bar oscillation.
-        const threshold = prev > 100 ? 60 : 50;
-        return Math.abs(prev - next) < threshold ? prev : next;
-      });
+      setKeyboardHeight(next);
     }
 
-    update();
+    function update() {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(commit, 280);
+    }
+
+    // Initial read fires immediately (no need to debounce a stable value).
+    commit();
     vvp.addEventListener("resize", update);
     return () => {
+      if (timer !== null) clearTimeout(timer);
       vvp.removeEventListener("resize", update);
     };
   }, []);

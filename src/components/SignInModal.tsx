@@ -106,7 +106,7 @@ export function SignInModal(): React.JSX.Element | null {
           smoothly with the iOS keyboard so items-center re-centers the
           card without snap. */}
       <div
-        className="fixed inset-0 z-[80] flex items-center justify-center p-6 pointer-events-none"
+        className="fixed inset-0 z-[80] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
         style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
       >
         <div

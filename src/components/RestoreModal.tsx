@@ -254,7 +254,7 @@ export function RestoreModal({
 
       {/* Modal — centered. Padding-bottom inflates with the iOS keyboard. */}
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none transition-[padding] duration-150 ease-out"
         style={{ paddingBottom: `calc(1.5rem + ${kbd}px)` }}
       >
         <div
