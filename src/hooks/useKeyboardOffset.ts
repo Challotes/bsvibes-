@@ -5,29 +5,41 @@ import { useEffect, useState } from "react";
 /**
  * Returns the iOS soft-keyboard height in pixels (0 when closed).
  *
- * DEBOUNCED: the actual state update fires ~280ms after the LAST
- * visualViewport `resize` event. This is the critical design choice.
+ * The hook commits state changes ONLY on true open↔closed transitions —
+ * intermediate height changes (QuickType predictions bar appearing,
+ * mid-animation samples) are ignored once the keyboard is already open.
+ * Result: the modal moves at most TWICE — once when the keyboard opens,
+ * once when it closes. No mid-typing jiggles, no multi-step settles.
  *
- * Why debounce instead of reactive tracking:
+ * Why this matters:
  *
- * iOS Safari fires a stream of `resize` events during the keyboard's
- * ~250-300ms native slide animation. Every reactive update during that
- * window causes our React render to reposition the modal — items-center
- * recomputes against the new available space, and the card jumps to a
- * new pixel position. Across the animation the user sees 2-3 rapid
- * positional jumps. Throttling, deadbands, and CSS transitions all fail
- * to eliminate this because the underlying state changes are large
- * enough (0 → 336px) to break any reasonable filter.
+ * iOS fires visualViewport `resize` events at multiple distinct moments,
+ * not just the keyboard slide:
+ *   - During the keyboard's ~250ms slide-up animation (~3 events)
+ *   - When the QuickType predictions bar appears (~400ms after slide,
+ *     +44px to keyboard height)
+ *   - As predictions bar updates while user types
+ *   - During the keyboard's retract animation
  *
- * By debouncing, we update state EXACTLY ONCE, after the keyboard has
- * settled. The user sees the modal sit still during the keyboard slide
- * (iOS handles its own animation), then snap into position 280ms after
- * the slide ends. With a short CSS transition on the wrapper's
- * padding-bottom, that single snap becomes a quick eased move — no
- * jump cascade.
+ * A naive reactive hook (or a simple debounce) commits state on each
+ * settle between events — producing multiple visible modal jumps. We
+ * saw exactly this in user testing: "3 jumps up after keyboard opens,
+ * 2 more when closing."
  *
- * 280ms timing rationale: iOS keyboard slide is ~250ms; we want to fire
- * slightly after that completes, but not so late the user perceives lag.
+ * The lock-once-open pattern eliminates all but the open and close
+ * commits. The captured open height is whatever iOS reports first after
+ * the debounce window — typically the full keyboard height (since the
+ * debounce waits for the slide to complete). Once committed, further
+ * height changes (QuickType bar, autocomplete strip, etc.) are
+ * suppressed until the keyboard truly retracts (vvp.height returns to
+ * near screen height).
+ *
+ * Debounce timing:
+ *
+ * `commit()` fires ~280ms after the LAST `resize` event. iOS's keyboard
+ * slide is ~250ms; firing slightly after ensures we read the settled
+ * vvp.height, not a mid-animation sample. The debounce also coalesces
+ * the burst of events that fires during the slide into a single commit.
  *
  *   const kbd = useKeyboardOffset();
  *   <div
@@ -38,7 +50,11 @@ import { useEffect, useState } from "react";
  * Baseline uses `document.documentElement.clientHeight` (stable across
  * Safari URL bar transitions) rather than `window.innerHeight` (which
  * fluctuates). Spurious values where the implied keyboard exceeds 60%
- * of screen are ignored (no real keyboard ever occupies that much).
+ * of screen are ignored.
+ *
+ * Threshold (100px): keyboards are always ≥ ~250px tall on iOS; anything
+ * below 100px is browser chrome flicker (URL bar transitions, etc.),
+ * not a real keyboard.
  */
 export function useKeyboardOffset(): number {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -53,7 +69,16 @@ export function useKeyboardOffset(): number {
       const screenHeight = document.documentElement.clientHeight;
       const next = Math.max(0, screenHeight - vvp.height);
       if (next > screenHeight * 0.6) return;
-      setKeyboardHeight(next);
+
+      setKeyboardHeight((prev) => {
+        const wasOpen = prev > 100;
+        const isOpen = next > 100;
+        // Same open/closed state — don't update. Locks out the QuickType
+        // bar and mid-animation samples while keyboard is open.
+        if (wasOpen === isOpen) return prev;
+        // True transition (closed → open OR open → closed). Commit.
+        return next;
+      });
     }
 
     function update() {
@@ -61,7 +86,6 @@ export function useKeyboardOffset(): number {
       timer = setTimeout(commit, 280);
     }
 
-    // Initial read fires immediately (no need to debounce a stable value).
     commit();
     vvp.addEventListener("resize", update);
     return () => {
