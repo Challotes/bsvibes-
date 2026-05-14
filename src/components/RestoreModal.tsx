@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
-import { useKeyboardOffset } from "@/hooks/useVisualViewport";
+import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
 import { importIdentity, signPost } from "@/services/bsv/identity";

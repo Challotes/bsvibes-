@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
-import { useKeyboardOffset } from "@/hooks/useVisualViewport";
+import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 
 interface FundAddressProps {
   address: string;

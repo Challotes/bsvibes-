@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-import { useKeyboardOffset } from "@/hooks/useVisualViewport";
+import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { getStoredHint } from "@/services/bsv/backup-template";
 import { unlockIdentity } from "@/services/bsv/identity";
 

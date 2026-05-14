@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
-import { useKeyboardOffset } from "@/hooks/useVisualViewport";
+import { useKeyboardOffset } from "@/hooks/useKeyboardOffset";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, unlockIdentity, upgradeIdentity } from "@/services/bsv/identity";
