@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, sweepFunds, upgradeIdentity } from "@/services/bsv/identity";
@@ -153,6 +154,8 @@ export function MoveAddressModal({
   // safety net when they actually need it. In the happy path, the final
   // combined recovery file at done-state supersedes this entirely.
   const preRotationBackupRef = useRef<BackupData | null>(null);
+
+  const vvp = useVisualViewport();
 
   // ── Stage runners ──────────────────────────────────────────────────────────
 
@@ -424,9 +427,13 @@ export function MoveAddressModal({
         />
       )}
 
-      {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop */}
-      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
-        <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[85vh] sm:min-h-0 overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
+      {/* Modal — centered, visualViewport-driven height so passphrase entry
+          stays above the iOS keyboard. */}
+      <div
+        className="fixed left-0 right-0 z-[70] flex items-center justify-center p-6 pointer-events-none"
+        style={vvp ? { top: vvp.offsetTop, height: vvp.height } : { top: 0, height: "100dvh" }}
+      >
+        <div className="w-full max-w-md rounded-2xl bg-[#0f0f0f] border border-amber-400/20 shadow-2xl min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto pointer-events-auto animate-[slideUp_0.3s_ease-out] p-5">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div>

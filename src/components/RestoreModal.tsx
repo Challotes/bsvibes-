@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
 import { importIdentity, signPost } from "@/services/bsv/identity";
@@ -39,6 +40,7 @@ export function RestoreModal({
   const [pendingRestoreName, setPendingRestoreName] = useState<string | undefined>(undefined);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const vvp = useVisualViewport();
 
   function handleClose() {
     setImportError("");
@@ -250,10 +252,13 @@ export function RestoreModal({
         onClick={handleClose}
       />
 
-      {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop */}
-      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+      {/* Modal — centered, visualViewport-driven height. */}
+      <div
+        className="fixed left-0 right-0 z-[70] flex items-center justify-center p-6 pointer-events-none"
+        style={vvp ? { top: vvp.offsetTop, height: vvp.height } : { top: 0, height: "100dvh" }}
+      >
         <div
-          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[75vh] sm:min-h-0 overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
+          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
@@ -289,7 +294,7 @@ export function RestoreModal({
           </div>
 
           {/* Body */}
-          <div className="px-4 py-4 space-y-3">
+          <div className="px-5 py-5 space-y-3">
             <p className="text-[11px] text-red-400 leading-relaxed">
               Your current recovery file will be saved first.
             </p>

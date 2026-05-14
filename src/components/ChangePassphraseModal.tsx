@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, unlockIdentity, upgradeIdentity } from "@/services/bsv/identity";
@@ -38,6 +39,7 @@ export function ChangePassphraseModal({
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [chainWarning, setChainWarning] = useState(false);
+  const vvp = useVisualViewport();
 
   function handleClose() {
     setStep(preVerifiedPassphrase ? "newpass" : "verify");
@@ -181,11 +183,14 @@ export function ChangePassphraseModal({
         onClick={handleClose}
       />
 
-      {/* Modal — full-height wizard bottom sheet on mobile, centered on desktop.
-          flex flex-col so done-state buttons can pin to bottom via mt-auto. */}
-      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+      {/* Modal — centered, visualViewport-driven height. Content scrolls
+          inside the card when it exceeds available height. */}
+      <div
+        className="fixed left-0 right-0 z-[60] flex items-center justify-center p-6 pointer-events-none"
+        style={vvp ? { top: vvp.offsetTop, height: vvp.height } : { top: 0, height: "100dvh" }}
+      >
         <div
-          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-2xl overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[80vh] sm:min-h-0 flex flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
+          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-2xl overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[220px] max-h-[calc(100dvh-3rem)] flex flex-col overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
@@ -222,7 +227,7 @@ export function ChangePassphraseModal({
           </div>
 
           {/* Body */}
-          <div className="px-4 py-4 space-y-3">
+          <div className="px-5 py-5 space-y-3">
             {step === "done" ? (
               <>
                 <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
@@ -232,7 +237,7 @@ export function ChangePassphraseModal({
                     keep it somewhere safe.
                   </p>
                 </div>
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -272,7 +277,7 @@ export function ChangePassphraseModal({
                   </div>
                 )}
                 {error && <p className="text-[11px] text-red-400">{error}</p>}
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-3">
                   <button
                     type="button"
                     onClick={handleClose}
@@ -354,7 +359,7 @@ export function ChangePassphraseModal({
 
                 {error && <p className="text-[11px] text-red-400">{error}</p>}
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-3">
                   <button
                     type="button"
                     onClick={handleClose}

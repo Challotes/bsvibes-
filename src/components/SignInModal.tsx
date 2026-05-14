@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { getStoredHint } from "@/services/bsv/backup-template";
 import { unlockIdentity } from "@/services/bsv/identity";
 
@@ -24,6 +25,7 @@ export function SignInModal(): React.JSX.Element | null {
   const [hintRevealed, setHintRevealed] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const vvp = useVisualViewport();
 
   // Load hint and autofocus on open
   useEffect(() => {
@@ -98,11 +100,15 @@ export function SignInModal(): React.JSX.Element | null {
         onClick={closeSignIn}
       />
 
-      {/* Modal — bottom sheet on mobile, centered on desktop */}
-      <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+      {/* Modal — centered, visualViewport-driven height so it stays above
+          the iOS keyboard when the passphrase input is focused. */}
+      <div
+        className="fixed left-0 right-0 z-[80] flex items-center justify-center p-6 pointer-events-none"
+        style={vvp ? { top: vvp.offsetTop, height: vvp.height } : { top: 0, height: "100dvh" }}
+      >
         <div
           key={shakeKey === 0 ? "modal" : `modal-shake-${shakeKey}`}
-          className={`w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 ${
+          className={`w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto ${
             shakeKey > 0 ? "animate-[shake_0.5s_ease-in-out]" : "animate-[slideUp_0.3s_ease-out]"
           }`}
           style={{ backgroundColor: "#0f0f0f" }}
@@ -136,7 +142,7 @@ export function SignInModal(): React.JSX.Element | null {
           </div>
 
           {/* Body — mirrors You modal locked-state */}
-          <div className="px-4 py-4 space-y-3">
+          <div className="px-5 py-5 space-y-3">
             <input
               ref={inputRef}
               type="password"
@@ -166,7 +172,7 @@ export function SignInModal(): React.JSX.Element | null {
                 </button>
               ))}
             {error && <p className="text-[11px] text-red-400">{error}</p>}
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-3">
               <button
                 type="button"
                 onClick={closeSignIn}

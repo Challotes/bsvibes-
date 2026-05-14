@@ -12,6 +12,7 @@ import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useInstallContext } from "@/contexts/InstallContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { getStoredAnonName, isEffectivelyProtected, unlockIdentity } from "@/services/bsv/identity";
@@ -49,6 +50,7 @@ export function IdentityChip(): React.JSX.Element | null {
   const { identity, isLoading, needsUnlock, updateIdentity, openSignIn } = useIdentityContext();
   const installCtx = useInstallContext();
   const [open, setOpen] = useState(false);
+  const vvp = useVisualViewport();
 
   // Security state
   const [isProtected, setIsProtected] = useState(false);
@@ -563,12 +565,16 @@ export function IdentityChip(): React.JSX.Element | null {
             onClick={closeManageModal}
           />
 
-          {/* Modal — bottom sheet on mobile, centered on desktop. max-h-[92vh]
-              critical — this is the tallest modal (earnings + chart + activity
-              + balance + rows) and overflows on small phones without the cap. */}
-          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+          {/* Modal — centered, visualViewport-driven height. This is the
+              tallest modal (earnings + chart + activity + balance + rows);
+              max-h-[calc(100dvh-3rem)] with overflow-y-auto lets the content
+              scroll inside the card when it exceeds available height. */}
+          <div
+            className="fixed left-0 right-0 z-[60] flex items-center justify-center p-6 pointer-events-none"
+            style={vvp ? { top: vvp.offsetTop, height: vvp.height } : { top: 0, height: "100dvh" }}
+          >
             <div
-              className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
+              className="w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] min-h-[220px] max-h-[calc(100dvh-3rem)] overflow-y-auto"
               style={{ backgroundColor: "#0f0f0f" }}
             >
               <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
