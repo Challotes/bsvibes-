@@ -38,12 +38,17 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
     }
   }, [open, messages.length]);
 
-  // Only auto-scroll if user hasn't manually scrolled up
+  // Follow the AI response as it streams. messages in deps so each token
+  // chunk triggers a scroll. behavior: instant (not smooth) avoids iOS
+  // queueing competing scroll animations during fast streaming. userScrolled
+  // freezes auto-scroll once the user manually scrolls up — letting them
+  // re-read earlier content without being yanked back to bottom.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages is the intentional re-fire trigger; body doesn't read it but effect must run on every messages change.
   useEffect(() => {
     if (!userScrolled) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
-  }, [userScrolled]);
+  }, [messages, userScrolled]);
 
   // Reset scroll tracking when user sends a new message
   function handleUserScroll() {
@@ -220,8 +225,9 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          {/* Header — pt safe-area so the close X isn't covered by the
+              PWA status bar (black-translucent overlay). */}
+          <div className="shrink-0 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
               <span className="text-sm font-medium text-zinc-300">BSVibes Agent</span>

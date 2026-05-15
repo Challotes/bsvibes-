@@ -20,12 +20,18 @@ const caveat = Caveat({
 // Use Next.js Viewport API (canonical) so Next.js doesn't inject a
 // competing default viewport meta tag. `interactiveWidget` only works
 // on iOS Safari 16.4+; older versions silently fall back to default.
+//
+// themeColor is BLACK so the Safari iOS bottom URL bar is tinted black.
+// The amber-at-top look is achieved via a body gradient (see globals.css)
+// that paints amber in the env(safe-area-inset-top) zone — visible
+// behind both the Safari iOS top chrome and the PWA translucent status
+// bar.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#f59e0b",
+  themeColor: "#000000",
 };
 
 export const metadata: Metadata = {
