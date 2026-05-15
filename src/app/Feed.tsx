@@ -212,7 +212,7 @@ function FeedContent({
       {/* Scrollable posts area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto relative scrollbar-hide"
+        className="flex-1 overflow-y-auto overscroll-y-contain relative scrollbar-hide"
         style={{ scrollbarWidth: "none" }}
       >
         <PostList

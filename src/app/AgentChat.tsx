@@ -252,11 +252,14 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           {/* Messages — flex-1 min-h-0 so it compresses when keyboard
               shrinks the layout viewport (interactive-widget=resizes-content),
               keeping the input row visible. min-h-0 is critical: without it
-              the flex child refuses to shrink below content height. */}
+              the flex child refuses to shrink below content height.
+              overscroll-y-contain blocks the iOS pull-down-to-refresh
+              gesture from triggering the browser refresh when user scrolls
+              to top of chat. */}
           <div
             ref={messagesContainerRef}
             onScroll={handleUserScroll}
-            className="flex-1 min-h-0 sm:h-[450px] sm:flex-none overflow-y-auto scrollbar-hide px-4 py-3 space-y-3"
+            className="flex-1 min-h-0 sm:h-[450px] sm:flex-none overflow-y-auto overscroll-y-contain scrollbar-hide px-4 py-3 space-y-3"
             style={{ scrollbarWidth: "none" }}
           >
             {messages.map((msg) => (

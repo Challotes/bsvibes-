@@ -17,6 +17,17 @@ body {
   color: var(--foreground);
 }
 
+/* Block iOS pull-down-to-refresh. The feed auto-polls every 5s so manual
+   refresh adds no value, and accidental refresh while scrolling near the
+   top costs the user any unsaved compose draft. overscroll-behavior-y:
+   contain at document level prevents the gesture from propagating to the
+   browser refresh handler. Scrollable inner containers (feed posts,
+   AgentChat messages) also have overscroll-y-contain for the same
+   reason. */
+html {
+  overscroll-behavior-y: contain;
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

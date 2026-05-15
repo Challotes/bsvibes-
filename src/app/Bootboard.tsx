@@ -177,11 +177,12 @@ export function Bootboard({
                 type="button"
                 onClick={() => setExpanded(!expanded)}
                 aria-label={expanded ? "Collapse history" : "Expand history"}
-                className="relative -m-3 p-3 text-zinc-600 hover:text-zinc-400 transition-colors"
+                className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-amber-300 border border-zinc-800 hover:border-amber-500/30 rounded-full px-2.5 py-1 transition-colors"
               >
+                <span>{expanded ? "less" : "more"}</span>
                 <svg
-                  width="12"
-                  height="12"
+                  width="10"
+                  height="10"
                   viewBox="0 0 16 16"
                   fill="none"
                   aria-hidden="true"
