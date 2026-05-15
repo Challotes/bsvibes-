@@ -222,24 +222,39 @@ export function Bootboard({
         </div>
       )}
 
-      {/* Expand/collapse — amber inverted triangle protruding below the card
-          bottom edge, like a tab sticking out. Doesn't take any space inside
-          the card (absolute-positioned), so the feed area isn't reduced.
-          Rotates 180° when expanded so the apex points up into the card,
-          signalling "tap to collapse". p-1.5 gives generous hit area around
-          the small triangle. */}
+      {/* Expand/collapse — rounded amber tab protruding below the card.
+          Aligned with the card's base (top edge of tab meets card's bottom
+          border, with -mt-px to avoid a double-line). Border + gradient bg
+          mirror the card so the tab reads as part of the same surface.
+          border-t-0 means no top border on the tab — the card's bottom
+          border becomes the tab's top edge, creating one continuous amber
+          outline around the whole shape. Doesn't take any vertical space
+          inside the card (absolute-positioned). */}
       {current && (
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
           aria-label={expanded ? "Collapse history" : "Expand history"}
-          className="absolute top-full left-1/2 -translate-x-1/2 -mt-2 p-1.5 group"
+          className={`absolute top-full left-1/2 -translate-x-1/2 -mt-px px-3 py-1 flex items-center justify-center rounded-b-lg border border-t-0 bg-gradient-to-b from-amber-500/8 to-amber-500/3 transition-colors ${
+            glowing ? "border-amber-400" : "border-amber-500/30 hover:border-amber-400"
+          }`}
         >
-          <span
-            className={`block w-0 h-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-amber-400 group-hover:border-t-amber-300 transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-          />
+          <svg
+            width="14"
+            height="8"
+            viewBox="0 0 14 8"
+            fill="none"
+            aria-hidden="true"
+            className={`text-amber-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+          >
+            <path
+              d="M2 2l5 4 5-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
       )}
     </div>

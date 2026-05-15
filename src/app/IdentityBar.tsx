@@ -297,12 +297,14 @@ export function IdentityChip(): React.JSX.Element | null {
   }, [manageAuthed, isProtected]);
 
   // Auto-focus the passphrase input when the You modal opens in locked
-  // state. requestAnimationFrame defers focus until after the input is
-  // mounted (handles the cross-fade re-mount on re-open after blur).
+  // state. Deferred 320ms (past the slideUp animation) so the iOS keyboard
+  // appearing on focus doesn't trigger a layout viewport resize via
+  // interactive-widget=resizes-content WHILE the modal is still animating
+  // — that race produced a visible fade-then-shift glitch on Safari.
   useEffect(() => {
     if (showManage && !manageAuthed) {
-      const id = requestAnimationFrame(() => gateInputRef.current?.focus());
-      return () => cancelAnimationFrame(id);
+      const id = setTimeout(() => gateInputRef.current?.focus(), 320);
+      return () => clearTimeout(id);
     }
   }, [showManage, manageAuthed]);
 

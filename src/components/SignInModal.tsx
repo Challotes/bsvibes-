@@ -25,12 +25,17 @@ export function SignInModal(): React.JSX.Element | null {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load hint and autofocus on open
+  // Load hint and autofocus on open. Autofocus is DEFERRED past the
+  // 300ms slideUp animation so the iOS keyboard (which appears on focus)
+  // doesn't trigger a layout-viewport resize via interactive-widget=
+  // resizes-content WHILE the modal animation is still running — that
+  // race caused a visible fade-then-shift glitch on Safari (PWA was
+  // unaffected since PWA ignores interactive-widget).
   useEffect(() => {
     if (signInOpen) {
       setStoredHint(getStoredHint() ?? null);
-      const id = requestAnimationFrame(() => inputRef.current?.focus());
-      return () => cancelAnimationFrame(id);
+      const id = setTimeout(() => inputRef.current?.focus(), 320);
+      return () => clearTimeout(id);
     }
   }, [signInOpen]);
 
