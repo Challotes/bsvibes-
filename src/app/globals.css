@@ -15,21 +15,20 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /* overflow: hidden on body alongside the page wrapper's overflow-hidden
-     makes Safari treat the document as completely non-scrollable, which
-     suppresses iOS's pull-to-refresh gesture (the recommended pure-CSS
-     attempt). The page wrapper still owns the layout via 100dvh. If this
-     doesn't fully block refresh on Safari, the JS-touchmove preventDefault
-     fallback is the next step. */
-  overflow: hidden;
 }
 
-/* overscroll-behavior is mostly a no-op on iOS Safari for pull-to-refresh
-   suppression (Chrome respects it, Safari treats it as a rendering hint
-   only). We keep it on the html and inner scrollable containers as a
-   belt-and-braces measure for Chrome/Android. */
+/* Pull-to-refresh suppression — on the html element rather than body,
+   with `none` (not `contain`) so the bounce is eliminated earlier in the
+   gesture. iOS Safari partially ignores overscroll-behavior for the
+   native refresh gesture; the touch-action constraint on the page
+   wrapper in page.tsx is the more reliable signal there.
+
+   IMPORTANT: do NOT add `overflow: hidden` to body. It causes a Safari
+   compositor promotion race for fixed-position modal animations —
+   slideUp visibly tears into fade-then-shift because GPU layer
+   promotion gets deferred until after layout settles. */
 html {
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

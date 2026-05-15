@@ -148,7 +148,7 @@ export function Bootboard({
 
   return (
     <div
-      className={`rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 pt-3.5 transition-all duration-300 overflow-hidden ${
+      className={`relative rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
         glowing ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" : "border-amber-500/30"
       } ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
     >
@@ -177,13 +177,13 @@ export function Bootboard({
           </div>
 
           {/* Content */}
-          <p className="text-sm leading-snug text-zinc-100 whitespace-pre-wrap break-words pb-3.5">
+          <p className="text-sm leading-snug text-zinc-100 whitespace-pre-wrap break-words">
             {current.content}
           </p>
 
           {/* Expanded: scrollable history with reboot */}
           {expanded && (
-            <div className="animate-[slideUp_0.2s_ease-out] pb-2 pt-2 border-t border-zinc-800/40 -mx-3.5 px-3.5">
+            <div className="animate-[slideUp_0.2s_ease-out] mt-2 pt-2 border-t border-zinc-800/40">
               <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1.5">
                 <span>booted by {current.boosted_by_name ?? current.boosted_by}</span>
               </div>
@@ -204,38 +204,9 @@ export function Bootboard({
               )}
             </div>
           )}
-
-          {/* Expand/collapse — wide thin chevron at the base of the card.
-              Discreet but discoverable; spans the full card width via
-              negative margins so the entire bottom strip is the hit area.
-              Border-t separates it from content above when collapsed and
-              from the history list when expanded. */}
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            aria-label={expanded ? "Collapse history" : "Expand history"}
-            className="-mx-3.5 px-3.5 py-1.5 w-[calc(100%+1.75rem)] flex items-center justify-center text-zinc-600 hover:text-amber-300 hover:bg-amber-500/5 border-t border-zinc-800/40 transition-colors"
-          >
-            <svg
-              width="32"
-              height="6"
-              viewBox="0 0 32 6"
-              fill="none"
-              aria-hidden="true"
-              className={`transition-transform ${expanded ? "rotate-180" : ""}`}
-            >
-              <path
-                d="M2 1.5l14 3 14-3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-xs pb-3.5">
+        <div className="flex items-center gap-2 text-xs">
           <BootIcon size={14} className="text-amber-400" />
           <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wide">
             Bootboard
@@ -249,6 +220,27 @@ export function Bootboard({
             </>
           )}
         </div>
+      )}
+
+      {/* Expand/collapse — amber inverted triangle protruding below the card
+          bottom edge, like a tab sticking out. Doesn't take any space inside
+          the card (absolute-positioned), so the feed area isn't reduced.
+          Rotates 180° when expanded so the apex points up into the card,
+          signalling "tap to collapse". p-1.5 gives generous hit area around
+          the small triangle. */}
+      {current && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? "Collapse history" : "Expand history"}
+          className="absolute top-full left-1/2 -translate-x-1/2 -mt-2 p-1.5 group"
+        >
+          <span
+            className={`block w-0 h-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-amber-400 group-hover:border-t-amber-300 transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          />
+        </button>
       )}
     </div>
   );

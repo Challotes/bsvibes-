@@ -14,7 +14,7 @@ export default async function Home() {
     // with themeColor: "#000000" so Safari's bottom URL bar is also black.
     // Result: top amber + bottom black on both Safari and PWA.
     <div
-      className="h-[100dvh] text-white overflow-hidden"
+      className="h-[100dvh] text-white overflow-hidden touch-pan-x touch-pan-y overscroll-none"
       style={{
         background:
           "linear-gradient(to bottom, #f59e0b 0, #f59e0b env(safe-area-inset-top), #000 env(safe-area-inset-top), #000 100%)",
