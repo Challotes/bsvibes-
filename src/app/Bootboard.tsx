@@ -148,13 +148,13 @@ export function Bootboard({
 
   return (
     <div
-      className={`rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
+      className={`relative rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
         glowing ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" : "border-amber-500/30"
       } ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
     >
       {current ? (
         <div className={slideIn ? "animate-[slideUp_0.4s_ease-out_backwards]" : ""}>
-          {/* Meta line — label + author + timer + expand toggle */}
+          {/* Meta line — label + author + timer */}
           <div className="flex flex-wrap items-center justify-between text-xs text-zinc-500 mb-1.5 gap-y-1">
             <div className="flex items-center gap-1.5 min-w-0">
               <BootIcon size={14} className="text-amber-400 shrink-0" />
@@ -173,35 +173,6 @@ export function Bootboard({
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <LiveTimer since={current.booted_at} />
-              {/* Expand/collapse — subtle text + chevron at the end of the
-                  meta line. Lives inside the existing row so it adds zero
-                  vertical space, and being inside the card means no
-                  positioning hacks (every external-position attempt had
-                  alignment issues across browsers). */}
-              <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                aria-label={expanded ? "Collapse history" : "Expand history"}
-                className="flex items-center gap-0.5 text-zinc-500 hover:text-amber-300 transition-colors -mr-1 px-1 py-0.5"
-              >
-                <span className="text-[11px]">{expanded ? "less" : "more"}</span>
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  aria-hidden="true"
-                  className={`transition-transform ${expanded ? "rotate-180" : ""}`}
-                >
-                  <path
-                    d="M4 6l4 4 4-4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
 
@@ -249,6 +220,36 @@ export function Bootboard({
             </>
           )}
         </div>
+      )}
+
+      {/* Expand/collapse — small chevron at the absolute bottom-center of
+          the card, sitting inside the existing 14px bottom padding zone.
+          Zero feed-room loss, zero card enlargement. Rotates 180° when
+          expanded to indicate "tap to collapse". */}
+      {current && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? "Collapse history" : "Expand history"}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 px-3 py-1 text-zinc-500 hover:text-amber-300 transition-colors"
+        >
+          <svg
+            width="14"
+            height="8"
+            viewBox="0 0 14 8"
+            fill="none"
+            aria-hidden="true"
+            className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+          >
+            <path
+              d="M2 2l5 4 5-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       )}
     </div>
   );

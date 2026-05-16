@@ -15,20 +15,16 @@
 body {
   background: var(--background);
   color: var(--foreground);
-}
-
-/* Pull-to-refresh suppression — on the html element rather than body,
-   with `none` (not `contain`) so the bounce is eliminated earlier in the
-   gesture. iOS Safari partially ignores overscroll-behavior for the
-   native refresh gesture; the touch-action constraint on the page
-   wrapper in page.tsx is the more reliable signal there.
-
-   IMPORTANT: do NOT add `overflow: hidden` to body. It causes a Safari
-   compositor promotion race for fixed-position modal animations —
-   slideUp visibly tears into fade-then-shift because GPU layer
-   promotion gets deferred until after layout settles. */
-html {
-  overscroll-behavior-y: none;
+  /* Blocks iOS Safari pull-to-refresh. This is the only CSS mechanism
+     that actually works for that gesture — Safari ignores
+     overscroll-behavior, touch-action, and JS preventDefault attempts
+     (without per-container native listeners). Was briefly removed in
+     E16 due to a modal slideUp compositor tear; the root causes of
+     that tear (missing GPU layer promotion, autofocus mid-animation,
+     no animation-fill-mode) have since been fixed independently
+     (E17/E18), so the bare overflow: hidden should not regress modal
+     animations. */
+  overflow: hidden;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
