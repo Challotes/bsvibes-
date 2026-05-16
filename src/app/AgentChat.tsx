@@ -216,11 +216,12 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           iOS keyboard opens, keeping the input row visible above the keyboard.
           Without this, h-[60vh] on messages stayed fixed, squeezing the input
           off-screen when the layout viewport shrank.
-          p-2 on mobile (was 0) insets the card 8px from each screen edge so
-          the side borders are visibly inside the viewport — fixes the
-          looks-like-cut-off appearance on phones where the screen edge is
-          imperceptibly out-of-square. */}
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 pointer-events-none">
+          pt uses max(0.5rem, env(safe-area-inset-top)) so the card's top
+          edge is always below the iOS status bar. With items-end the card
+          grows up from the bottom and the top edge would otherwise clip
+          behind the status bar overlay. px/pb still 8px for the side/bottom
+          edge inset. */}
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-[max(0.5rem,env(safe-area-inset-top))] px-2 pb-2 sm:p-4 pointer-events-none">
         <div
           className="w-full sm:max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] shadow-2xl flex flex-col max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
@@ -257,12 +258,13 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
               shrinks the layout viewport (interactive-widget=resizes-content),
               keeping the input row visible. min-h-0 is critical: without it
               the flex child refuses to shrink below content height.
-              overscroll-y-contain blocks the iOS pull-down-to-refresh
-              gesture from triggering the browser refresh when user scrolls
-              to top of chat. */}
+              onTouchMove stopPropagation prevents the document-level
+              touchmove preventDefault (the pull-to-refresh blocker in
+              Feed.tsx) from freezing legitimate scrolling here. */}
           <div
             ref={messagesContainerRef}
             onScroll={handleUserScroll}
+            onTouchMove={(e) => e.stopPropagation()}
             className="flex-1 min-h-0 sm:h-[450px] sm:flex-none overflow-y-auto overscroll-y-contain scrollbar-hide px-4 py-3 space-y-3"
             style={{ scrollbarWidth: "none" }}
           >

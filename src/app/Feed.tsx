@@ -177,6 +177,22 @@ function FeedContent({
     el.scrollBy(0, -1);
   }, [scrollRef]);
 
+  // Block iOS Safari pull-down-to-refresh. CSS overscroll-behavior is
+  // Chrome-only — Safari respects only preventDefault on touchmove with
+  // { passive: false }. The document-level listener catches the gesture;
+  // scrollable inner containers (posts list, AgentChat messages) need
+  // onTouchMove={e => e.stopPropagation()} so this handler doesn't freeze
+  // their scrolling. The !e.cancelable guard prevents a console warning
+  // for momentum-scroll events that Safari marks non-cancelable.
+  useEffect(() => {
+    function handleTouchMove(e: TouchEvent) {
+      if (!e.cancelable) return;
+      e.preventDefault();
+    }
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    return () => document.removeEventListener("touchmove", handleTouchMove);
+  }, []);
+
   const handleAskAgent = useCallback(() => {
     scrollToBottom();
     setAgentHighlight(true);
@@ -209,9 +225,12 @@ function FeedContent({
         <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-b from-transparent to-black pointer-events-none" />
       </div>
 
-      {/* Scrollable posts area */}
+      {/* Scrollable posts area. onTouchMove stopPropagation prevents the
+          document-level touchmove preventDefault (the pull-to-refresh
+          blocker) from freezing legitimate scrolling here. */}
       <div
         ref={scrollRef}
+        onTouchMove={(e) => e.stopPropagation()}
         className="flex-1 overflow-y-auto overscroll-y-contain relative scrollbar-hide"
         style={{ scrollbarWidth: "none" }}
       >

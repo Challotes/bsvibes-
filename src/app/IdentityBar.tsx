@@ -572,6 +572,7 @@ export function IdentityChip(): React.JSX.Element | null {
               locked-state passphrase entry sits above where keyboard slides up. */}
           <div className="fixed inset-0 z-[60] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
             <div
+              onTouchMove={(e) => e.stopPropagation()}
               className="w-full max-w-sm rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] max-h-[80vh] overflow-y-auto"
               style={{ backgroundColor: "#0f0f0f" }}
             >
@@ -989,6 +990,7 @@ export function IdentityChip(): React.JSX.Element | null {
 
         {open && identity && (
           <div
+            onTouchMove={(e) => e.stopPropagation()}
             className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 border border-amber-400/20 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-50 overflow-hidden max-h-[85vh] overflow-y-auto"
             style={{ backgroundColor: "#0f0f0f" }}
           >

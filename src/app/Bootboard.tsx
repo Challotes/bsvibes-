@@ -148,7 +148,7 @@ export function Bootboard({
 
   return (
     <div
-      className={`relative rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
+      className={`rounded-xl border bg-gradient-to-b from-amber-500/8 to-amber-500/3 px-3.5 py-3.5 transition-all duration-300 ${
         glowing ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" : "border-amber-500/30"
       } ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
     >
@@ -173,6 +173,35 @@ export function Bootboard({
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <LiveTimer since={current.booted_at} />
+              {/* Expand/collapse — subtle text + chevron at the end of the
+                  meta line. Lives inside the existing row so it adds zero
+                  vertical space, and being inside the card means no
+                  positioning hacks (every external-position attempt had
+                  alignment issues across browsers). */}
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                aria-label={expanded ? "Collapse history" : "Expand history"}
+                className="flex items-center gap-0.5 text-zinc-500 hover:text-amber-300 transition-colors -mr-1 px-1 py-0.5"
+              >
+                <span className="text-[11px]">{expanded ? "less" : "more"}</span>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                  className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+                >
+                  <path
+                    d="M4 6l4 4 4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -189,6 +218,7 @@ export function Bootboard({
               </div>
               {history.length > 0 && (
                 <div
+                  onTouchMove={(e) => e.stopPropagation()}
                   className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1"
                   style={{ scrollbarWidth: "none" }}
                 >
@@ -220,41 +250,6 @@ export function Bootboard({
             </>
           )}
         </div>
-      )}
-
-      {/* Expand/collapse — solid amber triangle with rounded corners and a
-          slightly darker amber outline. When collapsed, the triangle sits
-          OUTSIDE the card pointing DOWN (▼) just below the bottom edge.
-          When expanded, it slides UP into the card and rotates 180° to
-          point UP (▲) just above the bottom edge — signalling "tap to
-          collapse, the contents are inside". The transition uses
-          transform so it animates smoothly between external and internal
-          positions. */}
-      {current && (
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          aria-label={expanded ? "Collapse history" : "Expand history"}
-          className="absolute top-full left-1/2 p-1.5 transition-transform duration-300 ease-out"
-          style={{
-            transform: expanded
-              ? "translate(-50%, calc(-100% - 6px)) rotate(180deg)"
-              : "translate(-50%, -1px)",
-          }}
-        >
-          {/* SVG triangle: solid amber-400 fill, amber-500 stroke for the
-              outline, strokeLinejoin=round gives the rounded corners.
-              Closed path (Z) so all three corners are joins (rounded). */}
-          <svg width="20" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">
-            <path
-              d="M3 3 L10 11 L17 3 Z"
-              fill="rgb(251 191 36)"
-              stroke="rgb(245 158 11)"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
       )}
     </div>
   );
