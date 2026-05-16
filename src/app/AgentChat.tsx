@@ -215,15 +215,10 @@ export function AgentChat({ highlight }: { highlight?: boolean }) {
           flex-col with max-h capped so the messages list compresses when the
           iOS keyboard opens, keeping the input row visible above the keyboard.
           Without this, h-[60vh] on messages stayed fixed, squeezing the input
-          off-screen when the layout viewport shrank.
-          pt uses max(0.5rem, env(safe-area-inset-top)) so the card's top
-          edge is always below the iOS status bar. With items-end the card
-          grows up from the bottom and the top edge would otherwise clip
-          behind the status bar overlay. px/pb still 8px for the side/bottom
-          edge inset. */}
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-[max(0.5rem,env(safe-area-inset-top))] px-2 pb-2 sm:p-4 pointer-events-none">
+          off-screen when the layout viewport shrank. */}
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-2 pb-2 sm:p-4 pointer-events-none">
         <div
-          className="w-full sm:max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] shadow-2xl flex flex-col max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[calc(100dvh-2rem)]"
+          className="w-full sm:max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] shadow-2xl flex flex-col max-h-[calc(100svh-env(safe-area-inset-top)-0.5rem)] sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-label="BSVibes Agent"
