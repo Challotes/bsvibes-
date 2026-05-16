@@ -253,7 +253,7 @@ export function RestoreModal({
       {/* Modal — pinned to top of viewport (iOS-native pattern). */}
       <div className="fixed inset-0 z-[70] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
         <div
-          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out] max-h-[80vh] overflow-y-auto"
+          className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] max-h-[80vh] overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >
           <div className="h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />

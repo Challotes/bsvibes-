@@ -153,7 +153,7 @@ export function Bootboard({
       } ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
     >
       {current ? (
-        <div className={slideIn ? "animate-[slideUp_0.4s_ease-out]" : ""}>
+        <div className={slideIn ? "animate-[slideUp_0.4s_ease-out_backwards]" : ""}>
           {/* Meta line — label + author + timer + expand toggle */}
           <div className="flex flex-wrap items-center justify-between text-xs text-zinc-500 mb-1.5 gap-y-1">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -183,7 +183,7 @@ export function Bootboard({
 
           {/* Expanded: scrollable history with reboot */}
           {expanded && (
-            <div className="animate-[slideUp_0.2s_ease-out] mt-2 pt-2 border-t border-zinc-800/40">
+            <div className="animate-[slideUp_0.2s_ease-out_backwards] mt-2 pt-2 border-t border-zinc-800/40">
               <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1.5">
                 <span>booted by {current.boosted_by_name ?? current.boosted_by}</span>
               </div>
@@ -222,36 +222,35 @@ export function Bootboard({
         </div>
       )}
 
-      {/* Expand/collapse — rounded amber tab protruding below the card.
-          Aligned with the card's base (top edge of tab meets card's bottom
-          border, with -mt-px to avoid a double-line). Border + gradient bg
-          mirror the card so the tab reads as part of the same surface.
-          border-t-0 means no top border on the tab — the card's bottom
-          border becomes the tab's top edge, creating one continuous amber
-          outline around the whole shape. Doesn't take any vertical space
-          inside the card (absolute-positioned). */}
+      {/* Expand/collapse — solid amber triangle with rounded corners and a
+          slightly darker amber outline. When collapsed, the triangle sits
+          OUTSIDE the card pointing DOWN (▼) just below the bottom edge.
+          When expanded, it slides UP into the card and rotates 180° to
+          point UP (▲) just above the bottom edge — signalling "tap to
+          collapse, the contents are inside". The transition uses
+          transform so it animates smoothly between external and internal
+          positions. */}
       {current && (
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
           aria-label={expanded ? "Collapse history" : "Expand history"}
-          className={`absolute top-full left-1/2 -translate-x-1/2 -mt-px px-3 py-1 flex items-center justify-center rounded-b-lg border border-t-0 bg-gradient-to-b from-amber-500/8 to-amber-500/3 transition-colors ${
-            glowing ? "border-amber-400" : "border-amber-500/30 hover:border-amber-400"
-          }`}
+          className="absolute top-full left-1/2 p-1.5 transition-transform duration-300 ease-out"
+          style={{
+            transform: expanded
+              ? "translate(-50%, calc(-100% - 6px)) rotate(180deg)"
+              : "translate(-50%, -1px)",
+          }}
         >
-          <svg
-            width="14"
-            height="8"
-            viewBox="0 0 14 8"
-            fill="none"
-            aria-hidden="true"
-            className={`text-amber-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-          >
+          {/* SVG triangle: solid amber-400 fill, amber-500 stroke for the
+              outline, strokeLinejoin=round gives the rounded corners.
+              Closed path (Z) so all three corners are joins (rounded). */}
+          <svg width="20" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">
             <path
-              d="M2 2l5 4 5-4"
-              stroke="currentColor"
+              d="M3 3 L10 11 L17 3 Z"
+              fill="rgb(251 191 36)"
+              stroke="rgb(245 158 11)"
               strokeWidth="1.5"
-              strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
