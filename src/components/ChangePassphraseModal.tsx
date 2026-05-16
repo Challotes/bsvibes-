@@ -185,7 +185,6 @@ export function ChangePassphraseModal({
           NOT track the keyboard; sits above where it slides up. */}
       <div className="fixed inset-0 z-[60] flex items-start justify-center px-6 pt-[8vh] pointer-events-none">
         <div
-          onTouchMove={(e) => e.stopPropagation()}
           className="w-full max-w-md rounded-2xl border border-amber-400/20 shadow-2xl overflow-hidden pointer-events-auto animate-[slideUp_0.3s_ease-out_backwards] max-h-[80vh] flex flex-col overflow-y-auto"
           style={{ backgroundColor: "#0f0f0f" }}
         >

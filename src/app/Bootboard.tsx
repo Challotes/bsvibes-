@@ -218,7 +218,6 @@ export function Bootboard({
               </div>
               {history.length > 0 && (
                 <div
-                  onTouchMove={(e) => e.stopPropagation()}
                   className="max-h-[120px] overflow-y-auto scrollbar-hide space-y-1"
                   style={{ scrollbarWidth: "none" }}
                 >
