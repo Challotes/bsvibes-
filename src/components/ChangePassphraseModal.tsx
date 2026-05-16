@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, unlockIdentity, upgradeIdentity } from "@/services/bsv/identity";
@@ -39,7 +40,37 @@ export function ChangePassphraseModal({
   const [working, setWorking] = useState(false);
   const [chainWarning, setChainWarning] = useState(false);
 
+  // Suppress pagehide-driven session wipe from the moment rotation starts until
+  // the user dismisses "done". iOS Save-Password sheet on PWA fires pagehide;
+  // without this the encrypted store unlocks but the in-memory session is
+  // torched and the modal renders into a re-locked state.
+  const { blockSessionClear, unblockSessionClear } = useIdentityContext();
+  const blockedRef = useRef(false);
+  const block = () => {
+    if (!blockedRef.current) {
+      blockedRef.current = true;
+      blockSessionClear();
+    }
+  };
+  const unblock = () => {
+    if (blockedRef.current) {
+      blockedRef.current = false;
+      unblockSessionClear();
+    }
+  };
+  // Safety net: if the modal unmounts mid-flow without handleClose firing
+  // (e.g., parent re-renders the tree), make sure we release our block.
+  useEffect(() => {
+    return () => {
+      if (blockedRef.current) {
+        blockedRef.current = false;
+        unblockSessionClear();
+      }
+    };
+  }, [unblockSessionClear]);
+
   function handleClose() {
+    unblock();
     setStep(preVerifiedPassphrase ? "newpass" : "verify");
     setCurrentPass(preVerifiedPassphrase ?? "");
     setNewPass("");
@@ -103,6 +134,9 @@ export function ChangePassphraseModal({
 
     setWorking(true);
     setError("");
+    // Hold the session lock from this point through the "done" step — iOS may
+    // fire pagehide on its Save-Password sheet. Released in handleClose.
+    block();
     try {
       const result = await upgradeIdentity(
         newPass,
@@ -255,6 +289,7 @@ export function ChangePassphraseModal({
               <>
                 <input
                   type="password"
+                  autoComplete="current-password"
                   placeholder="Current passphrase"
                   value={currentPass}
                   onChange={(e) => {
@@ -297,6 +332,7 @@ export function ChangePassphraseModal({
                 </p>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   placeholder="New passphrase (min 8 characters)"
                   value={newPass}
                   onChange={(e) => {
@@ -307,6 +343,7 @@ export function ChangePassphraseModal({
                 />
                 <input
                   type="password"
+                  autoComplete="new-password"
                   placeholder="Confirm new passphrase"
                   value={confirmPass}
                   onChange={(e) => {

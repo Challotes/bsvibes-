@@ -279,27 +279,13 @@ export function PostForm({
       }
     };
 
-    // Permissions API is unreliable on iOS for "microphone" — try, but proceed
-    // regardless. Only block when we get a definitive "denied".
-    if (typeof navigator !== "undefined" && navigator.permissions) {
-      navigator.permissions
-        .query({ name: "microphone" as PermissionName })
-        .then((status) => {
-          if (status.state === "denied") {
-            isStartingRef.current = false;
-            showMicError("Microphone access denied. Enable it in Settings → Safari → Microphone.");
-            return;
-          }
-          beginRecognition();
-        })
-        .catch(() => {
-          // Permissions API doesn't support "microphone" on this browser —
-          // proceed and let start() / onerror handle it.
-          beginRecognition();
-        });
-    } else {
-      beginRecognition();
-    }
+    // No pre-check. `navigator.permissions.query({ name: "microphone" })`
+    // returns a stale "denied" on iOS Safari long after the user has
+    // granted access in Settings — the Permissions API cache only
+    // re-syncs after a hard refresh. Calling recognition.start() directly
+    // is the single source of truth: iOS surfaces the native prompt on
+    // first use, and `onerror`'s `not-allowed` path handles real denials.
+    beginRecognition();
   }
 
   return (

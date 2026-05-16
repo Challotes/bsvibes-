@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, sweepFunds, upgradeIdentity } from "@/services/bsv/identity";
@@ -126,7 +127,7 @@ export function MoveAddressModal({
   isProtected,
   passphrase,
   onComplete,
-  onClose,
+  onClose: rawOnClose,
 }: MoveAddressModalProps): React.JSX.Element {
   const [stage, setStage] = useState<Stage>("passphrase");
   const [errorStage, setErrorStage] = useState<ErrorStage | null>(null);
@@ -153,6 +154,40 @@ export function MoveAddressModal({
   // safety net when they actually need it. In the happy path, the final
   // combined recovery file at done-state supersedes this entirely.
   const preRotationBackupRef = useRef<BackupData | null>(null);
+
+  // Suppress pagehide-driven session wipe from the moment rotation starts until
+  // the user dismisses "done". iOS Save-Password sheet on PWA fires pagehide;
+  // without this the rotation's new identity is wiped mid-flow.
+  const { blockSessionClear, unblockSessionClear } = useIdentityContext();
+  const blockedRef = useRef(false);
+  const block = () => {
+    if (!blockedRef.current) {
+      blockedRef.current = true;
+      blockSessionClear();
+    }
+  };
+  const unblock = () => {
+    if (blockedRef.current) {
+      blockedRef.current = false;
+      unblockSessionClear();
+    }
+  };
+  // Safety net: release the block if the modal unmounts mid-flow.
+  useEffect(() => {
+    return () => {
+      if (blockedRef.current) {
+        blockedRef.current = false;
+        unblockSessionClear();
+      }
+    };
+  }, [unblockSessionClear]);
+
+  // Every dismissal path (X, backdrop, Continue, Cancel) flows through here
+  // so the session-clear block is always released before unmount.
+  const onClose = (): void => {
+    unblock();
+    rawOnClose();
+  };
 
   // ── Stage runners ──────────────────────────────────────────────────────────
 
@@ -241,6 +276,9 @@ export function MoveAddressModal({
 
   async function runCreating(): Promise<void> {
     setStage("creating");
+    // Hold the session lock from the moment rotation starts through "done".
+    // Released by `onClose` (which always wraps user dismissal paths).
+    block();
     try {
       // Reuse a prior result if one exists — retry reuses the same key
       if (!upgradeResultRef.current) {
@@ -458,6 +496,7 @@ export function MoveAddressModal({
             <div className="space-y-3">
               <input
                 type="password"
+                autoComplete="new-password"
                 placeholder="New passphrase (min 8 characters)"
                 value={newPass}
                 onChange={(e) => {
@@ -468,6 +507,7 @@ export function MoveAddressModal({
               />
               <input
                 type="password"
+                autoComplete="new-password"
                 placeholder="Confirm passphrase"
                 value={confirmNewPass}
                 onChange={(e) => {

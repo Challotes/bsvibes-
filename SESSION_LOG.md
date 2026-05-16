@@ -2,6 +2,18 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-16 — E24: iPhone mic, Safari password save, PWA "Done" flow
+
+Category: iOS bugfixes — three independent regressions discovered during B-category manual testing.
+
+**Fix 1 — Mic permission stuck on denied (PostForm.tsx).** Removed the `navigator.permissions.query({ name: "microphone" })` pre-check that gated `recognition.start()`. On iOS Safari, that API returns a stale "denied" long after the user enables mic access in Settings → Safari → Microphone — the cache only refreshes on hard refresh / app reinstall. The pre-check was both redundant (recognition.start() already surfaces the native prompt) and broken (caused our "Enable in Settings" toast to fire forever even with permission granted). Now we call recognition.start() directly; the existing `onerror` handler catches `not-allowed` for genuine denials.
+
+**Fix 2 — Safari stopped offering to save the password.** All seven password inputs across SignInModal, IdentityBar (manage gate), ChangePassphraseModal (verify + new + confirm), and MoveAddressModal (new + confirm) were missing `autoComplete` attributes. iOS 17+ iCloud Keychain only triggers the "Save Password?" prompt when fields carry the proper `current-password` (unlock paths, 3 inputs) or `new-password` (rotation paths, 4 inputs) signal. Added all seven.
+
+**Fix 3 — PWA "Done" closes modal before "Download again / Got it" appears.** In standalone PWA mode, the iOS "Save Password?" system sheet fires `pagehide` on the host page. IdentityContext's pagehide handler then calls `clearSessionCaches()` (intentional password-manager-style backgrounding cleanup), which torches the session mid-rotation. The modal silently unmounts. Fix: added a ref-counted `blockSessionClear()` / `unblockSessionClear()` pair on IdentityContext. Pagehide handler checks the ref before clearing. ChangePassphraseModal calls block() at the entry of handleChange and unblocks in handleClose (with a useEffect-cleanup safety net). MoveAddressModal does the same at runCreating entry; every dismissal path is funneled through a wrapped `onClose` that always unblocks.
+
+Mechanism is ref-counted so nested callers compose safely. Biome clean, tsc clean.
+
 ## 2026-05-12 — Bucket 1 complete: all modals refactored to bottom-sheet pattern
 
 Category: Mobile polish

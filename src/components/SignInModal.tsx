@@ -154,6 +154,7 @@ export function SignInModal(): React.JSX.Element | null {
             <input
               ref={inputRef}
               type="password"
+              autoComplete="current-password"
               placeholder="Passphrase"
               value={passphrase}
               onChange={(e) => {

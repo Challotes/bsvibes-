@@ -609,6 +609,7 @@ export function IdentityChip(): React.JSX.Element | null {
                   <input
                     ref={gateInputRef}
                     type="password"
+                    autoComplete="current-password"
                     placeholder="Passphrase"
                     value={manageGatePass}
                     onChange={(e) => {

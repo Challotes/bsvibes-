@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useIdentity } from "@/hooks/useIdentity";
 import { detectStandalone } from "@/hooks/useStandaloneMode";
 import { clearSessionCaches, getIdentity, importIdentity } from "@/services/bsv/identity";
@@ -33,6 +41,18 @@ interface IdentityContextValue {
   openSignIn: () => void;
   closeSignIn: () => void;
   /**
+   * Block the `pagehide → clearSessionCaches()` handler from wiping the in-memory
+   * session. Use during flows where iOS may fire a system sheet (Save Password,
+   * Share, Files picker) that triggers pagehide on a standalone PWA — those
+   * background blips would otherwise torch the active rotation mid-flow.
+   *
+   * Ref-counted so nested callers compose safely. Always pair every
+   * `blockSessionClear()` with a corresponding `unblockSessionClear()` (use a
+   * cleanup in the same effect, or unblock in the modal's close path).
+   */
+  blockSessionClear: () => void;
+  unblockSessionClear: () => void;
+  /**
    * Gate for any transaction-requiring action. Returns true if signed in,
    * otherwise opens <SignInModal> and returns false. Use at the top of every
    * handler that needs a signed BSV identity (post, boot, tip, future):
@@ -55,6 +75,17 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
 
   const openSignIn = useCallback(() => setSignInOpen(true), []);
   const closeSignIn = useCallback(() => setSignInOpen(false), []);
+
+  // Ref-counted suppression of pagehide-driven session clearing. Ref (not
+  // state) so the pagehide handler reads the live value without re-binding
+  // the listener on every change, and so blockers don't trigger renders.
+  const sessionClearBlockedRef = useRef(0);
+  const blockSessionClear = useCallback(() => {
+    sessionClearBlockedRef.current += 1;
+  }, []);
+  const unblockSessionClear = useCallback(() => {
+    sessionClearBlockedRef.current = Math.max(0, sessionClearBlockedRef.current - 1);
+  }, []);
 
   const requireIdentity = useCallback((): boolean => {
     if (identityValue.identity) return true;
@@ -91,6 +122,10 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   // so iPad Stage Manager transitions between modes are caught correctly.
   useEffect(() => {
     function handleHide(): void {
+      // Suppress during rotation/save-password flows — iOS fires pagehide on
+      // its own system sheets (Save Password, Share, Files picker) even
+      // though the user hasn't really backgrounded the app.
+      if (sessionClearBlockedRef.current > 0) return;
       if (detectStandalone()) {
         clearSessionCaches();
       }
@@ -132,6 +167,8 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     openSignIn,
     closeSignIn,
     requireIdentity,
+    blockSessionClear,
+    unblockSessionClear,
   };
 
   return <IdentityContext.Provider value={contextValue}>{children}</IdentityContext.Provider>;
