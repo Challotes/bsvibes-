@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
 import { importIdentity, signPost } from "@/services/bsv/identity";
@@ -40,7 +41,35 @@ export function RestoreModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Suppress pagehide / visibilitychange teardown during restore — iOS may
+  // fire its Save Password sheet on the file picker / decrypt path on the PWA,
+  // and the background blip would otherwise close this modal mid-flow.
+  // Released whenever the modal dismisses (handleClose) and on unmount.
+  const { blockSessionClear, unblockSessionClear } = useIdentityContext();
+  const blockedRef = useRef(false);
+  const block = (): void => {
+    if (!blockedRef.current) {
+      blockedRef.current = true;
+      blockSessionClear();
+    }
+  };
+  const unblock = (): void => {
+    if (blockedRef.current) {
+      blockedRef.current = false;
+      unblockSessionClear();
+    }
+  };
+  useEffect(() => {
+    return () => {
+      if (blockedRef.current) {
+        blockedRef.current = false;
+        unblockSessionClear();
+      }
+    };
+  }, [unblockSessionClear]);
+
   function handleClose() {
+    unblock();
     setImportError("");
     setImporting(false);
     setImportSuccess(false);
@@ -54,6 +83,9 @@ export function RestoreModal({
   async function doImport(wif: string, name?: string): Promise<void> {
     setImporting(true);
     setImportError("");
+    // Hold the block from the moment we start touching the file system / sheets.
+    // Idempotent — performImport calls block() too, just a no-op once set.
+    block();
     try {
       if (isProtected && currentIdentity) {
         const passForBackup = reAuthPassphrase;
@@ -95,6 +127,10 @@ export function RestoreModal({
   }
 
   async function performImport(wif: string, name?: string): Promise<void> {
+    // Hold the session-clear block until the user explicitly dismisses the
+    // done state. Without this iOS could fire its system sheet between
+    // import and done-state mount and close the modal.
+    block();
     try {
       const imported = await importIdentity(wif, name);
 
@@ -108,11 +144,15 @@ export function RestoreModal({
           console.warn("[BSVibes] RestoreModal: cleanupMigrations failed (non-critical)", err);
         });
 
+      // CRITICAL ordering: flip local success state BEFORE notifying the parent.
+      // onSuccess(imported) triggers parent updateIdentity() → re-render.
+      // If the parent re-renders while this modal is mid-transition, the
+      // success state may not commit and the user lands on the home page
+      // with no visible confirmation. Local state first, then parent.
       setImportSuccess(true);
-      setTimeout(() => {
-        onSuccess(imported);
-        handleClose();
-      }, 1200);
+      onSuccess(imported);
+      // No auto-close. The user dismisses via "Got it" / X / backdrop so
+      // they actually see the confirmation that restore succeeded.
     } catch (e) {
       setImportError(e instanceof Error ? e.message : "Restore failed");
     } finally {
@@ -290,91 +330,108 @@ export function RestoreModal({
 
           {/* Body */}
           <div className="px-5 py-5 space-y-3">
-            <p className="text-[11px] text-red-400 leading-relaxed">
-              Your current recovery file will be saved first.
-            </p>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              Your current posts and earnings stay with your current key — the backup file is how
-              you return to them.
-            </p>
-
-            {pendingRestoreWif !== null ? (
-              <div className="space-y-2 bg-amber-400/5 rounded-lg p-2.5 border border-amber-400/15">
-                <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">
-                  Your recovery file has been saved.
-                </p>
-                <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  Continue with restore? This will replace your current identity.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPendingRestoreWif(null);
-                      setPendingRestoreName(undefined);
-                      setImporting(false);
-                    }}
-                    className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmPendingRestore}
-                    disabled={importing}
-                    className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {importing ? "Restoring..." : "Continue"}
-                  </button>
-                </div>
-              </div>
-            ) : encryptedImportData !== null ? (
-              <PassphrasePrompt
-                context="This recovery file is encrypted. Enter the passphrase you used when creating it."
-                error={encryptedImportError}
-                loading={decryptingImport}
-                onConfirm={handleDecryptAndImport}
-                onCancel={() => {
-                  setEncryptedImportData(null);
-                  setEncryptedImportError("");
-                }}
-                confirmLabel="Restore"
-                hint={encryptedImportData.hint}
-              />
-            ) : (
+            {importSuccess ? (
               <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".html,.json,text/html,application/json"
-                  onChange={handleImportFile}
-                  className="hidden"
-                />
+                <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
+                  <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                    Your identity has been restored. Your posts and earnings are now linked to this
+                    key on this device. Tap Got it when you&apos;re ready.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={importing}
-                  className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-400/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={handleClose}
+                  className="w-full bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
                 >
-                  {importing ? "Restoring..." : "Choose recovery file"}
+                  Got it
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] text-red-400 leading-relaxed">
+                  Your current recovery file will be saved first.
+                </p>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Your current posts and earnings stay with your current key — the backup file is
+                  how you return to them.
+                </p>
+
+                {pendingRestoreWif !== null ? (
+                  <div className="space-y-2 bg-amber-400/5 rounded-lg p-2.5 border border-amber-400/15">
+                    <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">
+                      Your recovery file has been saved.
+                    </p>
+                    <p className="text-[11px] text-zinc-500 leading-relaxed">
+                      Continue with restore? This will replace your current identity.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingRestoreWif(null);
+                          setPendingRestoreName(undefined);
+                          setImporting(false);
+                        }}
+                        className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmPendingRestore}
+                        disabled={importing}
+                        className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {importing ? "Restoring..." : "Continue"}
+                      </button>
+                    </div>
+                  </div>
+                ) : encryptedImportData !== null ? (
+                  <PassphrasePrompt
+                    context="This recovery file is encrypted. Enter the passphrase you used when creating it."
+                    error={encryptedImportError}
+                    loading={decryptingImport}
+                    onConfirm={handleDecryptAndImport}
+                    onCancel={() => {
+                      setEncryptedImportData(null);
+                      setEncryptedImportError("");
+                    }}
+                    confirmLabel="Restore"
+                    hint={encryptedImportData.hint}
+                  />
+                ) : (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".html,.json,text/html,application/json"
+                      onChange={handleImportFile}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={importing}
+                      className="w-full bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-400/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {importing ? "Restoring..." : "Choose recovery file"}
+                    </button>
+                  </>
+                )}
+
+                {importError && (
+                  <p className="text-[11px] text-red-400 leading-relaxed">{importError}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="w-full bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
                 </button>
               </>
             )}
-
-            {importError && (
-              <p className="text-[11px] text-red-400 leading-relaxed">{importError}</p>
-            )}
-            {importSuccess && (
-              <p className="text-[11px] text-amber-400 font-medium">Identity restored.</p>
-            )}
-
-            <button
-              type="button"
-              onClick={handleClose}
-              className="w-full bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
-            >
-              Cancel
-            </button>
           </div>
         </div>
       </div>

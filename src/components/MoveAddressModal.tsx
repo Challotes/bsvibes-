@@ -402,6 +402,11 @@ export function MoveAddressModal({
       downloadBackup(newBackup);
 
       setCompletedSteps(2);
+      // CRITICAL: setStage("done") must commit BEFORE onComplete fires.
+      // onComplete propagates updateIdentity() → parent re-render. If the
+      // parent re-renders while this modal is still in `recording` stage,
+      // React's reconciliation may unmount the modal before the done state
+      // renders. Sequence: local done-state → THEN parent identity update.
       setStage("done");
       onComplete(result.identity);
     } catch (e) {
@@ -491,9 +496,22 @@ export function MoveAddressModal({
             )}
           </div>
 
-          {/* Passphrase entry — shown before the wizard starts */}
+          {/* Passphrase entry — shown before the wizard starts.
+              Wrapped in a <form> with a hidden username input (set to
+              identity.name) so iCloud Keychain can match the form submission
+              against any prior saved entry for this account. Without the
+              username anchor iOS skips the save/update prompt entirely on
+              subsequent rotations — see DECISIONS.md "iCloud Keychain
+              requires a username anchor". */}
           {isPassphraseStage ? (
-            <div className="space-y-3">
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitPassphrase();
+              }}
+            >
+              <input type="text" autoComplete="username" value={identity.name} readOnly hidden />
               <input
                 type="password"
                 autoComplete="new-password"
@@ -557,15 +575,14 @@ export function MoveAddressModal({
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  onClick={() => void submitPassphrase()}
+                  type="submit"
                   disabled={newPass.length < 8 || newPass !== confirmNewPass || !newHint.trim()}
                   className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Continue
                 </button>
               </div>
-            </div>
+            </form>
           ) : (
             <>
               {/* 2-dot progress indicator (New key → Recorded) */}

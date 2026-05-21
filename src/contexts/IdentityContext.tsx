@@ -42,16 +42,23 @@ interface IdentityContextValue {
   closeSignIn: () => void;
   /**
    * Block the `pagehide → clearSessionCaches()` handler from wiping the in-memory
-   * session. Use during flows where iOS may fire a system sheet (Save Password,
-   * Share, Files picker) that triggers pagehide on a standalone PWA — those
+   * session AND any other visibility-related teardown that should pause during
+   * flows where iOS may fire a system sheet (Save Password, Share, Files picker)
+   * that triggers pagehide / visibilitychange on a standalone PWA — those
    * background blips would otherwise torch the active rotation mid-flow.
    *
    * Ref-counted so nested callers compose safely. Always pair every
    * `blockSessionClear()` with a corresponding `unblockSessionClear()` (use a
    * cleanup in the same effect, or unblock in the modal's close path).
+   *
+   * `isSessionClearBlocked()` is the reader used by other visibility handlers
+   * (e.g. the You modal's `visibilitychange→manageAuthed=false` teardown in
+   * IdentityBar). Sharing one ref keeps the block surface coherent across
+   * every page-occlusion-driven cleanup we have.
    */
   blockSessionClear: () => void;
   unblockSessionClear: () => void;
+  isSessionClearBlocked: () => boolean;
   /**
    * Gate for any transaction-requiring action. Returns true if signed in,
    * otherwise opens <SignInModal> and returns false. Use at the top of every
@@ -86,6 +93,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   const unblockSessionClear = useCallback(() => {
     sessionClearBlockedRef.current = Math.max(0, sessionClearBlockedRef.current - 1);
   }, []);
+  const isSessionClearBlocked = useCallback(() => sessionClearBlockedRef.current > 0, []);
 
   const requireIdentity = useCallback((): boolean => {
     if (identityValue.identity) return true;
@@ -169,6 +177,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     requireIdentity,
     blockSessionClear,
     unblockSessionClear,
+    isSessionClearBlocked,
   };
 
   return <IdentityContext.Provider value={contextValue}>{children}</IdentityContext.Provider>;

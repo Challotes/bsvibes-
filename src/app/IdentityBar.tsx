@@ -46,7 +46,8 @@ function suppressPassphraseNudge(): void {
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading, needsUnlock, updateIdentity, openSignIn } = useIdentityContext();
+  const { identity, isLoading, needsUnlock, updateIdentity, openSignIn, isSessionClearBlocked } =
+    useIdentityContext();
   const installCtx = useInstallContext();
   const [open, setOpen] = useState(false);
 
@@ -288,13 +289,20 @@ export function IdentityChip(): React.JSX.Element | null {
     if (!isProtected) return;
     function handleVisibility() {
       if (document.visibilityState === "hidden") {
+        // Suppress during active rotation/restore flows — iOS fires
+        // visibilitychange→hidden on its own system sheets (Save Password,
+        // Share, Files picker) on standalone PWA. Without this guard the
+        // wizard's parent re-renders during the sheet and the user never
+        // sees the done state. The same flows that call blockSessionClear()
+        // automatically protect this handler too via the shared ref.
+        if (isSessionClearBlocked()) return;
         setManageAuthed(false);
         reAuthPassphraseRef.current = "";
       }
     }
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [manageAuthed, isProtected]);
+  }, [manageAuthed, isProtected, isSessionClearBlocked]);
 
   // Auto-focus the passphrase input when the You modal opens in locked
   // state. Deferred 320ms (past the slideUp animation) so the iOS keyboard

@@ -2,6 +2,34 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-18 — E26: iCloud Keychain hidden-username + PWA modal-close fixes
+
+Category: iOS PWA bugfix — two distinct bugs surfaced in B-category iPhone testing on PWA.
+
+**Bug 1 — iCloud Keychain stopped prompting after first rotation.** User saw exactly ONE saved entry in Settings → Passwords for bsvibes.com, regardless of how many rotations they performed. The form had no `autocomplete="username"` anchor, so iOS's heuristic for "is this a new credential or an update?" fell through to silent — no Save sheet, no Update sheet, nothing.
+
+**Bug 2 — Rotation/Restore modals closed prematurely when iOS Save Password sheet dismissed.** User tapped Done on the iOS sheet; the BSVibes modal also closed, never showing the done state with Download again / Got it buttons. Reported for MoveAddressModal and RestoreModal.
+
+Three parallel agents (code-auditor, researcher, nextjs) identified four distinct root causes:
+
+1. Form has no `<input autocomplete="username">` — iOS can't match credentials on rotation.
+2. E24's `blockSessionClear` only covered `pagehide`. iOS Save Password sheet also fires `visibilitychange→hidden` on PWA. IdentityBar's `visibilitychange` handler then sets `manageAuthed=false`, cascading through React re-renders.
+3. RestoreModal had `setTimeout(handleClose, 1200)` auto-closing on success — fired regardless of iOS sheet timing.
+4. MoveAddressModal called `onComplete(newIdentity)` BEFORE `setStage("done")`. Parent re-render raced against the stage transition; React Compiler's batching could unmount the child before done state rendered.
+
+**Fixes:**
+
+- **IdentityContext**: exposed `isSessionClearBlocked()` reader. Same ref, one source of truth across pagehide + visibilitychange consumers.
+- **IdentityBar.tsx**: `visibilitychange` handler short-circuits when `isSessionClearBlocked()` returns true.
+- **MoveAddressModal.tsx**: wrapped the passphrase entry in a `<form>` with hidden `<input type="text" autoComplete="username" value={identity.name} readOnly hidden />`. Continue button is now `type="submit"` so iOS sees a real form submission. Also swapped call order in `runRecording()`: `setStage("done")` BEFORE `onComplete(result.identity)`.
+- **RestoreModal.tsx**: removed the 1200ms auto-close. Replaced "Identity restored." line + Cancel button with a proper done state (amber-bordered confirmation card + Got it button). Wired `blockSessionClear()` via `block()` / `unblock()` pair into `doImport` + `performImport`; useEffect cleanup releases on unmount. Same call-order fix: `setImportSuccess(true)` BEFORE `onSuccess(imported)`.
+
+DECISIONS.md gained four no-relitigate entries: (1) iCloud Keychain username-anchor requirement, (2) block scope must cover pagehide + visibilitychange, (3) local-state-before-parent ordering in modal callbacks, (4) no auto-close timers on success states. CLAUDE.md IdentityContext description updated.
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+Diagnostic console.warns in PostForm.tsx (E24 leftover, mic-flow parked) intentionally still uncommitted — task #50 tracks revert.
+
 ## 2026-05-18 — E25: iOS Quick Look fix for recovery file (noscript inversion + form-control selection)
 
 Category: iOS bugfix — recovery file rendering in iOS Files / Quick Look.
