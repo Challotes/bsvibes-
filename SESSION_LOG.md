@@ -2,6 +2,65 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-23 — E27: save-flow redesign shipped (Bug A + Bug B + no auto-download + Web Share + per-addr saved flag)
+
+Category: feature + bugfix — major UX redesign of the recovery-file save/restore flow.
+
+Implementation guided by three pre-investigation agents (researcher for iOS Web Share API specifics, code-auditor for insertion-point mapping, architecture-reviewer for the redesign options). Pre-commit code-auditor review identified one fix-needed: premature `markBackedUp()` in MoveAddressModal `onComplete` — addressed by removing it and adding a new `onSaved` callback prop that fires only after successful share.
+
+**Seven changes in one commit:**
+
+1. **`importEncryptedIdentity(wif, passphrase, name?, hint?)` in `identity.ts`** — new export. When restoring from an encrypted file, the user's typed passphrase becomes the new identity's passphrase. Hint preserved from the file. Mirrors `upgradeIdentity` store shape; primes session caches so `signPost` (cleanupMigrations) works immediately. Fixes Bug A.
+
+2. **IdentityBar RestoreModal dismissal moved from `onSuccess` to `onClose`** — modal stays mounted to show its done state with Got it button. Fixes Bug B (asymmetric with MoveAddressModal which was already correct).
+
+3. **`MoveAddressModal.runRecording` no longer auto-downloads.** `combinedBackupRef` still holds the payload. Pre-rotation failure-path download untouched.
+
+4. **MoveAddressModal done-state context card** — fetches earnings via `/api/earnings?summary=1` (chain-resolved), pairs with `useBsvPrice` for USD display. Primary "Save recovery file" + secondary "I'll do it later". On save: transitions to emerald "Saved" card with Got it button. `markAddressSaved(newAddr)` fires only after share completes; new `onSaved` callback notifies parent to flip global `backedUp` flag.
+
+5. **`shareOrDownloadBackup(data): Promise<ShareResult>` in `backup-template.ts`** — new export. Uses `navigator.share({ files: [file] })` when available with `application/octet-stream` MIME (iOS HTML-MIME-hostile workaround). Builds `File` synchronously to preserve iOS transient activation across the click→share boundary. `AbortError` = user cancelled = no fallback (would re-trigger the intrusive download sheet). Other errors fall back to `downloadBackup`. Legacy `downloadBackup` retained for fallback + sync emergency paths.
+
+6. **Per-address saved flag** — `bsvibes_saved:<addr6>` localStorage key, ISO date value. Helpers `markAddressSaved` / `isAddressSaved` / `getAddressSavedDate` in `backup-template.ts`. Global `backedUp` flag kept (drives install pitch, first-earning toast). `IdentityBar.showWarningDot` reads `backedUp === false || !isAddressSaved(identity.address)` — either condition surfaces the amber dot. `markBackedUp()` updated to also write the per-address flag (handles existing Save/Copy/Show key paths).
+
+7. **RestoreModal restore-pre Save-or-Skip prompt** — `doImport` no longer auto-emits the outgoing identity's file. A `useEffect` lazily builds `outgoingBackupPayload` (encrypted if protected + reAuthPassphrase, plaintext if unprotected) so the Save click handler can call `shareOrDownloadBackup` synchronously. Two-step Skip: tap "Skip" → red warning state with "Go back" + "Skip & restore anyway" requiring second tap. Force-save explicitly rejected per design discussion.
+
+**Cross-cutting fix:** premature `markBackedUp()` in `MoveAddressModal.onComplete` removed. The global `backedUp` flag now flips ONLY when the user actually completes a save (via the new `onSaved` callback). Pre-fix the flag was falsely flipping true on rotation completion alone — broke E27's "explicit save" premise.
+
+DECISIONS.md gains five no-relitigate entries covering: re-encrypt on restore, no auto-download with stakes context, Web Share API + AbortError handling, per-address saved flag, two-step Skip confirmation. CLAUDE.md MoveAddressModal + RestoreModal entries updated.
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+PostForm.tsx diagnostic console.warns (task #50) still uncommitted — mic flow stays parked.
+
+## 2026-05-22 — E27 planned: save-flow redesign (approved, NOT implemented)
+
+Category: planning checkpoint — implementation deferred to next session.
+
+Three parallel agents (code-auditor, designer, architecture-reviewer) investigated two bugs and proposed a redesign for the recovery-file save flow.
+
+**Bugs identified for fix:**
+
+- **Bug A — Restore doesn't adopt the file's passphrase.** `importIdentity` writes plaintext WIF and discards the passphrase typed at decrypt time. Per `git log --all -S "encryptWif"`, this re-encrypt-on-restore behavior was NEVER in the codebase — the save flow has always re-encrypted, but restore never did. The desired behavior is a new feature, not a regression restoration.
+- **Bug B — Modal closes on Done despite E26.** Code-auditor confirmed E26 IS in source and dev-server restart serves the E26 build, so this is the deployed code. Root cause: `IdentityBar.tsx` calls `setShowRestoreModal(false)` in the RestoreModal `onSuccess` handler, unmounting the modal before the done state renders. Asymmetric — MoveAddressModal's handler doesn't. E26 fixed the child component but missed the parent.
+
+**Redesign approved (7 items, single E27 commit, awaiting go-ahead):**
+
+1. Restore re-encrypts WIF with file's passphrase; preserve file's hint; protects new identity on first use.
+2. IdentityBar stops unmounting RestoreModal on `onSuccess`; let modal control own dismissal.
+3. Remove auto-download in `MoveAddressModal.runRecording`. Keep `combinedBackupRef`.
+4. Rotation done-state becomes a context card with stats (*"This device has X posts and Y sats..."*) + primary Save button + secondary "I'll do it later" link.
+5. Replace `<a download>` with `navigator.share({ files: [file] })` — iOS shows native share drawer instead of intrusive download sheet. Fall back to `<a download>` on browsers without Web Share API. Pattern used by Bitwarden.
+6. Per-address saved flag (`bsvibes_saved:<addr6>: <ISO date>`); amber "Unsaved key" badge in IdentityBar persists until address is marked saved.
+7. Same context-card pattern in RestoreModal restore-pre. Allow Skip with confirmation toggle ("I understand I'll lose this identity"). Force-save explicitly rejected.
+
+**Filename improvement (Option E from architecture-reviewer's options)** DEFERRED. Stays in scope post-launch.
+
+**Disaster-recovery safety preserved:** pre-rotation file still emits on failure mid-flight; file format unchanged; combined-rotation-file pattern unchanged.
+
+PostForm.tsx diagnostic console.warns (task #50) still uncommitted — mic flow stays parked.
+
+A-D iPhone testing paused at this point too — B5-B8, C1-C4, D1b, D3 still untested. Resume after E27 ships.
+
 ## 2026-05-18 — E26: iCloud Keychain hidden-username + PWA modal-close fixes
 
 Category: iOS PWA bugfix — two distinct bugs surfaced in B-category iPhone testing on PWA.

@@ -842,3 +842,77 @@ export async function importIdentity(
 
   return { name: identityName, address, wif: trimmed, pubkey };
 }
+
+/**
+ * Import a WIF and write it to the ENCRYPTED store using a caller-supplied
+ * passphrase + optional hint. Used by Restore-from-file when the file was
+ * passphrase-protected: the passphrase the user typed to decrypt the file
+ * becomes the passphrase guarding the new identity going forward. The hint
+ * from the file (if any) is preserved.
+ *
+ * Why this exists alongside importIdentity:
+ * - `importIdentity` writes plaintext — fine for restoring an unprotected file.
+ * - `importEncryptedIdentity` writes ciphertext with a specific passphrase — fine
+ *   for restoring an encrypted file without forcing the user to rotate again.
+ * - `upgradeIdentity` is the wrong tool: it generates a NEW key and a migration.
+ *   We're not generating — we're adopting the file's key.
+ *
+ * Post-conditions (mirror importIdentity for cache coherence):
+ * - STORAGE_KEY removed (so isEffectivelyProtected() returns true)
+ * - ENCRYPTED_KEY populated with { encrypted, name, address, hint? }
+ * - _sessionIdentity primed so signPost can fire immediately for cleanupMigrations
+ * - _cachedWif / _cachedPrivateKey set
+ */
+export async function importEncryptedIdentity(
+  wif: string,
+  passphrase: string,
+  name?: string,
+  hint?: string
+): Promise<Identity & { pubkey: string }> {
+  if (typeof window === "undefined") {
+    throw new Error("importEncryptedIdentity can only run in the browser");
+  }
+
+  const trimmed = wif.trim();
+  if (!trimmed) throw new Error("WIF is required");
+  if (!passphrase) throw new Error("Passphrase is required to encrypt the restored key");
+
+  const { PrivateKey } = await getBsvSdk();
+
+  let key: import("@bsv/sdk").PrivateKey;
+  try {
+    key = PrivateKey.fromWif(trimmed);
+  } catch {
+    throw new Error("Invalid key — please check and try again");
+  }
+
+  const pubkey = key.toPublicKey().toString();
+  const address = key.toPublicKey().toAddress().toString();
+  const identityName = (name ?? "").trim() || generateAnonName();
+
+  const encrypted = await encryptWif(trimmed, passphrase);
+  const trimmedHint = (hint ?? "").trim();
+  const storePayload = {
+    encrypted,
+    name: identityName,
+    address,
+    ...(trimmedHint ? { hint: trimmedHint } : {}),
+  };
+
+  // Critical ordering: remove plaintext FIRST, then write encrypted store.
+  // If the order were reversed and the second write failed, we'd have BOTH
+  // keys in localStorage with mismatched identity — isEffectivelyProtected()
+  // would return false (plaintext present) and the user would be confused.
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(ENCRYPTED_KEY, JSON.stringify(storePayload));
+
+  // Prime session caches so signPost (used immediately by cleanupMigrations)
+  // works without forcing the user to re-unlock. The encrypted-store path
+  // normally requires unlockIdentity(passphrase) before signing — we skip
+  // that here because we JUST received the passphrase from the user.
+  _sessionIdentity = { name: identityName, address, wif: trimmed };
+  _cachedWif = trimmed;
+  _cachedPrivateKey = key;
+
+  return { name: identityName, address, wif: trimmed, pubkey };
+}

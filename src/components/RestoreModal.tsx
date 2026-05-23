@@ -4,9 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
+import { useBsvPrice } from "@/hooks/useBsvPrice";
+import {
+  type BackupData,
+  getStoredHint,
+  markAddressSaved,
+  shareOrDownloadBackup,
+} from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
-import { importIdentity, signPost } from "@/services/bsv/identity";
+import { importEncryptedIdentity, importIdentity, signPost } from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface RestoreModalProps {
@@ -38,6 +44,21 @@ export function RestoreModal({
   const [decryptingImport, setDecryptingImport] = useState(false);
   const [pendingRestoreWif, setPendingRestoreWif] = useState<string | null>(null);
   const [pendingRestoreName, setPendingRestoreName] = useState<string | undefined>(undefined);
+  // If the source file was encrypted, capture the passphrase the user just typed
+  // and the hint from the file so we can re-encrypt the new identity. Plaintext
+  // restores leave these undefined and fall back to the legacy importIdentity path.
+  const [pendingRestorePassphrase, setPendingRestorePassphrase] = useState<string | undefined>(
+    undefined
+  );
+  const [pendingRestoreHint, setPendingRestoreHint] = useState<string | undefined>(undefined);
+  // E27: Save-or-Skip prompt for the OUTGOING identity. Built lazily when
+  // pendingRestoreWif is set so the share handler can be synchronous (iOS
+  // transient activation can't survive an `await encryptWif` before share).
+  const [outgoingBackupPayload, setOutgoingBackupPayload] = useState<BackupData | null>(null);
+  const [outgoingEarnings, setOutgoingEarnings] = useState<number | null>(null);
+  const [skipConfirmed, setSkipConfirmed] = useState(false);
+  const [sharingOldKey, setSharingOldKey] = useState(false);
+  const bsvPrice = useBsvPrice();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,21 +98,55 @@ export function RestoreModal({
     setEncryptedImportError("");
     setPendingRestoreWif(null);
     setPendingRestoreName(undefined);
+    setPendingRestorePassphrase(undefined);
+    setPendingRestoreHint(undefined);
+    setOutgoingBackupPayload(null);
+    setOutgoingEarnings(null);
+    setSkipConfirmed(false);
+    setSharingOldKey(false);
     onClose();
   }
 
-  async function doImport(wif: string, name?: string): Promise<void> {
+  async function doImport(
+    wif: string,
+    name?: string,
+    passphrase?: string,
+    hint?: string
+  ): Promise<void> {
     setImporting(true);
     setImportError("");
     // Hold the block from the moment we start touching the file system / sheets.
     // Idempotent — performImport calls block() too, just a no-op once set.
     block();
-    try {
-      if (isProtected && currentIdentity) {
-        const passForBackup = reAuthPassphrase;
-        if (passForBackup) {
-          const encBackup = await encryptWif(currentIdentity.wif, passForBackup);
-          downloadBackup({
+    // E27: NO auto-download here. The outgoing identity's recovery file is
+    // built lazily by the effect below and emitted only on explicit user
+    // action (Save button) inside the save-or-skip prompt that the pending
+    // state triggers. Skip is gated by a confirmation toggle so the user
+    // can't lose access by accident.
+    setPendingRestoreWif(wif);
+    setPendingRestoreName(name);
+    setPendingRestorePassphrase(passphrase);
+    setPendingRestoreHint(hint);
+    setImporting(false);
+  }
+
+  // Build the outgoing-identity backup payload + fetch its earnings whenever
+  // a pending restore is active. Pre-built so the Save handler can call
+  // shareOrDownloadBackup synchronously inside the click — iOS transient
+  // activation can't survive an `await encryptWif` between click and share.
+  useEffect(() => {
+    if (pendingRestoreWif === null) {
+      setOutgoingBackupPayload(null);
+      setOutgoingEarnings(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let payload: BackupData;
+        if (isProtected && currentIdentity && reAuthPassphrase) {
+          const encBackup = await encryptWif(currentIdentity.wif, reAuthPassphrase);
+          payload = {
             name: currentIdentity.name,
             address: currentIdentity.address,
             wif_encrypted: encBackup,
@@ -99,40 +154,94 @@ export function RestoreModal({
             createdAt: new Date().toISOString(),
             note: "Previous identity saved before switching.",
             hint: getStoredHint(),
-          });
+          };
+        } else if (!isProtected && currentIdentity) {
+          payload = {
+            name: currentIdentity.name,
+            address: currentIdentity.address,
+            wif: currentIdentity.wif,
+            pathType: "restore-pre",
+            createdAt: new Date().toISOString(),
+            note: "Previous identity saved before switching.",
+            hint: getStoredHint(),
+          };
+        } else {
+          // Protected but no reAuthPassphrase available — can't build encrypted
+          // payload. Save button stays disabled; user must Skip-with-confirm.
+          if (!cancelled) setOutgoingBackupPayload(null);
+          return;
         }
-        setPendingRestoreWif(wif);
-        setPendingRestoreName(name);
-        setImporting(false);
+        if (!cancelled) setOutgoingBackupPayload(payload);
+      } catch {
+        if (!cancelled) setOutgoingBackupPayload(null);
+      }
+    })();
+    if (currentIdentity?.address) {
+      fetch(`/api/earnings?address=${encodeURIComponent(currentIdentity.address)}&summary=1`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (cancelled) return;
+          setOutgoingEarnings(typeof j?.totalEarned === "number" ? j.totalEarned : 0);
+        })
+        .catch(() => {
+          if (!cancelled) setOutgoingEarnings(0);
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingRestoreWif, isProtected, currentIdentity, reAuthPassphrase]);
+
+  async function handleSaveOldKey(): Promise<void> {
+    if (!outgoingBackupPayload || sharingOldKey) return;
+    setSharingOldKey(true);
+    block();
+    try {
+      const result = await shareOrDownloadBackup(outgoingBackupPayload);
+      if (result.cancelled) {
+        // User dismissed iOS share drawer. Stay on prompt — they can try
+        // again, change their mind to Skip, or Cancel out entirely.
         return;
       }
-
-      if (!isProtected && currentIdentity) {
-        downloadBackup({
-          name: currentIdentity.name,
-          address: currentIdentity.address,
-          wif: currentIdentity.wif,
-          pathType: "restore-pre",
-          createdAt: new Date().toISOString(),
-          note: "Previous identity saved before switching.",
-          hint: getStoredHint(),
-        });
+      if (result.shared && currentIdentity) {
+        markAddressSaved(currentIdentity.address);
+        // Proceed with the actual import now that the outgoing key is safe.
+        await confirmPendingRestore();
       }
-
-      await performImport(wif, name);
-    } catch (e) {
-      setImportError(e instanceof Error ? e.message : "Restore failed");
-      setImporting(false);
+    } finally {
+      setSharingOldKey(false);
     }
   }
 
-  async function performImport(wif: string, name?: string): Promise<void> {
+  function handleSkipOldKey(): void {
+    if (!skipConfirmed) return;
+    void confirmPendingRestore();
+  }
+
+  async function performImport(
+    wif: string,
+    name?: string,
+    passphrase?: string,
+    hint?: string
+  ): Promise<void> {
     // Hold the session-clear block until the user explicitly dismisses the
     // done state. Without this iOS could fire its system sheet between
     // import and done-state mount and close the modal.
     block();
     try {
-      const imported = await importIdentity(wif, name);
+      // When the source file was encrypted, the passphrase the user just typed
+      // becomes the passphrase guarding the new identity. We re-encrypt with
+      // that passphrase + preserve the file's hint, so the user doesn't have
+      // to rotate again to be protected. When the source file was plaintext,
+      // fall back to the legacy plaintext import path.
+      const imported = passphrase
+        ? await importEncryptedIdentity(wif, passphrase, name, hint)
+        : await importIdentity(wif, name);
+
+      // The restored file IS the recovery file for this address — mark it
+      // saved so the new "Unsaved key" badge doesn't fire for an address
+      // the user demonstrably has a recovery file for.
+      markAddressSaved(imported.address);
 
       const cleanupTs = Date.now();
       const cleanupMsg = `cleanup:${imported.pubkey}:${cleanupTs}`;
@@ -164,10 +273,14 @@ export function RestoreModal({
     if (!pendingRestoreWif) return;
     const wif = pendingRestoreWif;
     const name = pendingRestoreName;
+    const passphrase = pendingRestorePassphrase;
+    const hint = pendingRestoreHint;
     setPendingRestoreWif(null);
     setPendingRestoreName(undefined);
+    setPendingRestorePassphrase(undefined);
+    setPendingRestoreHint(undefined);
     setImporting(true);
-    await performImport(wif, name);
+    await performImport(wif, name, passphrase, hint);
   }
 
   function handleImportFile(e: React.ChangeEvent<HTMLInputElement>): void {
@@ -269,8 +382,12 @@ export function RestoreModal({
         return;
       }
       const name = encryptedImportData.name;
+      const hint = encryptedImportData.hint;
       setEncryptedImportData(null);
-      await doImport(wif, name);
+      // Pass passphrase + hint through so the new identity is re-encrypted with
+      // the same passphrase the user just typed. Preserves the file's hint too.
+      // performImport branches on `passphrase` to call importEncryptedIdentity.
+      await doImport(wif, name, passphrase, hint);
     } catch {
       setEncryptedImportError("Something went wrong — try again");
     } finally {
@@ -357,34 +474,80 @@ export function RestoreModal({
                 </p>
 
                 {pendingRestoreWif !== null ? (
-                  <div className="space-y-2 bg-amber-400/5 rounded-lg p-2.5 border border-amber-400/15">
-                    <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">
-                      Your recovery file has been saved.
+                  <div className="space-y-3 bg-amber-400/5 rounded-lg p-3 border border-amber-400/15">
+                    <p className="text-[11px] text-zinc-200 leading-relaxed font-medium">
+                      You&apos;re about to switch to a different key.
                     </p>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">
-                      Continue with restore? This will replace your current identity.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPendingRestoreWif(null);
-                          setPendingRestoreName(undefined);
-                          setImporting(false);
-                        }}
-                        className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={confirmPendingRestore}
-                        disabled={importing}
-                        className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {importing ? "Restoring..." : "Continue"}
-                      </button>
-                    </div>
+                    {outgoingEarnings !== null && outgoingEarnings > 0 ? (
+                      <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                        Your current key (
+                        <span className="font-semibold text-amber-300">{currentIdentity.name}</span>
+                        ) has{" "}
+                        <span className="font-semibold text-amber-300">
+                          {outgoingEarnings.toLocaleString()} sats
+                        </span>
+                        {bsvPrice > 0 ? (
+                          <> (~${((outgoingEarnings / 1e8) * bsvPrice).toFixed(2)})</>
+                        ) : null}{" "}
+                        on this device.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        Save the current key&apos;s recovery file first if you might want to come
+                        back to it.
+                      </p>
+                    )}
+                    {!skipConfirmed ? (
+                      <>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          Save its recovery file so you can come back to it later, or skip if you
+                          already have a backup elsewhere.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSkipConfirmed(true)}
+                            disabled={sharingOldKey || importing}
+                            className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Skip
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveOldKey}
+                            disabled={!outgoingBackupPayload || sharingOldKey || importing}
+                            className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {sharingOldKey ? "Saving..." : "Save current key"}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-red-400 leading-relaxed font-medium">
+                          Your current key will be lost forever unless you&apos;ve saved its
+                          recovery file elsewhere.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSkipConfirmed(false)}
+                            disabled={importing}
+                            className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Go back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSkipOldKey}
+                            disabled={importing}
+                            className="flex-1 bg-red-500/20 text-red-300 border border-red-500/40 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {importing ? "Restoring..." : "Skip & restore anyway"}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : encryptedImportData !== null ? (
                   <PassphrasePrompt

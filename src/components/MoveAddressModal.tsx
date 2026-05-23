@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
+import { useBsvPrice } from "@/hooks/useBsvPrice";
+import {
+  type BackupData,
+  downloadBackup,
+  getStoredHint,
+  markAddressSaved,
+  shareOrDownloadBackup,
+} from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { commitUpgrade, sweepFunds, upgradeIdentity } from "@/services/bsv/identity";
 import type { Identity } from "@/types";
@@ -14,6 +21,14 @@ interface MoveAddressModalProps {
   passphrase: string; // old passphrase for backup encryption (empty if unprotected)
   onComplete: (newIdentity: Identity) => void;
   onClose: () => void;
+  /**
+   * Fires AFTER the user successfully saves the recovery file via the new
+   * done-state Save button. Distinct from `onComplete` (which only signals
+   * rotation reached its done stage). E27: parent uses this to flip the
+   * global "backedUp" flag — that flag should ONLY flip when a file has
+   * actually been externalised, not on rotation completion alone.
+   */
+  onSaved?: () => void;
 }
 
 type Stage = "passphrase" | "creating" | "sweep-failed" | "recording" | "done" | "error";
@@ -128,6 +143,7 @@ export function MoveAddressModal({
   passphrase,
   onComplete,
   onClose: rawOnClose,
+  onSaved,
 }: MoveAddressModalProps): React.JSX.Element {
   const [stage, setStage] = useState<Stage>("passphrase");
   const [errorStage, setErrorStage] = useState<ErrorStage | null>(null);
@@ -143,6 +159,20 @@ export function MoveAddressModal({
 
   // Track which steps have completed — drives the progress dots and step list
   const [completedSteps, setCompletedSteps] = useState(0);
+
+  // E27 done-state: explicit Save flow with stats context.
+  // `saved` flips true after the user successfully shares/downloads the file
+  // via the new Save button. Controls whether we render the Save/Skip pair or
+  // the post-save Got it button.
+  const [saved, setSaved] = useState(false);
+  // Prevents double-tap on Save while the share sheet is open / dismissing.
+  const [sharing, setSharing] = useState(false);
+  // Total earnings for the rotated address (chain-resolved server-side so
+  // earnings across the old + new addresses are summed). Fetched once the
+  // done stage is reached. null = still loading, 0 = legitimately none.
+  const [totalEarnedSats, setTotalEarnedSats] = useState<number | null>(null);
+  // BSV/USD price for the stakes-context line. Cached 5m in the hook.
+  const bsvPrice = useBsvPrice();
 
   // Store upgradeIdentity result so later stages can use it
   const upgradeResultRef = useRef<Awaited<ReturnType<typeof upgradeIdentity>> | null>(null);
@@ -181,6 +211,61 @@ export function MoveAddressModal({
       }
     };
   }, [unblockSessionClear]);
+
+  // Fetch earnings stats once the done stage is reached. The new key's address
+  // is on the freshly-inserted migration row, so /api/earnings's chain-resolver
+  // will return the SUM across old + new addresses. This is what drives the
+  // stakes-context line on the new context card.
+  useEffect(() => {
+    if (stage !== "done") return;
+    const newAddr = upgradeResultRef.current?.identity.address;
+    if (!newAddr) return;
+    let cancelled = false;
+    fetch(`/api/earnings?address=${encodeURIComponent(newAddr)}&summary=1`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled) return;
+        const total = typeof j?.totalEarned === "number" ? j.totalEarned : 0;
+        setTotalEarnedSats(total);
+      })
+      .catch(() => {
+        // Non-fatal: missing stats just means the context line falls back to
+        // a generic message. The save flow still works.
+        if (!cancelled) setTotalEarnedSats(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage]);
+
+  // Save handler — gated to user click so iOS transient activation survives
+  // through navigator.share. Builds the File synchronously inside the handler
+  // (the share helper does that internally) before any await.
+  async function handleSaveBackup(): Promise<void> {
+    if (!combinedBackupRef.current || sharing) return;
+    setSharing(true);
+    // Block is already held from runCreating; idempotent.
+    block();
+    try {
+      const result = await shareOrDownloadBackup(combinedBackupRef.current);
+      if (result.cancelled) {
+        // User dismissed the share drawer. Do nothing — the amber "Save"
+        // card stays visible so they can try again. AbortError on iOS is
+        // a deliberate cancel, NOT a failure to fall back from.
+        return;
+      }
+      if (result.shared) {
+        const newAddr = upgradeResultRef.current?.identity.address;
+        if (newAddr) markAddressSaved(newAddr);
+        setSaved(true);
+        // Notify parent so the GLOBAL backedUp flag flips true. Only here —
+        // reaching the done stage alone is no longer evidence of a save.
+        onSaved?.();
+      }
+    } finally {
+      setSharing(false);
+    }
+  }
 
   // Every dismissal path (X, backdrop, Continue, Cancel) flows through here
   // so the session-clear block is always released before unmount.
@@ -399,7 +484,11 @@ export function MoveAddressModal({
       };
       if (newHint.trim()) newBackup.hint = newHint.trim();
       combinedBackupRef.current = newBackup;
-      downloadBackup(newBackup);
+      // NOTE: NO auto-download here. E27 redesign — file save is now an explicit
+      // user action via the Save button in the done-state context card. The
+      // backup payload stays in `combinedBackupRef` so the Save button can fire
+      // it on demand via the Web Share API path. Pre-rotation file still emits
+      // automatically on FAILURE (the safety net) — see runCreating/error paths.
 
       setCompletedSteps(2);
       // CRITICAL: setStage("done") must commit BEFORE onComplete fires.
@@ -708,7 +797,15 @@ export function MoveAddressModal({
                     </div>
                   ) : null)}
 
-                {/* Done state */}
+                {/* Done state — E27 redesign.
+                    The recovery file is NOT auto-downloaded. Instead we show
+                    a stakes-context card (your earnings) and gate the actual
+                    file emit behind an explicit Save button. Save uses the
+                    Web Share API on iOS (rounded share drawer, "Save to Files"
+                    one tap) and falls back to <a download> elsewhere. Skipping
+                    leaves the new key on this device with no external backup,
+                    so an amber "Unsaved key" badge persists in IdentityBar
+                    via the per-address saved flag until they come back. */}
                 {isDone && (
                   <div className="space-y-3 pt-1">
                     <p className="text-[11px] text-zinc-300 leading-relaxed">
@@ -733,33 +830,66 @@ export function MoveAddressModal({
                         </p>
                       </div>
                     )}
-                    <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
-                      <p className="text-[11px] text-amber-400/90 leading-relaxed">
-                        This file contains both your old and new key &mdash; keep it somewhere safe
-                        (cloud, USB) and remember your passphrase.{" "}
-                        <span className="font-semibold text-amber-300">
-                          Without both, you can&apos;t get back in.
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (combinedBackupRef.current) downloadBackup(combinedBackupRef.current);
-                        }}
-                        className="flex-1 bg-zinc-900 text-zinc-300 border border-amber-400/20 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
-                      >
-                        Download again
-                      </button>
+
+                    {/* Saved confirmation OR Save-needed context card */}
+                    {saved ? (
+                      <div className="border-l-2 border-emerald-500/60 pl-2.5 py-0.5">
+                        <p className="text-[11px] text-emerald-400/90 leading-relaxed">
+                          Saved. Your recovery file is on this device. Keep it somewhere safe and
+                          remember your passphrase &mdash; without both, you can&apos;t get back in.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5 space-y-1">
+                        {totalEarnedSats !== null && totalEarnedSats > 0 ? (
+                          <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                            This device has{" "}
+                            <span className="font-semibold text-amber-300">
+                              {totalEarnedSats.toLocaleString()} sats
+                            </span>
+                            {bsvPrice > 0 ? (
+                              <> (~${((totalEarnedSats / 1e8) * bsvPrice).toFixed(2)})</>
+                            ) : null}{" "}
+                            tied to your new key. Save your recovery file so you don&apos;t lose
+                            them.
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-amber-400/90 leading-relaxed">
+                            Save your recovery file. It contains both your old and new key &mdash;
+                            without it and your passphrase, you can&apos;t get back in.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action row */}
+                    {saved ? (
                       <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                        className="w-full bg-amber-500/10 text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-500/20 transition-colors"
                       >
                         Got it
                       </button>
-                    </div>
+                    ) : (
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                        >
+                          I&apos;ll do it later
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveBackup}
+                          disabled={sharing || !combinedBackupRef.current}
+                          className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-2 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {sharing ? "Saving..." : "Save recovery file"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

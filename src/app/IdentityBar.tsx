@@ -12,7 +12,12 @@ import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useInstallContext } from "@/contexts/InstallContext";
 import { satsToDollars, useBsvPrice } from "@/hooks/useBsvPrice";
 import { useCurrencyMode } from "@/hooks/useCurrencyMode";
-import { downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
+import {
+  downloadBackup,
+  getStoredHint,
+  isAddressSaved,
+  markAddressSaved,
+} from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { getStoredAnonName, isEffectivelyProtected, unlockIdentity } from "@/services/bsv/identity";
 import { FundAddress } from "./FundAddress";
@@ -442,6 +447,11 @@ export function IdentityChip(): React.JSX.Element | null {
     // bottom banner to miss the save event. Then short-circuit on local UI
     // state if we've already flipped justBackedUp in this session.
     installCtx.markBackedUp();
+    // E27: also mark THIS specific address as saved. The global flag drives
+    // first-time install pitch / first-earning toast etc.; the per-address
+    // flag is what hides the "Unsaved key" warning dot after a rotation
+    // where the user has already saved a previous key but not this one.
+    if (identity) markAddressSaved(identity.address);
     if (backedUp) return;
     setBackedUp(true);
     setJustBackedUp(true);
@@ -479,7 +489,14 @@ export function IdentityChip(): React.JSX.Element | null {
   // manage-passphrase flow. Transaction actions open SignInModal instead.
   const displayName = identity?.name ?? getStoredAnonName() ?? "...";
 
-  const showWarningDot = backedUp === false;
+  // E27: show the amber warning dot when EITHER the user has never saved any
+  // recovery file globally (`backedUp === false` — first-launch UX) OR the
+  // current address specifically has no per-address saved flag (post-rotation
+  // UX, where the user backed up the OLD key but not yet the NEW one). The
+  // latter check reads localStorage on every render — cheap and reactive
+  // since IdentityBar re-renders when modals close after a successful save.
+  const showWarningDot =
+    backedUp === false || (identity != null && !isAddressSaved(identity.address));
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -496,10 +513,21 @@ export function IdentityChip(): React.JSX.Element | null {
             // leave the wizard mounted so the user can see all status updates
             // (completed steps, sats moved, recovery file note). The actual
             // close happens when the user clicks "Continue" → onClose below.
+            // E27: do NOT call markBackedUp() here. With auto-download removed,
+            // reaching the done stage no longer implies the user has saved a
+            // file — they may still tap "I'll do it later." Saving fires
+            // separately via onSaved when the user explicitly taps Save and
+            // the share/download completes.
             updateIdentity(newIdentity);
             setIsProtected(true);
-            markBackedUp();
             moveCompletedRef.current = true;
+          }}
+          onSaved={() => {
+            // Fires from MoveAddressModal's done-state Save button after the
+            // Web Share / download completes successfully. ONLY now does the
+            // user actually have an externalized recovery file, so this is
+            // where global `backedUp` flips true.
+            markBackedUp();
           }}
           onClose={() => {
             // Fires from: Cancel mid-wizard, Continue on done, X icon, or
@@ -531,7 +559,19 @@ export function IdentityChip(): React.JSX.Element | null {
       {showRestoreModal && identity && (
         <RestoreModal
           isOpen={showRestoreModal}
-          onClose={() => setShowRestoreModal(false)}
+          onClose={() => {
+            // Dismissals happen here, not in onSuccess. Keeping the modal
+            // mounted after onSuccess lets it render its own "done" state
+            // (the amber confirmation card + Got it button). Parent used to
+            // call setShowRestoreModal(false) here in onSuccess which
+            // unmounted the modal before the done state was ever visible.
+            setShowRestoreModal(false);
+            // Close the You modal too — the modal is showing the previous
+            // identity's state, which is stale under the imported identity.
+            // closeManageModal handles all gate state teardown including
+            // reAuthPassphraseRef.
+            closeManageModal();
+          }}
           onSuccess={(imported) => {
             updateIdentity(imported);
             // The file the user just restored IS their backup — mark
@@ -539,14 +579,6 @@ export function IdentityChip(): React.JSX.Element | null {
             // for a redundant new save on a device that already has the
             // recovery file by definition.
             markBackedUp();
-            setShowRestoreModal(false);
-            // Close the You modal too — same logic as MoveAddressModal:
-            // the modal is now showing the previous identity's state,
-            // which is stale and confusing. User lands on the page with
-            // the updated chip. closeManageModal handles all gate state
-            // teardown including reAuthPassphraseRef (stale under the
-            // imported identity).
-            closeManageModal();
           }}
           currentIdentity={identity}
           isProtected={isProtected}

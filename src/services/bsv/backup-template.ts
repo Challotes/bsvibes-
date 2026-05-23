@@ -597,7 +597,11 @@ export function generateBackupHtml(data: BackupData): string {
 }
 
 /**
- * Download a backup as a self-contained HTML file.
+ * Download a backup as a self-contained HTML file via classic `<a download>`.
+ * Used as the FALLBACK path when the Web Share API isn't available, and as the
+ * sync emergency path (e.g. mid-flight rotation failure auto-emit) where async
+ * share would complicate the error recovery flow.
+ *
  * The filename is auto-generated from BackupData fields.
  */
 export function downloadBackup(data: BackupData): void {
@@ -613,6 +617,78 @@ export function downloadBackup(data: BackupData): void {
 }
 
 /**
+ * Result of `shareOrDownloadBackup`. Caller uses this to decide whether to
+ * mark the address as saved (`shared`) or leave the "unsaved" badge in place
+ * (`cancelled` or `failed`).
+ */
+export interface ShareResult {
+  /** User picked a destination AND the share / download completed. */
+  shared: boolean;
+  /** User dismissed the iOS share sheet without picking a destination. */
+  cancelled: boolean;
+}
+
+/**
+ * Share a backup file using the Web Share API where available, falling back
+ * to `<a download>`. On iOS Safari 15.4+ / PWA on 16+, this opens the native
+ * share drawer ("Save to Files" appears as a top-level option) instead of
+ * the intrusive full-screen download sheet.
+ *
+ * Critical iOS implementation notes (informed by Web Share API spec +
+ * community reports — see DECISIONS.md "Web Share API for recovery files"):
+ *
+ * - **Build the File synchronously in the click handler before any `await`.**
+ *   iOS Safari's transient activation token expires across async boundaries,
+ *   which is why this function takes a synchronously-constructable BackupData
+ *   and does the html-generation + File-construction inline.
+ * - **MIME type is `application/octet-stream`, not `text/html`.** iOS has been
+ *   observed treating `text/html` shares as "potentially hostile" and either
+ *   stripping them from the share pipeline or refusing them. The .html
+ *   extension is preserved so the file opens as HTML when the user views it.
+ * - **AbortError = user cancelled.** Do NOT fall back to `<a download>` on
+ *   AbortError — that would re-trigger the intrusive download sheet AFTER
+ *   the user deliberately dismissed the share drawer. UX regression.
+ * - **Any non-AbortError falls back to `<a download>`.** Some browsers report
+ *   `canShare` true but throw on `share` — always try/catch.
+ *
+ * The CALLER must wrap this invocation with `blockSessionClear()` /
+ * `unblockSessionClear()` if the active flow has state-protection concerns —
+ * the iOS share sheet fires `visibilitychange→hidden` and `pagehide` like
+ * any other system sheet. See E26 for the block-ref pattern.
+ */
+export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResult> {
+  const html = generateBackupHtml(data);
+  const filename = buildFilename(data);
+  // application/octet-stream avoids iOS HTML-MIME-hostile rejection paths.
+  // The .html extension on the filename keeps it openable in Safari.
+  const file = new File([html], filename, { type: "application/octet-stream" });
+
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] }) &&
+    typeof navigator.share === "function"
+  ) {
+    try {
+      await navigator.share({ files: [file], title: "BSVibes recovery key" });
+      return { shared: true, cancelled: false };
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return { shared: false, cancelled: true };
+      }
+      // Real failure (not user-initiated) — fall through to <a download>.
+    }
+  }
+
+  // Fallback: classic anchor-click download. Used when:
+  // - Web Share API unavailable (older Safari, Firefox desktop, some PWAs)
+  // - canShare returned false (file too large, MIME rejected, etc.)
+  // - navigator.share threw a non-AbortError
+  downloadBackup(data);
+  return { shared: true, cancelled: false };
+}
+
+/**
  * Read the stored passphrase hint from encrypted identity storage.
  */
 export function getStoredHint(): string | undefined {
@@ -623,5 +699,64 @@ export function getStoredHint(): string | undefined {
     return parsed.hint || undefined;
   } catch {
     return undefined;
+  }
+}
+
+// ── Per-address saved tracking ─────────────────────────────────────────────
+//
+// Existing `BACKED_UP_KEY` (in InstallContext.tsx) is a single global boolean
+// that flips true on first-ever save. It drives the install pitch, the first-
+// earning prompt, etc. We keep it as-is for those existing consumers.
+//
+// E27 adds a per-address flag layered on top: `bsvibes_saved:<addr6>` storing
+// the ISO date of the most recent save for that address. Each rotation creates
+// a new address, so users need to save once per identity — but global
+// "backedUp ever?" semantics are preserved.
+//
+// `addr6 = address.slice(1, 7)` to match `buildFilename`'s addr6 convention
+// (skip the leading "1" since all P2PKH addresses start with that).
+
+const ADDR_SAVED_KEY_PREFIX = "bsvibes_saved:";
+
+function addrSlug(address: string): string {
+  return address.slice(1, 7);
+}
+
+/**
+ * Mark a specific address as having a recovery file saved for it.
+ * Called from the Save button handler AFTER share/download succeeds.
+ */
+export function markAddressSaved(address: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ADDR_SAVED_KEY_PREFIX + addrSlug(address), new Date().toISOString());
+  } catch {
+    /* localStorage quota / SecurityError — non-fatal */
+  }
+}
+
+/**
+ * True iff a Save event has been recorded for this address since import/rotation.
+ * Drives the "Unsaved key" amber badge in IdentityBar.
+ */
+export function isAddressSaved(address: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(ADDR_SAVED_KEY_PREFIX + addrSlug(address)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the ISO date of the last save for this address, or null if never saved.
+ * Useful for displaying "Last saved: 2 days ago" in the UI.
+ */
+export function getAddressSavedDate(address: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ADDR_SAVED_KEY_PREFIX + addrSlug(address));
+  } catch {
+    return null;
   }
 }
