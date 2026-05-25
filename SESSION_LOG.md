@@ -2,6 +2,31 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-25 — E28a: PWA share drawer fix + diagnostic instrumentation
+
+Category: bugfix + diagnostic — follow-up to E27 after iPhone PWA testing surfaced two real issues.
+
+**Issues found in PWA testing:**
+
+1. **Spurious `.txt` sidecar file** on every Save. iOS treats `navigator.share({ files, title })` as TWO share items when both are passed — saves the HTML recovery file AND a `.txt` containing just the title string.
+2. **PWA share drawer never appears.** Every Save / protect path on installed PWA triggers the full-page download popup instead of the rounded share drawer. Per Web Share API researcher: WebKit's PWA process uses a stricter file-MIME allow-list than Safari tab; `application/octet-stream` (E27 choice) is likely OFF that list while `text/html` is ON it. Silent fallback to `<a download>` hides the actual `navigator.share` error.
+3. **PWA restore from encrypted file lands as "Not protected"** while Safari correctly adopts the file's passphrase. Code-auditor ruled out localStorage atomicity (writes ARE atomic within a microtask); most likely cause (H5): `IdentityBar.tsx` `useEffect` at lines 192-196 has deps `[identity?.address, identity?.wif, identity]` — if the restored identity has the same address/wif as prior state (or PWA renders one extra time vs Safari, shifting effect timing), the effect doesn't re-fire and `setIsProtected` stays stale.
+
+**Three categories of change shipped in this commit:**
+
+- **Definitive (Issue 1):** dropped `title` from `navigator.share` call in `backup-template.ts`. Files only.
+- **Best-guess fix (Issue 2):** changed MIME from `application/octet-stream` to `text/html` in the share `File` constructor. Diagnostic logs will confirm if this is the fix.
+- **Diagnostic instrumentation (Issue 2 + 3, will be reverted in E28b once root cause confirmed):**
+  - `backup-template.ts` `shareOrDownloadBackup`: logs `canShareSupported`, `canShareFiles`, `shareSupported`, `file.type`, `file.size` before share gate; logs `error.name + error.message` in catch block on non-AbortError.
+  - `identity.ts` `isEffectivelyProtected`: logs `hasEncrypted`, `hasPlaintext`, `result` on both branches.
+  - `IdentityBar.tsx` protected-check `useEffect`: logs whether the effect fires + the resulting `isProtected` value on identity change.
+
+DECISIONS.md updated: existing E27 Web Share entry amended to reflect the `text/html` MIME change (supersedes the earlier octet-stream decision); new "no `title` with files" entry added as a no-relitigate guard.
+
+Pre-commit code-auditor review: PASS on all three categories; no secret leakage in logs; address logged is the first 8 chars of public address (not WIF / passphrase).
+
+Biome clean, tsc clean, 63/63 tests pass. PostForm.tsx mic diagnostic logs (task #50) intentionally still uncommitted.
+
 ## 2026-05-23 — E27: save-flow redesign shipped (Bug A + Bug B + no auto-download + Web Share + per-addr saved flag)
 
 Category: feature + bugfix — major UX redesign of the recovery-file save/restore flow.

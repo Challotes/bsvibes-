@@ -191,7 +191,15 @@ export function IdentityChip(): React.JSX.Element | null {
 
   useEffect(() => {
     if (!identity) return;
-    setIsProtected(isEffectivelyProtected());
+    const protectedNow = isEffectivelyProtected();
+    // E28a diagnostic (will be reverted in E28b once cause confirmed).
+    // Lets us see whether this effect actually fires after a PWA restore
+    // and what isEffectivelyProtected returns at that moment.
+    console.warn("[BSVibes] IdentityBar protected-check effect fired", {
+      address6: identity.address.slice(0, 8),
+      protectedNow,
+    });
+    setIsProtected(protectedNow);
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
 

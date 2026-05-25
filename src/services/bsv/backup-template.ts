@@ -641,10 +641,18 @@ export interface ShareResult {
  *   iOS Safari's transient activation token expires across async boundaries,
  *   which is why this function takes a synchronously-constructable BackupData
  *   and does the html-generation + File-construction inline.
- * - **MIME type is `application/octet-stream`, not `text/html`.** iOS has been
- *   observed treating `text/html` shares as "potentially hostile" and either
- *   stripping them from the share pipeline or refusing them. The .html
- *   extension is preserved so the file opens as HTML when the user views it.
+ * - **MIME type is `text/html` (E28a, 2026-05-25).** Earlier E27 used
+ *   `application/octet-stream` on a researcher's "iOS treats text/html as
+ *   hostile" guidance, but iPhone PWA testing showed the share drawer never
+ *   appeared at all (silent fallback to `<a download>`). Current research +
+ *   community consensus is that WebKit's PWA process uses a stricter file-MIME
+ *   allow-list than Safari tab, and `text/html` is reliably on that list.
+ *   The diagnostic logs added in E28a will confirm the actual behavior; if
+ *   share still rejects, we may need to add an explicit user-visible fallback
+ *   instead of relying on silent `<a download>`.
+ * - **Do NOT pass `title` alongside `files`.** iOS treats `title` as a
+ *   separate text payload when files are present, saving it as a sidecar
+ *   `.txt` file containing just the title string (E28a finding).
  * - **AbortError = user cancelled.** Do NOT fall back to `<a download>` on
  *   AbortError — that would re-trigger the intrusive download sheet AFTER
  *   the user deliberately dismissed the share drawer. UX regression.
@@ -659,20 +667,40 @@ export interface ShareResult {
 export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResult> {
   const html = generateBackupHtml(data);
   const filename = buildFilename(data);
-  // application/octet-stream avoids iOS HTML-MIME-hostile rejection paths.
-  // The .html extension on the filename keeps it openable in Safari.
-  const file = new File([html], filename, { type: "application/octet-stream" });
+  // E28a: text/html — Web Share API researcher reports WebKit's PWA process
+  // uses a stricter file-MIME allow-list than Safari tab; community consensus
+  // is text/html is reliably on it. Tracking via diagnostic logs below — if
+  // navigator.share still throws on PWA we'll see the exact error code.
+  const file = new File([html], filename, { type: "text/html" });
 
-  if (
-    typeof navigator !== "undefined" &&
-    typeof navigator.canShare === "function" &&
-    navigator.canShare({ files: [file] }) &&
-    typeof navigator.share === "function"
-  ) {
+  const canShareSupported =
+    typeof navigator !== "undefined" && typeof navigator.canShare === "function";
+  const canShareFiles = canShareSupported && navigator.canShare({ files: [file] }) === true;
+  const shareSupported = typeof navigator?.share === "function";
+
+  // E28a diagnostic (will be reverted in E28b once cause is confirmed).
+  console.warn("[BSVibes] shareOrDownloadBackup gates", {
+    canShareSupported,
+    canShareFiles,
+    shareSupported,
+    fileType: file.type,
+    fileSize: file.size,
+  });
+
+  if (canShareFiles && shareSupported) {
     try {
-      await navigator.share({ files: [file], title: "BSVibes recovery key" });
+      // E28a: dropped the `title` field. iOS treats `title` alongside `files`
+      // as a separate text payload — saved as a .txt sidecar file containing
+      // just the title string. Sharing the file alone is the cleanest pattern.
+      await navigator.share({ files: [file] });
       return { shared: true, cancelled: false };
     } catch (err) {
+      // E28a diagnostic: see exactly why share fails on PWA (NotAllowedError
+      // suspected per researcher — iOS PWA stricter transient activation).
+      console.warn("[BSVibes] navigator.share threw", {
+        name: err instanceof Error ? err.name : "unknown",
+        message: err instanceof Error ? err.message : String(err),
+      });
       if (err instanceof Error && err.name === "AbortError") {
         return { shared: false, cancelled: true };
       }
