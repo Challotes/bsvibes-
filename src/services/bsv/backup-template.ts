@@ -667,10 +667,10 @@ export interface ShareResult {
 export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResult> {
   const html = generateBackupHtml(data);
   const filename = buildFilename(data);
-  // E28a: text/html — Web Share API researcher reports WebKit's PWA process
-  // uses a stricter file-MIME allow-list than Safari tab; community consensus
-  // is text/html is reliably on it. Tracking via diagnostic logs below — if
-  // navigator.share still throws on PWA we'll see the exact error code.
+  // text/html: WebKit's PWA process uses a stricter file-MIME allow-list than
+  // Safari tab. text/html is reliably on the PWA list; application/octet-stream
+  // was off it (E28a finding via iPhone PWA testing). See DECISIONS.md "Web
+  // Share API for recovery files".
   const file = new File([html], filename, { type: "text/html" });
 
   const canShareSupported =
@@ -678,29 +678,14 @@ export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResu
   const canShareFiles = canShareSupported && navigator.canShare({ files: [file] }) === true;
   const shareSupported = typeof navigator?.share === "function";
 
-  // E28a diagnostic (will be reverted in E28b once cause is confirmed).
-  console.warn("[BSVibes] shareOrDownloadBackup gates", {
-    canShareSupported,
-    canShareFiles,
-    shareSupported,
-    fileType: file.type,
-    fileSize: file.size,
-  });
-
   if (canShareFiles && shareSupported) {
     try {
-      // E28a: dropped the `title` field. iOS treats `title` alongside `files`
-      // as a separate text payload — saved as a .txt sidecar file containing
-      // just the title string. Sharing the file alone is the cleanest pattern.
+      // No `title` field — iOS treats `title` alongside `files` as a separate
+      // text payload, saved as a .txt sidecar file. Sharing the file alone
+      // is the cleanest pattern (E28a finding).
       await navigator.share({ files: [file] });
       return { shared: true, cancelled: false };
     } catch (err) {
-      // E28a diagnostic: see exactly why share fails on PWA (NotAllowedError
-      // suspected per researcher — iOS PWA stricter transient activation).
-      console.warn("[BSVibes] navigator.share threw", {
-        name: err instanceof Error ? err.name : "unknown",
-        message: err instanceof Error ? err.message : String(err),
-      });
       if (err instanceof Error && err.name === "AbortError") {
         return { shared: false, cancelled: true };
       }

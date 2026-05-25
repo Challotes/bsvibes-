@@ -2,6 +2,39 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-26 — E28b: revert E28a diagnostics + migrate IdentityBar Save to Web Share
+
+Category: cleanup + UX consistency.
+
+E28a's diagnostic logs confirmed two things via iPhone PWA testing: (1) `text/html` MIME unblocked `navigator.share` on PWA — the share API now succeeds where `application/octet-stream` failed silently, (2) `isEffectivelyProtected` correctly returns `true` after a clean restore (the previous "Not protected" symptom was PWA cache serving pre-E28a code). With the diagnosis confirmed, E28b reverts the temporary logs and extends the Web Share migration to the remaining Save sites.
+
+**Reverts (4 diagnostic blocks):**
+- `backup-template.ts shareOrDownloadBackup` — pre-share gates log + catch-block error log
+- `identity.ts isEffectivelyProtected` — branch logs (encrypted-missing and encrypted-present)
+- `IdentityBar.tsx` protected-check `useEffect` — diagnostic block restored to simple form
+
+**Migrations (IdentityBar Save row → Web Share):**
+
+The original "Save recovery file" row in the You modal still routed through the legacy `downloadBackup` (`<a download>`), giving iPhone PWA users the intrusive full-page popup. The rotation done-state Save (E27) was the only path using `shareOrDownloadBackup`. E28b brings parity:
+
+- `doDownloadPlaintext` — straightforward migration to `shareOrDownloadBackup` (sync, no `await` before share). Wrapped in `blockSessionClear()` / `unblockSessionClear()` to suppress iOS PWA's `visibilitychange→hidden` from torching the manage gate while the share drawer is open.
+- `handleSaveEncrypted` — hybrid pattern. Synchronously reads the cached `wif_encrypted` from `bfn_keypair_enc` localStorage (the field that's always present for properly-protected accounts). If cached → calls `shareOrDownloadBackup` inline preserving iOS transient activation through the click → share boundary. If cache absent (rare degenerate state — interrupted upgrade) → falls back to legacy `downloadBackup` with the async `encryptWif` path. The legacy fallback keeps the rare case working; the hot path gets the native share UX.
+
+**Pre-commit code-auditor verification — three preconditions all PASS:**
+
+1. `setJustDownloaded(true)` gates on `result.shared && !result.cancelled` in both async paths. A cancelled iOS share drawer no longer falsely marks the account as backed up (security-adjacent guard: prevents data loss via false "saved" signal).
+2. Both async share paths wrap `blockSessionClear()` / `unblockSessionClear()` correctly. The degenerate sync path does NOT (it doesn't open a share drawer — no need).
+3. Degenerate sync fallback retained in `handleSaveEncrypted` so the rare cache-absent case still works.
+
+Plus 5 additional checks all PASS: `cachedEnc` reads the right field, share payload parity with prior `downloadBackup` calls, `handleSaveFile` correctly `void`s the now-async `doDownloadPlaintext`, no missed migration sites, `markBackedUp` downstream contract unchanged.
+
+**Deferred (out of E28b scope):**
+- `ChangePassphraseModal.tsx` has 2 `downloadBackup` call sites that should also migrate to Web Share for consistency. Per earlier E26 audit, ChangePassphraseModal isn't actually mounted in IdentityBar (Passphrase row opens MoveAddressModal instead) — so this is effectively dead-code drift. Leave alone until/unless the modal is re-mounted.
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+PostForm.tsx mic diagnostic logs (task #50) intentionally still uncommitted.
+
 ## 2026-05-25 — E28a: PWA share drawer fix + diagnostic instrumentation
 
 Category: bugfix + diagnostic — follow-up to E27 after iPhone PWA testing surfaced two real issues.

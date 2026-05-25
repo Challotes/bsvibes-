@@ -93,28 +93,10 @@ function getStoredIdentity(): StoredIdentity | null {
  * presence.
  */
 export function isEffectivelyProtected(): boolean {
-  const encryptedPresent = isIdentityEncrypted();
-  if (!encryptedPresent) {
-    // E28a diagnostic (will be reverted in E28b once cause confirmed).
-    if (typeof window !== "undefined") {
-      console.warn("[BSVibes] isEffectivelyProtected → false (no encrypted)", {
-        hasEncrypted: false,
-        hasPlaintext: localStorage.getItem(STORAGE_KEY) !== null,
-      });
-    }
-    return false;
-  }
+  if (!isIdentityEncrypted()) return false;
   if (typeof window === "undefined") return false;
   try {
-    const plaintext = localStorage.getItem(STORAGE_KEY);
-    const result = plaintext === null;
-    // E28a diagnostic (will be reverted in E28b once cause confirmed).
-    console.warn("[BSVibes] isEffectivelyProtected", {
-      hasEncrypted: true,
-      hasPlaintext: plaintext !== null,
-      result,
-    });
-    return result;
+    return localStorage.getItem(STORAGE_KEY) === null;
   } catch {
     // localStorage threw (private browsing quota, etc.) — fall back to the
     // narrower signal. The encrypted-store-only check is safer than assuming

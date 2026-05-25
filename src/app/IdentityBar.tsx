@@ -17,6 +17,7 @@ import {
   getStoredHint,
   isAddressSaved,
   markAddressSaved,
+  shareOrDownloadBackup,
 } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
 import { getStoredAnonName, isEffectivelyProtected, unlockIdentity } from "@/services/bsv/identity";
@@ -51,8 +52,16 @@ function suppressPassphraseNudge(): void {
 // ─── Main IdentityChip ─────────────────────────────────────────────────────
 
 export function IdentityChip(): React.JSX.Element | null {
-  const { identity, isLoading, needsUnlock, updateIdentity, openSignIn, isSessionClearBlocked } =
-    useIdentityContext();
+  const {
+    identity,
+    isLoading,
+    needsUnlock,
+    updateIdentity,
+    openSignIn,
+    isSessionClearBlocked,
+    blockSessionClear,
+    unblockSessionClear,
+  } = useIdentityContext();
   const installCtx = useInstallContext();
   const [open, setOpen] = useState(false);
 
@@ -191,15 +200,7 @@ export function IdentityChip(): React.JSX.Element | null {
 
   useEffect(() => {
     if (!identity) return;
-    const protectedNow = isEffectivelyProtected();
-    // E28a diagnostic (will be reverted in E28b once cause confirmed).
-    // Lets us see whether this effect actually fires after a PWA restore
-    // and what isEffectivelyProtected returns at that moment.
-    console.warn("[BSVibes] IdentityBar protected-check effect fired", {
-      address6: identity.address.slice(0, 8),
-      protectedNow,
-    });
-    setIsProtected(protectedNow);
+    setIsProtected(isEffectivelyProtected());
     loadStoredHint();
   }, [identity?.address, identity?.wif, identity, loadStoredHint]);
 
@@ -394,43 +395,89 @@ export function IdentityChip(): React.JSX.Element | null {
     }
     // Unprotected: plaintext download
     if (!identity) return;
-    doDownloadPlaintext();
+    void doDownloadPlaintext();
   }
 
-  function doDownloadPlaintext() {
+  // E28b: route through shareOrDownloadBackup so iPhone gets the native share
+  // drawer ("Save to Files" one-tap) instead of the intrusive full-page download
+  // sheet. block()/unblock() wrap the share to suppress iOS's
+  // visibilitychange→hidden teardown that would otherwise re-lock the manage
+  // gate when the share drawer covers the page. `setJustDownloaded` only flips
+  // on real success — if user cancels the share drawer, no false "saved" signal.
+  async function doDownloadPlaintext(): Promise<void> {
     if (!identity) return;
     setDownloading(true);
-    downloadBackup({
-      name: identity.name,
-      address: identity.address,
-      wif: identity.wif,
-      pathType: "save",
-      createdAt: new Date().toISOString(),
-      hint: getStoredHint(),
-    });
-    setJustDownloaded(true);
-    // Stay in You modal — inline confirmation appears on the Save row.
-    setTimeout(() => setDownloading(false), 1000);
+    blockSessionClear();
+    try {
+      const result = await shareOrDownloadBackup({
+        name: identity.name,
+        address: identity.address,
+        wif: identity.wif,
+        pathType: "save",
+        createdAt: new Date().toISOString(),
+        hint: getStoredHint(),
+      });
+      // Only flip the "saved" state if the share / download actually completed.
+      // Cancellation (AbortError on iOS share drawer) returns shared:false and
+      // must NOT light up the "Got it" confirmation UI.
+      if (result.shared && !result.cancelled) setJustDownloaded(true);
+    } finally {
+      unblockSessionClear();
+      // Stay in You modal — inline confirmation appears on the Save row.
+      setTimeout(() => setDownloading(false), 1000);
+    }
   }
 
   async function handleSaveEncrypted(passphrase: string): Promise<void> {
     if (!identity) return;
     setDownloading(true);
-    try {
-      // Read already-encrypted value from the local store if available (avoids double-encrypting)
-      let encryptedWif: string;
-      try {
-        const raw = localStorage.getItem("bfn_keypair_enc");
-        if (raw) {
-          const parsed = JSON.parse(raw) as { encrypted?: string };
-          encryptedWif = parsed.encrypted ?? (await encryptWif(identity.wif, passphrase));
-        } else {
-          encryptedWif = await encryptWif(identity.wif, passphrase);
-        }
-      } catch {
-        encryptedWif = await encryptWif(identity.wif, passphrase);
-      }
 
+    // Hybrid: synchronously read the cached encrypted WIF if available, so
+    // we can call shareOrDownloadBackup with no `await` between the user
+    // click and navigator.share (iOS transient activation can't survive an
+    // await encryptWif which is ~200-600ms of PBKDF2). For users who've
+    // completed normal setup the cache is always populated. The degenerate
+    // case (cache missing, must encrypt fresh) falls back to the legacy
+    // sync downloadBackup path — slightly worse UX (full-page popup) but
+    // still saves the file.
+    let cachedEnc: string | null = null;
+    try {
+      const raw = localStorage.getItem("bfn_keypair_enc");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { encrypted?: string };
+        cachedEnc = parsed.encrypted ?? null;
+      }
+    } catch {
+      // localStorage threw — fall through to async path.
+    }
+
+    if (cachedEnc) {
+      // Hot path: no await before share, so iOS transient activation survives.
+      blockSessionClear();
+      try {
+        const result = await shareOrDownloadBackup({
+          name: identity.name,
+          address: identity.address,
+          wif_encrypted: cachedEnc,
+          pathType: "save",
+          createdAt: new Date().toISOString(),
+          note: "Use your passphrase to restore.",
+          hint: getStoredHint(),
+        });
+        if (result.shared && !result.cancelled) setJustDownloaded(true);
+      } finally {
+        unblockSessionClear();
+        setTimeout(() => setDownloading(false), 1000);
+      }
+      return;
+    }
+
+    // Degenerate path: cache missing, must encrypt fresh. The `await encryptWif`
+    // would consume iOS transient activation before any share call could fire,
+    // so fall back to the legacy sync downloadBackup — full-page popup on PWA
+    // but the file still saves. Rare in practice (only when cache absent).
+    try {
+      const encryptedWif = await encryptWif(identity.wif, passphrase);
       downloadBackup({
         name: identity.name,
         address: identity.address,
@@ -441,7 +488,6 @@ export function IdentityChip(): React.JSX.Element | null {
         hint: getStoredHint(),
       });
       setJustDownloaded(true);
-      // Stay in You modal — inline confirmation appears on the Save row.
     } catch {
       console.error("BSVibes: save encrypted failed");
     } finally {
