@@ -664,6 +664,23 @@ export interface ShareResult {
  * the iOS share sheet fires `visibilitychange→hidden` and `pagehide` like
  * any other system sheet. See E26 for the block-ref pattern.
  */
+/**
+ * True when the device's PRIMARY input is touch (finger / stylus). False on
+ * desktop-with-mouse, hybrid laptops with a mouse attached, and iPad with
+ * Magic Keyboard/trackpad. This is posture-aware, not capability-aware: a
+ * Surface Pro detached as a tablet returns true; the same device with a mouse
+ * plugged in returns false. iPadOS 13.4+ also flips to fine pointer when a
+ * trackpad is connected.
+ *
+ * Used by `shareOrDownloadBackup` to skip the OS-native share sheet on desktop
+ * (E29a — macOS Chrome opens AirDrop/share, Windows Chrome opens Phone Link,
+ * both of which are surprising compared to the plain `<a download>` desktop
+ * users expect).
+ */
+function isTouchPrimary(): boolean {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
 export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResult> {
   const html = generateBackupHtml(data);
   const filename = buildFilename(data);
@@ -672,6 +689,16 @@ export async function shareOrDownloadBackup(data: BackupData): Promise<ShareResu
   // was off it (E28a finding via iPhone PWA testing). See DECISIONS.md "Web
   // Share API for recovery files".
   const file = new File([html], filename, { type: "text/html" });
+
+  // E29a: skip the Web Share API on desktop-with-mouse. On macOS Chrome /
+  // Safari it opens the OS share sheet (AirDrop + nearby devices); on Windows
+  // it opens Phone Link. Both are UX regressions vs the plain `<a download>`
+  // desktop users expect. Keep the share path for touch-primary devices where
+  // it's a genuine win (rounded iOS share drawer, one-tap Save to Files).
+  if (!isTouchPrimary()) {
+    downloadBackup(data);
+    return { shared: true, cancelled: false };
+  }
 
   const canShareSupported =
     typeof navigator !== "undefined" && typeof navigator.canShare === "function";

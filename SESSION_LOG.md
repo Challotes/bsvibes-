@@ -2,6 +2,44 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-27 — E29a: skip Web Share API on desktop (UX hotfix)
+
+Category: UX hotfix — desktop save sheets were opening OS-native share UI instead of the simple `<a download>` desktop users expect.
+
+iPhone PWA testing of E29 surfaced an unrelated regression from E27/E28a's `navigator.share` migration: on **desktop** browsers, calling `navigator.share({ files: [file] })` opens the **OS-native share sheet** — AirDrop + nearby device options on macOS, Phone Link on Windows. Functional (file can still be saved) but surprising vs the legacy `<a download>` which just drops the file into Downloads with no prompt.
+
+**Fix** (1 file, ~12 lines added): add an `isTouchPrimary()` helper to `src/services/bsv/backup-template.ts` using `window.matchMedia('(pointer: coarse)').matches`. Insert an early-return gate in `shareOrDownloadBackup` that bypasses the Web Share path entirely when the primary input is fine (mouse/trackpad), falling through to the legacy `downloadBackup` instead.
+
+**Why `(pointer: coarse)` is the right detector** (per pre-commit audit):
+
+- Posture-aware, not capability-aware: same Surface Pro returns `true` detached as a tablet, `false` with mouse plugged in
+- iPad with Magic Keyboard/trackpad correctly returns `false` (iPadOS 13.4+ flips to fine pointer when trackpad is connected)
+- W3C-blessed semantic; stable since 2018
+- Doesn't depend on UA strings (iPadOS lies and claims to be Mac)
+
+**Device behavior matrix after E29a:**
+
+| Device | Behavior |
+|---|---|
+| iPhone (Safari + PWA) | share drawer (preserved E27/E28a win) |
+| Android phone | share sheet (preserved) |
+| iPad tablet posture | share sheet (preserved) |
+| iPad + Magic Keyboard | `<a download>` (laptop posture) |
+| Surface Pro tablet posture | share sheet |
+| Surface Pro + mouse | `<a download>` (laptop posture) |
+| macOS Chrome/Safari | `<a download>` (fix) |
+| Windows Chrome/Edge | `<a download>` (fix) |
+| Linux desktop | `<a download>` |
+
+**Edge cases verified:**
+- No SSR risk — function only invoked from client `onClick` handlers; `window.matchMedia` is safe in that context
+- Firefox desktop on Linux with touchscreen as primary input would route to share sheet, but Firefox doesn't implement `navigator.canShare({files})` so falls through to download anyway — net harmless
+- All three call sites (RestoreModal, MoveAddressModal, IdentityBar) inherit the fix automatically since they all route through `shareOrDownloadBackup`
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+PostForm.tsx mic diagnostic logs (task #50) intentionally still uncommitted.
+
 ## 2026-05-26 — E29: block restore of rotated keys (Design C-strict)
 
 Category: security architecture — block restoring any key that has been rotated forward on-chain.
