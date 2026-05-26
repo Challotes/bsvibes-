@@ -2,6 +2,29 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-26 — E28c: welcome-gate restore preserves file's passphrase
+
+Category: bugfix — first-PWA-install restore-from-encrypted-file landed unprotected.
+
+iPhone PWA testing showed that restoring from a passphrase-protected recovery file via the welcome gate (first home-screen install) discarded the typed passphrase. The new identity was written plaintext to localStorage; `isEffectivelyProtected()` returned false; the You modal showed "Not protected" and prompted the user to set up a passphrase they had already typed seconds before.
+
+Root cause: `IdentityContext.acceptRestoredIdentity(wif, name?)` only called `importIdentity` (plaintext path). The welcome gate decrypted the file then passed only WIF + name onward — passphrase dropped on the floor. RestoreModal had been fixed in E27 by branching to `importEncryptedIdentity` when a passphrase was provided; the welcome-gate path was missed.
+
+**Fix (minimal, two files):**
+
+- `IdentityContext.tsx` — widened `acceptRestoredIdentity` signature to `(wif, name?, passphrase?, hint?) => Promise<Identity>`. Internal branch: with passphrase → `importEncryptedIdentity(wif, passphrase, name, hint)` (re-encrypts the new identity with the file's passphrase, preserves hint, primes session caches); without passphrase → `importIdentity(wif, name)` (legacy plaintext path).
+- `HomeScreenWelcomeGate.tsx` — widened `onRestore` prop type to match; in `handlePassphrase` forward `passphrase + encryptedPayload.hint` to `onRestore`. The plaintext-file branch (when source file had `wif`, not `wif_encrypted`) was already correct — leaves it as-is.
+
+Single caller of `acceptRestoredIdentity` exists (Feed.tsx → `<HomeScreenWelcomeGate onRestore={acceptRestoredIdentity} />`); signature widening is backwards-compatible.
+
+**Intentionally NOT in scope:**
+
+- Auto-`cleanupMigrations` call. RestoreModal currently calls this; the welcome gate never has. E28c does NOT add it. The next commit (E29) will REMOVE the RestoreModal call entirely as part of a security-driven architecture change — restore of any rotated key will be blocked outright. See task #57 / DECISIONS.md (forthcoming) for full rationale.
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+PostForm.tsx mic diagnostic logs (task #50) intentionally still uncommitted.
+
 ## 2026-05-26 — E28b: revert E28a diagnostics + migrate IdentityBar Save to Web Share
 
 Category: cleanup + UX consistency.

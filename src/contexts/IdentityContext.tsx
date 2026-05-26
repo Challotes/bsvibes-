@@ -11,7 +11,12 @@ import {
 } from "react";
 import { useIdentity } from "@/hooks/useIdentity";
 import { detectStandalone } from "@/hooks/useStandaloneMode";
-import { clearSessionCaches, getIdentity, importIdentity } from "@/services/bsv/identity";
+import {
+  clearSessionCaches,
+  getIdentity,
+  importEncryptedIdentity,
+  importIdentity,
+} from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface IdentityContextValue {
@@ -29,13 +34,25 @@ interface IdentityContextValue {
   updateIdentity: (newIdentity: Identity) => void;
   /**
    * SINGLE entry point for the welcome gate to commit a restored identity.
-   * Calls `importIdentity` internally (writes localStorage, clears encrypted
-   * store, resets caches), then commits the result to React state. Callers
-   * MUST use this instead of calling `importIdentity` directly from gate paths.
+   * Branches internally on whether a passphrase was used to decrypt the
+   * source file:
+   * - With `passphrase` → calls `importEncryptedIdentity` so the new identity
+   *   is protected by the same passphrase the user just typed, with the
+   *   file's hint preserved (E28c — matches RestoreModal's behavior).
+   * - Without `passphrase` → calls `importIdentity` (plaintext path).
+   *
+   * Both internally write localStorage, clear/set the encrypted store, and
+   * prime session caches. Then commits the result to React state. Callers
+   * MUST use this instead of calling the underlying functions directly.
    *
    * Async to allow the gate to await the result before unmounting itself.
    */
-  acceptRestoredIdentity: (wif: string, name?: string) => Promise<Identity>;
+  acceptRestoredIdentity: (
+    wif: string,
+    name?: string,
+    passphrase?: string,
+    hint?: string
+  ) => Promise<Identity>;
   // Sign-in modal
   signInOpen: boolean;
   openSignIn: () => void;
@@ -102,12 +119,21 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   }, [identityValue.identity]);
 
   const acceptRestoredIdentity = useCallback(
-    async (wif: string, name?: string): Promise<Identity> => {
-      // importIdentity handles: WIF validation, address derivation, localStorage
-      // write, encrypted-store cleanup, session cache reset (lines 778+ of
-      // identity.ts). Must be the SINGLE entry point — duplicating any of that
-      // logic outside would risk drift.
-      const identity = await importIdentity(wif, name);
+    async (wif: string, name?: string, passphrase?: string, hint?: string): Promise<Identity> => {
+      // Branch on whether the file the user just restored was encrypted (and
+      // they typed a passphrase to decrypt it). Mirrors RestoreModal's pattern:
+      // - With passphrase → re-encrypt the new identity with the same passphrase
+      //   (importEncryptedIdentity primes _sessionIdentity AND writes the
+      //   encrypted store with the file's hint preserved).
+      // - Without passphrase → plaintext path (importIdentity).
+      //
+      // Both functions are the SINGLE entry points for their respective shapes —
+      // they handle WIF validation, address derivation, localStorage write,
+      // encrypted-store toggling, and session cache priming. Duplicating that
+      // logic here would risk drift.
+      const identity = passphrase
+        ? await importEncryptedIdentity(wif, passphrase, name, hint)
+        : await importIdentity(wif, name);
       // updateIdentity transitions the state machine to `kind: "ready"`,
       // simultaneously clearing whatever state was previously active
       // (awaitingWelcomeGate, needsUnlock, or loading).

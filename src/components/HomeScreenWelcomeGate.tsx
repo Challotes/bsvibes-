@@ -10,10 +10,14 @@ import type { Identity } from "@/types";
 interface HomeScreenWelcomeGateProps {
   /**
    * SINGLE entry point for restore — `IdentityContext.acceptRestoredIdentity`
-   * calls `importIdentity` internally + commits state. The gate never calls
-   * `importIdentity` directly.
+   * branches internally: with `passphrase` it calls `importEncryptedIdentity`
+   * (preserves the file's passphrase + hint as the new identity's protection);
+   * without `passphrase` it calls `importIdentity` (plaintext path). The gate
+   * never calls those underlying functions directly. (E28c — earlier the gate
+   * dropped the typed passphrase, landing every encrypted-file restore as
+   * plaintext.)
    */
-  onRestore: (wif: string, name?: string) => Promise<Identity>;
+  onRestore: (wif: string, name?: string, passphrase?: string, hint?: string) => Promise<Identity>;
 }
 
 type Mode = "buttons" | "passphrase" | "no-file";
@@ -112,7 +116,10 @@ export function HomeScreenWelcomeGate({
         setError("Wrong passphrase — try again");
         return;
       }
-      await onRestore(wif, encryptedPayload.name);
+      // E28c: forward the passphrase + hint so the new identity is protected
+      // by the same passphrase the user just typed (with the file's hint
+      // preserved). Without this the restored identity lands as plaintext.
+      await onRestore(wif, encryptedPayload.name, passphrase, encryptedPayload.hint);
       markBackedUp();
     } catch {
       setError("Something went wrong — please try again");
