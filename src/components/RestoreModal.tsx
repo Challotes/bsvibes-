@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cleanupMigrations } from "@/app/actions";
 import { PassphrasePrompt } from "@/components/PassphrasePrompt";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBsvPrice } from "@/hooks/useBsvPrice";
@@ -12,7 +11,11 @@ import {
   shareOrDownloadBackup,
 } from "@/services/bsv/backup-template";
 import { decryptWif, encryptWif } from "@/services/bsv/crypto";
-import { importEncryptedIdentity, importIdentity, signPost } from "@/services/bsv/identity";
+import {
+  derivePubkeyFromWif,
+  importEncryptedIdentity,
+  importIdentity,
+} from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface RestoreModalProps {
@@ -58,6 +61,18 @@ export function RestoreModal({
   const [outgoingEarnings, setOutgoingEarnings] = useState<number | null>(null);
   const [skipConfirmed, setSkipConfirmed] = useState(false);
   const [sharingOldKey, setSharingOldKey] = useState(false);
+  // E29: blocked-restore state. Populated when the eligibility check returns
+  // `allowed: false` (the supplied key has a forward migration on-chain).
+  // When set, the modal renders the explanation card instead of proceeding
+  // into the save-or-skip prompt or any localStorage write.
+  const [blockedRestoreInfo, setBlockedRestoreInfo] = useState<{
+    rotatedAt: string;
+    newAddrPrefix?: string;
+  } | null>(null);
+  // AbortController for in-flight eligibility checks. If the user closes the
+  // modal mid-fetch, abort it so the response can't set state on an unmounted
+  // component (React would warn). Created per check, replaced on each new one.
+  const eligibilityAbortRef = useRef<AbortController | null>(null);
   const bsvPrice = useBsvPrice();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +106,10 @@ export function RestoreModal({
 
   function handleClose() {
     unblock();
+    // E29: abort any in-flight eligibility check so its response can't set
+    // state on an unmounted component.
+    eligibilityAbortRef.current?.abort();
+    eligibilityAbortRef.current = null;
     setImportError("");
     setImporting(false);
     setImportSuccess(false);
@@ -104,6 +123,7 @@ export function RestoreModal({
     setOutgoingEarnings(null);
     setSkipConfirmed(false);
     setSharingOldKey(false);
+    setBlockedRestoreInfo(null);
     onClose();
   }
 
@@ -118,6 +138,43 @@ export function RestoreModal({
     // Hold the block from the moment we start touching the file system / sheets.
     // Idempotent — performImport calls block() too, just a no-op once set.
     block();
+
+    // E29: gate the restore on whether the supplied key has been rotated away.
+    // If it has, the migration record is treated as permanent revocation
+    // (DECISIONS.md "Restore of rotated keys (Design C-strict)"). Show the
+    // explanation card instead of proceeding. Fail-safe: any network/parse
+    // failure during the check also blocks — without verification we can't
+    // safely allow the restore.
+    try {
+      eligibilityAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      eligibilityAbortRef.current = ctrl;
+      const pubkey = await derivePubkeyFromWif(wif);
+      const res = await fetch(`/api/restore-eligibility?pubkey=${encodeURIComponent(pubkey)}`, {
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = (await res.json()) as {
+        allowed: boolean;
+        rotatedAt?: string;
+        newAddrPrefix?: string;
+      };
+      if (!data.allowed) {
+        setBlockedRestoreInfo({
+          rotatedAt: data.rotatedAt ?? "",
+          newAddrPrefix: data.newAddrPrefix,
+        });
+        setImporting(false);
+        return;
+      }
+    } catch (err) {
+      // Don't surface an error if the user closed the modal mid-fetch.
+      if (err instanceof Error && err.name === "AbortError") return;
+      setImportError("Couldn't verify this key — check your connection and try again.");
+      setImporting(false);
+      return;
+    }
+
     // E27: NO auto-download here. The outgoing identity's recovery file is
     // built lazily by the effect below and emitted only on explicit user
     // action (Save button) inside the save-or-skip prompt that the pending
@@ -243,15 +300,11 @@ export function RestoreModal({
       // the user demonstrably has a recovery file for.
       markAddressSaved(imported.address);
 
-      const cleanupTs = Date.now();
-      const cleanupMsg = `cleanup:${imported.pubkey}:${cleanupTs}`;
-      signPost(cleanupMsg)
-        .then((sig) => {
-          if (sig) return cleanupMigrations(imported.pubkey, sig.signature, cleanupTs);
-        })
-        .catch((err) => {
-          console.warn("[BSVibes] RestoreModal: cleanupMigrations failed (non-critical)", err);
-        });
+      // E29: cleanupMigrations is NO LONGER called on restore. The on-chain
+      // migration record is treated as a permanent revocation — rotated keys
+      // can't be restored (gated upstream in doImport), and even when a current
+      // key is restored we don't rewrite the server-side migration graph.
+      // See DECISIONS.md "Restore of rotated keys (Design C-strict)".
 
       // CRITICAL ordering: flip local success state BEFORE notifying the parent.
       // onSuccess(imported) triggers parent updateIdentity() → re-render.
@@ -447,7 +500,60 @@ export function RestoreModal({
 
           {/* Body */}
           <div className="px-5 py-5 space-y-3">
-            {importSuccess ? (
+            {blockedRestoreInfo !== null ? (
+              // E29: blocked-restore explanation card. Fires when the
+              // eligibility check returns `allowed: false` — the key the
+              // user picked has been rotated to a newer key on-chain.
+              <>
+                <div className="border-l-2 border-red-500/60 pl-2.5 py-0.5">
+                  <p className="text-[11px] text-red-400 leading-relaxed font-medium">
+                    This is an older key.
+                  </p>
+                </div>
+                <p className="text-[11px] text-zinc-300 leading-relaxed">
+                  You moved to a newer key{" "}
+                  {blockedRestoreInfo.rotatedAt
+                    ? `on ${new Date(blockedRestoreInfo.rotatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`
+                    : "previously"}
+                  {blockedRestoreInfo.newAddrPrefix ? (
+                    <>
+                      {" "}
+                      (address{" "}
+                      <span className="font-mono text-amber-300">
+                        1{blockedRestoreInfo.newAddrPrefix}…
+                      </span>
+                      )
+                    </>
+                  ) : null}
+                  . Find your most recent recovery file (the one saved after that date) and try
+                  again.
+                </p>
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  Your posts and earnings are safe at the newer key. Any BSV at this old address can
+                  still be spent by importing the secret key into another BSV wallet.
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 bg-zinc-900 text-zinc-400 border border-amber-400/15 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Reset to file-picker state so user can try a different file.
+                      setBlockedRestoreInfo(null);
+                      setImportError("");
+                    }}
+                    className="flex-1 bg-amber-400 text-black rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-300 transition-colors"
+                  >
+                    Try a different file
+                  </button>
+                </div>
+              </>
+            ) : importSuccess ? (
               <>
                 <div className="border-l-2 border-amber-500/60 pl-2.5 py-0.5">
                   <p className="text-[11px] text-amber-400/90 leading-relaxed">

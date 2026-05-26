@@ -2,6 +2,36 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-26 — E29: block restore of rotated keys (Design C-strict)
+
+Category: security architecture — block restoring any key that has been rotated forward on-chain.
+
+**Why:** every BSVibes user's first identity is plaintext by default. Its recovery file is a permanent leak vector. If restore-then-reclaim were allowed (the previous behavior via the auto-`cleanupMigrations` chain rewrite), anyone who ever obtained the plaintext file could later take over the user's future earnings — even years after upgrading to a strong passphrase. E29 closes this by treating the on-chain migration record as a permanent revocation event (parallel to Google / Apple invalidating sessions on a password change). Three parallel architecture-reviewer agents independently arrived at the same conclusion — pure Design B (warn-only) and B-hybrid (opt-in reclaim) both leave the attack vector open; only Design C-strict (block entirely) closes it.
+
+**Implementation across 6 files (~140 LOC added, ~25 removed):**
+
+- `src/services/bsv/identity.ts` — new `derivePubkeyFromWif(wif): Promise<string>` helper. Single sync derivation pattern previously duplicated across import sites; shared between E29 gate sites going forward.
+- `src/services/bsv/migration.ts` — new `getForwardMigration(pubkey): Promise<ForwardMigration | null>` helper. Server-side migration lookup, designed for reuse by E30 (stale-key mutation blocking, planned next).
+- `src/app/api/restore-eligibility/route.ts` — new GET endpoint. Pubkey query param, validates 02/03/04 compressed/uncompressed shapes, rate-limited 30/min/IP. Returns `{ allowed }` or `{ allowed: false, rotatedAt, newAddrPrefix }`. Derives the new address from the to_pubkey via `PublicKey.fromString(...).toAddress()` — same pattern as `weights.ts`.
+- `src/components/RestoreModal.tsx` — gate check in `doImport` BEFORE any identity write. AbortController wrapped (handleClose aborts in-flight check). New `blockedRestoreInfo` state + render branch with rotation date + new addr prefix + "Try a different file" button. ALSO removed the auto-`cleanupMigrations` call + the orphan `signPost` import (no other usage in the file).
+- `src/components/HomeScreenWelcomeGate.tsx` — same gate at both call sites (plaintext branch in `handleFile`, encrypted branch in `handlePassphrase`). New `Mode = "blocked"` variant with explicit render branch (avoids silent fallthrough). Same AbortController pattern. Shared `checkEligibility` helper inside the component since both call sites use it.
+
+**Doc updates:**
+- `DECISIONS.md` — new entry "Restore of rotated keys is blocked outright (Design C-strict)" with full security rationale, do-not-revert guards, and bridged-then-rotated edge case explicitly called out.
+- `DECISIONS.md` line 132 (`Identity import cleans up migrations`) marked SUPERSEDED with pointer to the new entry — prevents future contributors from reintroducing the old behavior thinking it's policy.
+
+**`cleanupMigrations` server action** in `src/app/actions.ts` is intentionally retained — no UI calls it post-E29, but the bridge logic is non-trivial and may be reusable for a future signature-gated admin reclaim design (would require stronger auth than "anyone with the WIF can reclaim"). Documented as orphan-by-design.
+
+**Fail-safe behavior:** any network/parse failure during the eligibility check ALSO blocks the restore with "Couldn't verify this key — check your connection and try again." Without verification we can't safely allow the restore.
+
+**Trade-off accepted:** users who lost their newer key and only have a pre-rotation file cannot recover via BSVibes UI. Mitigated by the existing combined-recovery-file pattern (every rotation file contains BOTH keys under one passphrase), so only the very first plaintext save (before any rotation) is unrecoverable. UTXOs at old addresses remain spendable via external BSV wallets.
+
+**Next**: E30 (planned) — block stale-key MUTATIONS (posts / boots) at the server. Different surface from E29: E29 handles "NEW device adopting stale key", E30 handles "EXISTING device discovering it's stale after rotation on another device". Will reuse the `getForwardMigration` helper from E29.
+
+Biome clean, tsc clean, 63/63 tests pass.
+
+PostForm.tsx mic diagnostic logs (task #50) intentionally still uncommitted.
+
 ## 2026-05-26 — E28c: welcome-gate restore preserves file's passphrase
 
 Category: bugfix — first-PWA-install restore-from-encrypted-file landed unprotected.

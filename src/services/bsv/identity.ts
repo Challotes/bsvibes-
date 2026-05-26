@@ -232,6 +232,20 @@ export async function getIdentity(options?: { allowAutoGen?: boolean }): Promise
 }
 
 /**
+ * Derive the public key (compressed, hex) from a WIF private key.
+ * Used by restore-eligibility checks in RestoreModal + HomeScreenWelcomeGate
+ * (E29) before touching any identity state — the pubkey is what the server
+ * uses to look up forward migration records.
+ *
+ * Throws if the WIF is malformed. Caller is responsible for surfacing the
+ * error to the user as "invalid recovery file" or similar.
+ */
+export async function derivePubkeyFromWif(wif: string): Promise<string> {
+  const { PrivateKey } = await getBsvSdk();
+  return PrivateKey.fromWif(wif.trim()).toPublicKey().toString();
+}
+
+/**
  * Unlock an encrypted identity with a passphrase.
  * Returns the identity if passphrase is correct, null if wrong.
  * Caches the decrypted identity in memory for the session.

@@ -3,6 +3,41 @@
  * When a user upgrades security, old key signs a migration to new key.
  */
 
+/**
+ * Look up a pubkey's forward migration record (if any).
+ *
+ * Returns the destination pubkey + creation timestamp when this pubkey has
+ * been rotated forward; returns null when this pubkey is current (no forward
+ * migration exists).
+ *
+ * Server-side only (queries SQLite directly). Shared between:
+ * - E29 `/api/restore-eligibility` — gates restore on whether the key is stale
+ * - E30 (planned) `createPost` + `boot-confirm` — gates mutations on whether
+ *   the signing pubkey has been rotated away
+ *
+ * The migrations table has `idx_migrations_from_unique` on `from_pubkey` so
+ * at most one row matches per pubkey. Returns the matching row's `to_pubkey`
+ * and a normalized ISO timestamp.
+ */
+export interface ForwardMigration {
+  toPubkey: string;
+  rotatedAt: string; // ISO 8601 with trailing Z
+}
+
+export async function getForwardMigration(pubkey: string): Promise<ForwardMigration | null> {
+  // Lazy import — this module is also used in client contexts above
+  // (postMigrationOnChain runs in browser). The DB import is server-only.
+  const { db } = await import("@/lib/db");
+  const row = db
+    .prepare("SELECT to_pubkey, created_at FROM migrations WHERE from_pubkey = ? LIMIT 1")
+    .get(pubkey.trim()) as { to_pubkey: string; created_at: string } | undefined;
+  if (!row) return null;
+  // SQLite returns `YYYY-MM-DD HH:MM:SS` (UTC, no Z). Normalize to ISO with Z.
+  // Matches the pattern in src/services/fairness/weights.ts.
+  const rotatedAt = `${row.created_at.replace(" ", "T")}Z`;
+  return { toPubkey: row.to_pubkey, rotatedAt };
+}
+
 interface MigrationData {
   oldPubkey: string;
   newPubkey: string;
