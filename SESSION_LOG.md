@@ -2,6 +2,37 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-05-28 — E30 design lock (planning session, no code)
+
+Category: design / planning — no code changes. Locked the full E30 (session-lockout for stale-key devices) implementation spec across three parallel agent reviews.
+
+**Agents consulted:**
+1. Technical pre-implementation map — surfaced 13 affected files, identified that `Identity` type needs a new `pubkey` field, and that `RestoreModal` needs nullable `currentIdentity` for the stale-key flow.
+2. Adversarial bug hunt — verdict SHIP-WITH-FIXES, surfaced 5 MUST-FIX items (U1 lost-newer-file escape hatch, F1+F2 fail-open on malformed `key_status`, R6 chain-head walk, R1 Show Recovery Key collision, feature flag for rollback) plus 6 SHOULD-ADDRESS items.
+3. UX lockdown + docs draft — final modal copy, amber banner spec, visual spec mirroring SignInModal, SECURITY_AUDIT.md L7 draft, DECISIONS.md entry draft, RestoreModal dead-end copy refinement.
+
+**Q&A resolution after agent triage:**
+- Q1 soak window → **same-day** (no soak instrumentation exists at BSVibes scale; signal value is low)
+- Q2 chain head → **dropped** (poll returns `{stale: true}` only with no pubkey data; `/api/restore-eligibility` already handles each hop one at a time via 1-hop forward check, so R6 is non-issue with this design)
+- Q3 modal stacking → **global bump RestoreModal z-[70] → z-[100]** (YAGNI on the z-prop option)
+- Q4 feature flag default → **on** (`E30_STALE_KEY_ENABLED=true` at deploy time)
+- Q5 scope split → **two commits** (E30a scaffolding ~210 LOC + 130 LOC tests, no user-visible change; E30b UI + behavior + #50 PostForm diagnostic revert + docs ~244 LOC + 80 LOC tests + 41 LOC docs)
+
+**U1 escape-hatch design** (option A, explanation only):
+- Trigger link `I don't have the newer file` (`text-[11px] text-zinc-500 underline`) below the primary CTA
+- Inline expand-below within the same modal; link text flips to `Hide` when expanded (matches existing IdentityBar `View all`/`Hide` pattern)
+- 3-paragraph explanation (~310 chars) in `text-zinc-400`: tells the user honestly that earnings + posting follow the newer key, the older key on this device can't post or earn, on-chain history is intact under the newer key. No support hook, no recovery promise, no "Got it" button (close X / backdrop are sufficient)
+
+**Bundled into E30b:** task #50 (revert PostForm.tsx diagnostic console.warn lines from E24 mic debugging) — E30b modifies PostForm anyway for the textarea → amber banner swap, so the revert lands cleanly in the same commit.
+
+**Identity.pubkey decision:** required field, not optional. Derives deterministically from WIF in `identity.ts` (`PrivateKey.fromWif(wif).toPublicKey().toString()`), backfill on load. TypeScript strict guarantees the rest. Avoids `??` chains across 8 consumer files.
+
+**`requireIdentity()` branching:** lands in E30a with a stub opener (dead branch, no caller triggers it). E30b swaps the stub for `setStaleModalOpen(true)`. Keeps E30b purely additive.
+
+**Next session:** explicit go-ahead → build E30a → build E30b → both in one push to origin (with explicit approval) → set `E30_STALE_KEY_ENABLED=true` on Railway/Vercel → close tasks #60 and #50.
+
+PostForm.tsx mic diagnostic logs (task #50) still uncommitted, will land bundled in E30b.
+
 ## 2026-05-27 — E29a: skip Web Share API on desktop (UX hotfix)
 
 Category: UX hotfix — desktop save sheets were opening OS-native share UI instead of the simple `<a download>` desktop users expect.
