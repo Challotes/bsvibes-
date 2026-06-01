@@ -162,7 +162,12 @@ export function ChangePassphraseModal({
           setWorking(false);
           return;
         }
-      } catch {
+      } catch (e) {
+        // Bind the error so it can be logged for debugging — the user-facing
+        // copy stays generic (network failure, server hiccup, etc.) but we
+        // preserve the actual error in the console so future production
+        // issues can be traced. E31 auditor Low finding follow-up.
+        console.error("[BSVibes] ChangePassphraseModal: eligibility check failed", e);
         setError("Couldn't verify your key — check your connection and try again.");
         setWorking(false);
         return;
