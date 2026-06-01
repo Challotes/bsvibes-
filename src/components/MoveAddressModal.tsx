@@ -12,7 +12,12 @@ import {
   shareOrDownloadBackup,
 } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
-import { commitUpgrade, sweepFunds, upgradeIdentity } from "@/services/bsv/identity";
+import {
+  commitUpgrade,
+  derivePubkeyFromWif,
+  sweepFunds,
+  upgradeIdentity,
+} from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface MoveAddressModalProps {
@@ -365,6 +370,43 @@ export function MoveAddressModal({
     // Released by `onClose` (which always wraps user dismissal paths).
     block();
     try {
+      // E31 client-side preflight: reject rotation if the current key has a
+      // forward migration on-chain (i.e. it's already been rotated forward
+      // elsewhere). Without this check, `upgradeIdentity` would generate a
+      // new key, run the sweep, and only THEN have `migrateIdentity` server
+      // action reject the migration — leaving the user's funds at an address
+      // the server can't recognise. The preflight closes that gap.
+      //
+      // Reuses the E29 `/api/restore-eligibility` endpoint — semantically
+      // identical question ("is this pubkey eligible to be the active key
+      // going forward?"). Fail-CLOSED on network/parse errors: rotation
+      // proceeds only when we can confirm the key is current.
+      try {
+        const currentPubkey = await derivePubkeyFromWif(identity.wif);
+        const res = await fetch(
+          `/api/restore-eligibility?pubkey=${encodeURIComponent(currentPubkey)}`
+        );
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data = (await res.json()) as { allowed: boolean };
+        if (!data.allowed) {
+          setStage("error");
+          setErrorStage("creating");
+          setErrorMessage(
+            "This key has already been replaced on another device. Restore your most recent recovery file to continue."
+          );
+          return;
+        }
+      } catch (e) {
+        setStage("error");
+        setErrorStage("creating");
+        setErrorMessage(
+          e instanceof Error && e.name === "AbortError"
+            ? "Cancelled"
+            : "Couldn't verify your key — check your connection and try again."
+        );
+        return;
+      }
+
       // Reuse a prior result if one exists — retry reuses the same key
       if (!upgradeResultRef.current) {
         const result = await upgradeIdentity(
@@ -447,12 +489,25 @@ export function MoveAddressModal({
       return;
     }
     try {
-      await migrateIdentity(
+      // E31: check the migrate result. Previously this call was fire-and-forget,
+      // which left the device on a new key when the server silently rejected
+      // (same regression class as historical SECURITY_AUDIT BUG-10 — fixed in
+      // ChangePassphraseModal but never patched here). With E31's stale-key
+      // gate now active server-side, an unchecked return value would put the
+      // device into an unrecoverable mismatched state.
+      const migrationResult = await migrateIdentity(
         result.migration.oldPubkey,
         result.migration.newPubkey,
         result.migration.migrationSignature,
         result.migration.migrationMessage
       );
+      if (!migrationResult.success) {
+        throw new Error(
+          migrationResult.reason === "stale_key"
+            ? "This key has already been replaced on another device. Restore your most recent recovery file to continue."
+            : "Migration failed — rotation aborted."
+        );
+      }
 
       // Commit encrypted key to localStorage
       commitUpgrade(result.encStore, result.identity);

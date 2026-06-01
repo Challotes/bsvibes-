@@ -9,7 +9,7 @@ async function getBsvSdk() {
   return { PublicKey, Signature };
 }
 
-import { postMigrationOnChain } from "@/services/bsv/migration";
+import { getForwardMigration, postMigrationOnChain } from "@/services/bsv/migration";
 import { logPostOnChain } from "@/services/bsv/onchain";
 import { executeBoot } from "@/services/fairness/boot-orchestrator";
 import { getBootPriceForUser } from "@/services/fairness/pricing";
@@ -243,91 +243,13 @@ export async function bootPost(
 }
 
 /**
- * Clean up any migration records where `from_pubkey` matches the given pubkey.
- *
- * Called when a user imports a key back into their browser. If key A was
- * previously upgraded (creating a migration A → B), but the user is now
- * actively using A again, the migration is stale and would silently redirect
- * all payouts to B — an address the user may no longer control.
- *
- * Deleting the migration row restores direct payouts to A.
- * This is safe: the user holding the key proves ownership.
+ * Result type for `migrateIdentity`. `reason` is set on failure so callers can
+ * distinguish rejection causes — particularly important for E31's stale-key
+ * gate, which surfaces a different UI than a generic verification failure.
  */
-export async function cleanupMigrations(
-  pubkey: string,
-  signature?: string,
-  timestamp?: number
-): Promise<{ deleted: number }> {
-  if (typeof pubkey !== "string" || pubkey.trim().length === 0) {
-    return { deleted: 0 };
-  }
-
-  // Require signature verification — caller must prove key ownership
-  if (typeof signature !== "string" || !signature || typeof timestamp !== "number") {
-    console.warn("[BSVibes] cleanupMigrations: called without signature — rejecting");
-    return { deleted: 0 };
-  }
-
-  // Reject timestamps older than 5 minutes to prevent replay attacks
-  const age = Date.now() - timestamp;
-  if (age > 5 * 60 * 1000 || age < -30_000) {
-    console.warn("[BSVibes] cleanupMigrations: timestamp out of range — rejecting");
-    return { deleted: 0 };
-  }
-
-  const message = `cleanup:${pubkey.trim()}:${timestamp}`;
-  try {
-    const { PublicKey, Signature } = await getBsvSdk();
-    const messageBytes = Array.from(new TextEncoder().encode(message));
-    const verified = PublicKey.fromString(pubkey.trim()).verify(
-      messageBytes,
-      Signature.fromDER(signature, "hex")
-    );
-    if (!verified) {
-      console.warn("[BSVibes] cleanupMigrations: signature verification failed — rejecting");
-      return { deleted: 0 };
-    }
-  } catch {
-    console.warn("[BSVibes] cleanupMigrations: signature verification error — rejecting");
-    return { deleted: 0 };
-  }
-
-  const trimmedPubkey = pubkey.trim();
-
-  // Before deleting, check if the target key has posts that would be orphaned.
-  // If so, insert a bridge migration (target → imported key) to preserve attribution.
-  const existingMigrations = db
-    .prepare("SELECT to_pubkey FROM migrations WHERE from_pubkey = ?")
-    .all(trimmedPubkey) as Array<{ to_pubkey: string }>;
-
-  db.transaction(() => {
-    for (const { to_pubkey } of existingMigrations) {
-      const postCount = db
-        .prepare("SELECT COUNT(*) as c FROM posts WHERE pubkey = ?")
-        .get(to_pubkey) as { c: number };
-
-      if (postCount.c > 0) {
-        // The intermediate key has posts — bridge it to the imported key
-        db.prepare(
-          "INSERT OR IGNORE INTO migrations (from_pubkey, to_pubkey, signature) VALUES (?, ?, ?)"
-        ).run(to_pubkey, trimmedPubkey, "auto-bridge-on-import");
-        console.log(
-          `[BSVibes] cleanupMigrations: bridged orphaned key ${to_pubkey.slice(0, 16)}… → ${trimmedPubkey.slice(0, 16)}…`
-        );
-      }
-    }
-
-    db.prepare("DELETE FROM migrations WHERE from_pubkey = ?").run(trimmedPubkey);
-  })();
-
-  const deleted = existingMigrations.length;
-  if (deleted > 0) {
-    console.log(
-      `[BSVibes] cleanupMigrations: removed ${deleted} stale migration(s) for pubkey ${trimmedPubkey.slice(0, 16)}…`
-    );
-  }
-
-  return { deleted };
+export interface MigrateIdentityResult {
+  success: boolean;
+  reason?: "bad_message" | "invalid_signature" | "stale_key";
 }
 
 export async function migrateIdentity(
@@ -335,16 +257,16 @@ export async function migrateIdentity(
   newPubkey: string,
   migrationSig: string,
   migrationMessage: string
-): Promise<{ success: boolean }> {
+): Promise<MigrateIdentityResult> {
   // Validate migration message structure — from_pubkey and to_pubkey must match params
   try {
     const parsed = JSON.parse(migrationMessage);
     if (parsed.from_pubkey !== oldPubkey || parsed.to_pubkey !== newPubkey) {
       console.warn("[BSVibes] migrateIdentity: message body does not match params");
-      return { success: false };
+      return { success: false, reason: "bad_message" };
     }
   } catch {
-    return { success: false };
+    return { success: false, reason: "bad_message" };
   }
 
   // Verify the migration signature — old key must have signed the message
@@ -355,9 +277,34 @@ export async function migrateIdentity(
       messageBytes,
       Signature.fromDER(migrationSig, "hex")
     );
-    if (!verified) return { success: false };
+    if (!verified) return { success: false, reason: "invalid_signature" };
   } catch {
-    return { success: false };
+    return { success: false, reason: "invalid_signature" };
+  }
+
+  // E31: reject if oldPubkey already has a forward migration on-chain.
+  // Symmetric to E29's restore-eligibility check: a key that has been
+  // rotated away is permanently retired for BSVibes' purposes. Without
+  // this guard, anyone holding any past WIF could sign a new migration
+  // and OVERWRITE the legitimate rotation (INSERT OR REPLACE below would
+  // silently take over the chain head). See DECISIONS.md "E31 block
+  // rotate-from-stale" + SECURITY_AUDIT.md BUG-11.
+  try {
+    const forward = await getForwardMigration(oldPubkey);
+    if (forward) {
+      console.warn(
+        `[BSVibes] migrateIdentity: rejecting rotation from stale key ${oldPubkey.slice(0, 16)}… (already rotated to ${forward.toPubkey.slice(0, 16)}…)`
+      );
+      return { success: false, reason: "stale_key" };
+    }
+  } catch (e) {
+    // Lookup failure: fail CLOSED here (not open) because allowing the
+    // migrate through without the staleness check would re-open the very
+    // bug E31 closes. Server-side DB error → reject the rotation; the
+    // user retries later when the DB is healthy. This is one of the few
+    // places fail-open would be the wrong default.
+    console.error("[BSVibes] migrateIdentity: getForwardMigration error — rejecting", e);
+    return { success: false, reason: "stale_key" };
   }
 
   // C7 fix: before replacing the migration row, check whether the existing to_pubkey

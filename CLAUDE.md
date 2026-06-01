@@ -40,7 +40,7 @@ This project is built using the **bOpen.ai toolkit** (agents, skills, plugins). 
 
 ### Server Actions & Data
 
-- `src/app/actions.ts` — Server actions. Reads (no signature): getPosts, getNewPosts, getUpdatedPosts, getOlderPosts, getBootboard, verifyMigrationChain (pre-rotation orphan check). Mutations (signature-verified): createPost, bootPost, migrateIdentity, cleanupMigrations.
+- `src/app/actions.ts` — Server actions. Reads (no signature): getPosts, getNewPosts, getUpdatedPosts, getOlderPosts, getBootboard, verifyMigrationChain (pre-rotation orphan check). Mutations (signature-verified): createPost, bootPost, migrateIdentity. `migrateIdentity` now also rejects any rotation whose `from_pubkey` already has a forward migration record (E31, symmetric to E29's restore-eligibility check — closes the rotate-from-stale takeover vector). `cleanupMigrations` was removed in E31 (originally added 2026-03-28 to fix payout-redirection after re-importing a rotated key; structurally obsoleted by E29 which blocks re-importing rotated keys in the first place). Recoverable from commit `31a9d92` if a future signature-gated admin reclaim design materialises — but it would need a different auth shape regardless.
 - `src/lib/db.ts` — SQLite setup (WAL, foreign keys, auto-migration, indexes, boot_grants + payouts tables)
 - `src/lib/rate-limit.ts` — In-memory sliding window rate limiter
 - `src/lib/utils.ts` — Shared utilities (generateAnonName, cn helper)

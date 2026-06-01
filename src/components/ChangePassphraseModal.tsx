@@ -5,7 +5,12 @@ import { migrateIdentity, verifyMigrationChain } from "@/app/actions";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { type BackupData, downloadBackup, getStoredHint } from "@/services/bsv/backup-template";
 import { encryptWif } from "@/services/bsv/crypto";
-import { commitUpgrade, unlockIdentity, upgradeIdentity } from "@/services/bsv/identity";
+import {
+  commitUpgrade,
+  derivePubkeyFromWif,
+  unlockIdentity,
+  upgradeIdentity,
+} from "@/services/bsv/identity";
 import type { Identity } from "@/types";
 
 interface ChangePassphraseModalProps {
@@ -138,6 +143,31 @@ export function ChangePassphraseModal({
     // fire pagehide on its Save-Password sheet. Released in handleClose.
     block();
     try {
+      // E31 client-side preflight: reject rotation if the current key has a
+      // forward migration on-chain. Without this check, `upgradeIdentity`
+      // would run the sweep BEFORE the server-side `migrateIdentity` reject
+      // — leaving funds at a new address the server can't recognise.
+      // Fail-CLOSED on network errors so we don't proceed without verification.
+      try {
+        const currentPubkey = await derivePubkeyFromWif(currentIdentity.wif);
+        const res = await fetch(
+          `/api/restore-eligibility?pubkey=${encodeURIComponent(currentPubkey)}`
+        );
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data = (await res.json()) as { allowed: boolean };
+        if (!data.allowed) {
+          setError(
+            "This key has already been replaced on another device. Restore your most recent recovery file to continue."
+          );
+          setWorking(false);
+          return;
+        }
+      } catch {
+        setError("Couldn't verify your key — check your connection and try again.");
+        setWorking(false);
+        return;
+      }
+
       const result = await upgradeIdentity(
         newPass,
         currentIdentity.wif,
@@ -153,6 +183,13 @@ export function ChangePassphraseModal({
       );
 
       if (!migrationResult.success) {
+        // E31: surface the stale-key case with specific copy. Other failure
+        // reasons fall through to the generic catch-block message.
+        if (migrationResult.reason === "stale_key") {
+          throw new Error(
+            "This key has already been replaced on another device. Restore your most recent recovery file to continue."
+          );
+        }
         throw new Error("Migration failed — passphrase change aborted.");
       }
 
@@ -194,7 +231,15 @@ export function ChangePassphraseModal({
       onSuccess(newIdentity, transferMsg);
       setStep("done");
     } catch (e) {
-      setError("Something went wrong — try again");
+      // Preserve specific error messages (e.g. E31 stale-key copy) when the
+      // thrown error already carries actionable user-facing text. Generic
+      // failures fall back to the boilerplate message.
+      const msg = e instanceof Error ? e.message : "";
+      setError(
+        msg && msg !== "Migration failed — passphrase change aborted."
+          ? msg
+          : "Something went wrong — try again"
+      );
       console.error("BSVibes: passphrase change failed", e);
     } finally {
       setWorking(false);

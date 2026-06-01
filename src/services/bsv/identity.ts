@@ -914,7 +914,7 @@ export async function importIdentity(wif: string, name?: string): Promise<Identi
  * Post-conditions (mirror importIdentity for cache coherence):
  * - STORAGE_KEY removed (so isEffectivelyProtected() returns true)
  * - ENCRYPTED_KEY populated with { encrypted, name, address, hint? }
- * - _sessionIdentity primed so signPost can fire immediately for cleanupMigrations
+ * - _sessionIdentity primed so signPost can fire immediately for follow-up signing
  * - _cachedWif / _cachedPrivateKey set
  */
 export async function importEncryptedIdentity(
@@ -960,7 +960,7 @@ export async function importEncryptedIdentity(
   localStorage.removeItem(STORAGE_KEY);
   localStorage.setItem(ENCRYPTED_KEY, JSON.stringify(storePayload));
 
-  // Prime session caches so signPost (used immediately by cleanupMigrations)
+  // Prime session caches so any follow-up signing (post creation, boot, etc.)
   // works without forcing the user to re-unlock. The encrypted-store path
   // normally requires unlockIdentity(passphrase) before signing — we skip
   // that here because we JUST received the passphrase from the user.

@@ -58,6 +58,7 @@ export function IdentityChip(): React.JSX.Element | null {
     needsUnlock,
     updateIdentity,
     openSignIn,
+    openStaleKeyModal,
     isSessionClearBlocked,
     blockSessionClear,
     unblockSessionClear,
@@ -541,6 +542,19 @@ export function IdentityChip(): React.JSX.Element | null {
   // ── Modal launchers ────────────────────────────────────────────────────
 
   function openMoveModal(pass: string): void {
+    // E31 trigger guard: if the local key is stale, intercept BEFORE we
+    // mount the rotation wizard. The wizard would otherwise let the user
+    // run the sweep and only fail at the server-side migrate step,
+    // leaving funds at an address the server can't recognise. The client
+    // preflight in MoveAddressModal.runCreating catches it too, but this
+    // saves the user the round-trip and gives them the right UI (restore
+    // flow, not rotation error). Three call sites in IdentityBar feed into
+    // this function (Passphrase row in You modal, Not Protected red banner,
+    // and the manage-gate fallback) — guarding here covers all of them.
+    if (staleKey) {
+      openStaleKeyModal();
+      return;
+    }
     setMovePassphrase(pass);
     // Keep You modal mounted underneath — sub-modal stacks on top.
     // Cancel returns to You modal; only successful completion closes both.

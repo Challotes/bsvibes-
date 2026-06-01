@@ -319,12 +319,6 @@ export function RestoreModal({
       // the user demonstrably has a recovery file for.
       markAddressSaved(imported.address);
 
-      // E29: cleanupMigrations is NO LONGER called on restore. The on-chain
-      // migration record is treated as a permanent revocation — rotated keys
-      // can't be restored (gated upstream in doImport), and even when a current
-      // key is restored we don't rewrite the server-side migration graph.
-      // See DECISIONS.md "Restore of rotated keys (Design C-strict)".
-
       // CRITICAL ordering: flip local success state BEFORE notifying the parent.
       // onSuccess(imported) triggers parent updateIdentity() → re-render.
       // If the parent re-renders while this modal is mid-transition, the

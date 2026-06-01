@@ -2,6 +2,39 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-06-01 — E31: block rotate-from-stale + delete cleanupMigrations (single commit)
+
+Category: security architecture — closes a HIGH severity takeover vector discovered during E30 manual testing. Symmetric to E29's restore-from-stale block.
+
+**Bug:** A stale-key holder could call `migrateIdentity` to rotate their already-rotated key. Old WIF signs a valid migration → server accepts → `INSERT OR REPLACE` silently overwrites the legitimate rotation → chain head takes over. Legitimate current key holder locked out. Same attack class as E29 just at a different endpoint. Tracked as SECURITY_AUDIT.md BUG-11.
+
+**Implementation across 6 files:**
+- `src/app/actions.ts` — `migrateIdentity` calls `getForwardMigration(oldPubkey)` after signature verification; rejects with `reason: "stale_key"` if a forward migration row exists. Return type extended to `MigrateIdentityResult` (success + optional reason). Fails CLOSED on DB lookup errors (rotate-from-stale must never succeed, even during partial DB outage). `cleanupMigrations` action DELETED entirely (~75 LOC removed).
+- `src/components/MoveAddressModal.tsx` — added client-side preflight in `runCreating` (calls `/api/restore-eligibility` before `upgradeIdentity` runs the sweep — prevents funds-in-flight edge case). Added return-value check on `migrateIdentity` call (was previously fire-and-forget — same regression class as historical BUG-10). Imports `derivePubkeyFromWif`.
+- `src/components/ChangePassphraseModal.tsx` — same client-side preflight pattern. Existing `migrateIdentity` return check now branches on `reason: "stale_key"` for specific user-facing copy. Catch block preserves specific error messages instead of always overwriting with generic boilerplate.
+- `src/app/IdentityBar.tsx` — `openMoveModal` checks `staleKey` and routes to `openStaleKeyModal()` instead of mounting the rotation wizard. Three call sites feed through this function (Passphrase row, Not Protected red banner, manage-gate fallback). Imports `openStaleKeyModal` from context.
+- `src/components/RestoreModal.tsx` — removed dead E29 comment about cleanupMigrations.
+- `src/services/bsv/identity.ts` — updated two stale JSDoc/inline comments referencing cleanupMigrations.
+
+**Docs:**
+- DECISIONS.md — new entry "E31 block rotate-from-stale" with full F-CLOSED rationale, decisions made during design (hard-lockout gate considered and rejected), do-not-revert guards. The `cleanupMigrations` retention entry was rewritten to document the deletion (originally added 2026-03-28 commit `31a9d92` to fix payout-redirection after re-importing a rotated key; structurally obsoleted by E29 which blocked re-importing rotated keys; recoverable from git history if a future admin-reclaim feature ever materialises).
+- SECURITY_AUDIT.md — new BUG-11 entry documenting the takeover vector + fix.
+- CLAUDE.md — updated actions.ts inventory entry (removes cleanupMigrations, notes the E31 migrate guard).
+
+**Three agents consulted during design (2026-06-01):**
+1. Architecture reviewer — endpoint audit: identified `migrateIdentity` + `cleanupMigrations` as vulnerable. All other endpoints (createPost, bootPost free+paid, /api/boot-confirm, /api/boot-shares) confirmed OK. Surfaced the secondary `MoveAddressModal` BUG-10 regression. Flagged the funds-in-flight edge case requiring client preflight.
+2. Designer — UX hardening: chip click while stale, You modal stale-state card, trigger guards on rotation modals.
+3. Architecture reviewer (follow-up) — `cleanupMigrations` archaeology: traced introducing commit `1d93f2e` (Mar 28); confirmed the original payout-redirection bug; confirmed E29 obsoleted the scenario; zero active callers; recovery via `git show 31a9d92:src/app/actions.ts` is near-zero cost.
+
+**Decisions made during the session:**
+- UI hardening approach: stay with E30's modal+banner + add small trigger guards (vs hard-lockout gate). Both UX and architecture agents recommended against hard-gate.
+- `cleanupMigrations`: delete entirely (vs guard or build admin reclaim now). Future admin reclaim would need different auth shape anyway.
+- Scope: single E31 commit (vs split server/UI).
+
+**Code-auditor verdict:** TBD (re-audit pending before commit). Earlier per-chunk auditor confirmed root cause (`INSERT OR REPLACE` enables clean overwrite) and identified the secondary regressions.
+
+Biome clean, tsc clean, 87/87 tests pass, prod build clean.
+
 ## 2026-05-29 — E30: stale-key session-lockout (shipped, two commits)
 
 Category: security architecture + UX — completes the rotation/revocation story by closing the "existing device unaware its key was revoked elsewhere" hole. E29 closed "new device adopts stale key"; E30 closes the symmetric case.

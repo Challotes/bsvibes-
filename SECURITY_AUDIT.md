@@ -113,6 +113,23 @@
 - L5: Direct WoC calls leak user addresses with IP
 - L6: Clipboard not cleared after WIF copy
 
+### BUG-11: Rotate-from-stale key takeover (E31 — FIXED 2026-06-01)
+**Severity:** HIGH (pre-fix) — full account takeover by anyone holding any past WIF
+**Files:** `src/app/actions.ts` `migrateIdentity`, `src/components/MoveAddressModal.tsx`, `src/components/ChangePassphraseModal.tsx`, `src/app/IdentityBar.tsx`
+**Risk (pre-fix):** A user holding a key A that had already been rotated forward (migration row `from=A, to=B` exists) could still call `migrateIdentity` to rotate A→C. The signature was cryptographically valid (A's WIF can still sign anything), so the server accepted the migration. `INSERT OR REPLACE` on the migrations table silently overwrote the legitimate `A→B` row with `A→C`. Chain head moved from B to C — legitimate B holder was locked out of their own account.
+
+**Discovery:** Found during E30 manual testing 2026-06-01. Same attack class as E29's restore-from-stale vector (which was closed). The parallel attack via rotate-from-stale was missed during E29's design.
+
+**Fix:**
+- Server: `migrateIdentity` calls `getForwardMigration(oldPubkey)` after signature verification. Rejects with `reason: "stale_key"` if a forward migration exists. Fails CLOSED on DB errors (rotate-from-stale must never succeed; partial DB outage rejects rather than allowing through).
+- Client preflight: `MoveAddressModal.runCreating()` and `ChangePassphraseModal.handleChange()` call `/api/restore-eligibility` BEFORE invoking `upgradeIdentity` (which runs the sweep). Prevents the funds-in-flight edge case where the sweep moves UTXOs to a new address before the server rejects the migrate.
+- Return-value check: `MoveAddressModal` now checks `migrateIdentity`'s result (it was previously fire-and-forget — same class as historical BUG-10 which was fixed in ChangePassphraseModal but never patched here).
+- UI trigger guard: `IdentityBar.openMoveModal` checks `staleKey` and routes to `openStaleKeyModal()` instead of mounting the rotation wizard.
+- `cleanupMigrations` server action deleted (separate but coupled — see DECISIONS.md "E31 block rotate-from-stale").
+
+**Cross-reference:** DECISIONS.md "E31 block rotate-from-stale" · DECISIONS.md "Restore of rotated keys (Design C-strict)" (E29, the symmetric protection) · L7 below (residual risk for `createPost` which is intentionally NOT gated)
+**Status:** FIXED.
+
 ### L7: Stale-key attribution griefing (E30 deferred risk)
 **Severity:** LOW — bounded per-victim, requires WIF compromise as prerequisite
 **Files:** `src/app/actions.ts` (createPost), `src/services/fairness/weights.ts`
