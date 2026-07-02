@@ -79,6 +79,36 @@
 - [ ] **Production smoke test** — `npm run build` green; post a test idea and confirm it lands on-chain (check the tx); do one free boost + one paid boost; open `/api/health` and confirm `"ok": true`.
 - [ ] Confirm `CONTENT_DENYLIST` is actually set (the one item that silently fails open if forgotten).
 
+## 6. Pre-launch gap-audit findings (2026-06-30 — 4-agent sweep: deploy / legal / security / code)
+
+> Build + 156 unit + 38 integration tests + 0 lint all green; **no broken code**. These are config / content / legal / deploy-correctness gaps the earlier sections didn't capture. ALPHA = before sharing the alpha link; PUBLIC = before opening to everyone / real funds.
+
+### New ALPHA items (beyond §1–§5)
+- [ ] **Switch `railway.toml` builder to `dockerfile`** — the Dockerfile pins Node 20 + installs `python3 make g++` for `better-sqlite3`'s native compile; nixpacks may pick Node 22 and fail. Then watch the first build succeed.
+- [ ] **Change `railway.toml` `healthcheckPath` from `/` → `/api/health`** — the root page hits the DB on boot; if the volume isn't mounted yet, `/` 500s into a restart loop.
+- [ ] **Confirm the Railway Volume is actually attached at `/data` in the dashboard** (the `[deploy.volumes]` TOML alone may not wire it on current Railway).
+- [ ] **Raise `serverLowBalanceAlertSats`** from ~10k → ~50k sats before funding (10k ≈ ~7 free boosts of runway).
+- [ ] After funding, **watch `/api/health` for `wallet.balanceSats > 0` + `low:false`**.
+- [ ] **Verify the Anthropic model id** (`claude-haiku-4-5-…`) is valid for the key + set a monthly cap in the Anthropic console; set a Groq cap too if on a paid key.
+- [ ] *Alpha gate* — build the ~15-line `middleware.ts` Basic-Auth (must EXEMPT `/api/health`) **or** simply don't advertise the URL.
+
+### New PUBLIC items (before opening to everyone / real funds)
+- [ ] **Confirm Railway runs exactly ONE instance** (or move the spend-ceiling + rate-limiter to Redis) — the caps are in-memory per-instance, so N instances = N× the $0.20/day ceiling + split rate-limit buckets.
+- [ ] **Build an instant runtime kill-switch toggle** (DB/Redis-backed) — `BSV_WALLET_SPEND_DISABLED` needs a redeploy to take effect = minutes of exposure during a live wallet drain.
+- [ ] **OG image (1200×630) + `metadataBase` + `og:url`** in `layout.tsx` — shared links are blank cards otherwise (matters for a share-driven launch).
+- [ ] **Error monitoring** (Sentry, or a Railway → Logtail/BetterStack log drain) — `console.error` into 7-day Railway logs is the only signal today.
+- [ ] **DB backup off Railway** (cron dump of `/data/local.db` → S3/R2/Backblaze) — the SQLite file is the only copy of contributor earnings.
+- [ ] **Broadcast-proxy / ARC failover** (`/api/broadcast`, Phase 6.5) — a single ARC provider is a SPOF that halts ALL boosts (free + paid) during an outage.
+- [ ] **`anon_XXXX` handle collisions** (FUTURE.md "before launch" item — ~1% collision at 184 users).
+- [ ] **`robots.txt`** (allow `/`, disallow `/api/`).
+- [ ] **Legal (public):** the ~1hr lawyer pass on the 3 hard clauses (**CSAM/operator-as-broadcaster is #1** — your server signs every post, so it doesn't de-risk like the others); fill ALL binding `[TODO]`s; remove the "Draft — not final" banner + flip docs in-force; age-gate decision; lawyer look at the "earnings/real-money" UI framing; register the DMCA agent.
+
+### NICE-TO-HAVE (debt)
+- [ ] Branded `not-found.tsx` (404 is Next's default page now).
+- [ ] Remove the 6 left-in `console.log`s in `src/services/bsv/client-boot.ts`.
+- [ ] `wallet.ts` invalid-WIF handler: log `e.message` only (avoid echoing key material on misconfig).
+- [ ] Reconcile SECURITY_AUDIT.md (H3 effectively resolved). Tracked debt: PBKDF2 100k→600k, CSP nonce, authenticated financial reads.
+
 ---
 
 *When every box is ticked and you're live: `git rm LAUNCH_CHECKLIST.md` and commit — the launch is closed.*

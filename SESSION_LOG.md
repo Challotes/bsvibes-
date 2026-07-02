@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-07-02 — Pre-launch gap audit + launch-sequencing planning
+
+- **Pre-launch gap sweep (4 agents: deploy/ops, legal, security/money, code/product).** No broken code (build + 156 unit + 38 integration + 0 lint green). Findings consolidated into **`LAUNCH_CHECKLIST.md` §6** — new alpha items (Railway Dockerfile builder + `/api/health` healthcheck + volume-attach, low-balance alert, model-id check), new public items (single-instance/Redis, instant kill-switch, OG image + `metadataBase`, error monitoring, DB backup, ARC failover, handle collisions, robots.txt, the lawyer pass), and nice-to-haves.
+- **Also pushed** the earlier stacked commits (58) to origin — repo now in sync.
+- **Launch data-prep + sequencing planning** captured in local working notes (not committed — involves contributor personal data + pre-launch specifics). Design verified across several agent passes; effort scoped small.
+- **Next session:** decide whether to start the launch data-prep build or continue gathering inputs.
+
 ## 2026-06-30 — MD accuracy audit (post in-app rewrite, 3 agents)
 
 - **Full doc-truth pass** after the in-app-browser rewrite — make sure no MD lies about the current code. 3 read-only agents cross-checked every MD against `src/`; I validated each finding against the code before fixing.
