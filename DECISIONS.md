@@ -76,6 +76,15 @@
 - Server-side enforcement (pubkey + IP + session token), not chain-only
 - Optional: proof-of-work for free posts
 
+## Launch generous, tighten with scale (settled 2026-07-20)
+
+- **Strategy:** launch with deliberately generous economics — free posting, every post earns a pool share, free boosts — to bootstrap the network (the classic marketplace "free to start" playbook). Tighten as the platform grows and there is a network worth protecting + users who can carry their own cost.
+- **Known risk knowingly accepted:** free-post weight-farming — post count adds pool weight *linearly* (`sqrt` dampens boosts-per-post, not post count) and posting is free, so spamming free posts inflates pool share cheaply. Bound + detail in SECURITY_AUDIT.md **L8** (negligible at launch ≈ cents/day, ~$700–1k/yr worst-case at scale; harm is fairness-dilution/reputation, not theft).
+- **Why deferred, not fixed now:** the cheap per-identity weight cap is sharding-bypassable (fresh keys are free), so it isn't worth building. The effective levers are structural — engagement-gated payout weight (pool earnings follow demonstrated engagement, not raw posting) and/or posting costs / reduced subsidies — tightening moves best applied *at scale*, when they're both needed and users can carry the cost. These are directional levers, not committed features.
+- **Tripwire (so "later" isn't open-ended):** revisit when daily paid-boost volume exceeds ~$50/day, OR any single identity/IP cluster holds >20% of total pool weight, OR the vector is publicly demonstrated.
+- **Safe to defer:** runtime weight-formula change only (no on-chain format or DB migration; `boot_split` carries `formula_version` so the split rule can change forward), addable any time. Sole caveat: on-chain payouts can't be clawed back — hence the tripwire.
+- **Don't relitigate pre-scale.**
+
 ## Bootboard (settled)
 
 - **Mechanic:** Any post can be "booted" to a spotlight slot by paying a fee. Someone else pays, you get booted off
