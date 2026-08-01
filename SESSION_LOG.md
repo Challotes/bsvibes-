@@ -2,6 +2,18 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-08-01 — Fairness/security decisions + full multi-agent MD accuracy audit
+
+- **Launch economics decision** — DECISIONS.md "Launch generous, tighten with scale": bootstrap with free posting / posts-earn / free boosts (marketplace "free to start"), tighten with scale, tripwire documented. **Free-post weight-farming** logged as a known, risk-accepted, deferred finding (SECURITY_AUDIT.md **L8**); corrected the FAIRNESS.md Gaming-Analysis "Spam posts" row (`sqrt` dampens boosts-per-post, NOT post count) + a `minPostsForPricing` price-vs-weight note. (Committed `670283b`.)
+- **Full multi-agent MD accuracy audit (4 agents, MD-vs-code).** Verdict: money-path descriptions + today's additions are accurate; findings were all **stale references to the REMOVED key-rotation/migration system** (+ date/count nits). Fixes applied:
+  - README.md — dropped "on-chain key migration" / "migration chain resolution" from "What's built today" (both removed 2026-06-14).
+  - CLAUDE.md — `layout.tsx` is not the provider wrapper (providers live in `Feed.tsx`); added the missing `broadcast.ts` entry.
+  - ROADMAP.md — removed 2 already-done owner-follow-ups (repo rename + OC icon); test count 150→194; clarified the Phase-3 header (Governance = content-moderation + legal → CODE COMPLETE, legal/lawyer pending) and Open Source → COMPLETE.
+  - DECISIONS.md — SUPERSEDED banners over the rotation-era Identity & Security entries + the OpenCook-Rebrand section (rebrand DONE: `app:opencook`, `migration.ts` deleted).
+  - LAUNCH_PLAN.md — noted the deleted `MoveAddressModal`.
+  - LAUNCH_CHECKLIST.md — console.log count 6→7; added a "use a DEDICATED `BSV_SERVER_WIF`, never personal" deploy-hygiene line (§1).
+- Off-repo (memory, deliberately): genesis data-prep + design, identity/wallet-standard (BRC-100) evaluation → keep custom key, server-key ops/tooling. No repo changes from those.
+
 ## 2026-07-02 — Pre-launch gap audit + launch-sequencing planning
 
 - **Pre-launch gap sweep (4 agents: deploy/ops, legal, security/money, code/product).** No broken code (build + 156 unit + 38 integration + 0 lint green). Findings consolidated into **`LAUNCH_CHECKLIST.md` §6** — new alpha items (Railway Dockerfile builder + `/api/health` healthcheck + volume-attach, low-balance alert, model-id check), new public items (single-instance/Redis, instant kill-switch, OG image + `metadataBase`, error monitoring, DB backup, ARC failover, handle collisions, robots.txt, the lawyer pass), and nice-to-haves.

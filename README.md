@@ -40,8 +40,8 @@ The fairness formula (Phase 1): contribution weight = `sqrt(engagement) × time_
 - Trustless split payments: browser builds the transaction, broadcasts directly to contributors
 - 15 free boots per user, then self-funded via BSV balance
 - AI agent chat (Claude) with full project context, streaming responses
-- Zero-friction identity: keypair auto-generated, AES-256-GCM optional encryption, on-chain key migration
-- Contribution scoring with decay, engagement multiplier, migration chain resolution
+- Zero-friction identity: keypair auto-generated, AES-256-GCM optional passphrase encryption (encrypt-in-place — the key/address never changes)
+- Contribution scoring with decay and engagement multiplier
 - Earnings sparkline, noob/goat currency toggle ($ vs sats), live balance polling
 - Self-contained HTML recovery files that work offline with no server required
 

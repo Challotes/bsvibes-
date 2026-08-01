@@ -40,7 +40,7 @@
 
 ## 1. Environment variables (Railway → service → Variables)
 
-- [ ] `BSV_SERVER_WIF` — server wallet private key (WIF). Required for on-chain post logging + server-funded free boosts. Without it, posts save to DB only (no on-chain fingerprint).
+- [ ] `BSV_SERVER_WIF` — server wallet private key (WIF). Required for on-chain post logging + server-funded free boosts. Without it, posts save to DB only (no on-chain fingerprint). **Use a DEDICATED key** (generate a fresh one, e.g. `node scripts/generate-wallet.mjs`) — **never a personal wallet**: this address publicly funds + collects for the entire platform on-chain, permanently, so a personal key links your identity/funds to OpenCook forever.
 - [ ] `ANTHROPIC_API_KEY` — required for the "Ask AI" agent chat.
 - [ ] `GROQ_API_KEY` — *(optional but recommended)* powers the compose-box voice-to-text mic (`/api/transcribe` → Groq Whisper). Free key, no card, from https://console.groq.com/keys (free tier 2,000 transcriptions/day). Unset = the mic shows "voice input offline" on tap; everything else works. *(optional)* `TRANSCRIBE_DAILY_LIMIT` caps daily transcription calls (default 2000).
 - [ ] `CONTENT_DENYLIST` — illegal-floor pre-publish filter (Phase 3). **MUST be set before public launch** (unset = permissive/no filtering). Patterns one-per-line or comma-separated; `/regex/` or substring. Scope to ILLEGAL content only. NOT committed.
@@ -105,7 +105,7 @@
 
 ### NICE-TO-HAVE (debt)
 - [ ] Branded `not-found.tsx` (404 is Next's default page now).
-- [ ] Remove the 6 left-in `console.log`s in `src/services/bsv/client-boot.ts`.
+- [ ] Remove the 7 left-in `console.log`s in `src/services/bsv/client-boot.ts`.
 - [ ] `wallet.ts` invalid-WIF handler: log `e.message` only (avoid echoing key material on misconfig).
 - [ ] Reconcile SECURITY_AUDIT.md (H3 effectively resolved). Tracked debt: PBKDF2 100k→600k, CSP nonce, authenticated financial reads.
 

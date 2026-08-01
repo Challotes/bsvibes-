@@ -17,6 +17,8 @@
 
 ## Identity & Security
 
+> ⚠️ **SUPERSEDED (2026-06-14) — read first.** Key rotation / the migration system was **REMOVED** in favour of encrypt-in-place: the key/address **never changes**. So any entry in this section referencing key **rotation**, **migration chains**, `migrateIdentity` / `upgradeIdentity` / `commitUpgrade` / `cleanupMigrations`, the deleted `MoveAddressModal` / `StaleKeyModal`, `/api/restore-eligibility`, or recovery files carrying an `oldWif` / a `"rotation"` / `"pre-rotation"` pathType is **HISTORICAL** — kept as an honest decision record, not live spec. Current shape: `encryptInPlace` / `changePassphrase` re-wrap the SAME WIF; recovery files are single-key (`pathType: "save" | "restore-pre"` only, `opencook-` filename prefix). See "Key rotation REMOVED in favor of encrypt-in-place" further down.
+
 ### Current state (Phase 1 — acceptable for now)
 - BSV keypair generated in-browser via `PrivateKey.fromRandom()`
 - Stored as plaintext WIF in localStorage
@@ -391,6 +393,8 @@
 ## OpenCook Rebrand & Launch
 
 > These decisions were settled 2026-06-13 during a launch-readiness review (three agent passes: irreversibility/extensibility, adversarial money/identity audit, and public-launch scope-gap). They define the critical path to OpenCook's first public launch.
+
+> **STATUS (2026-08-01):** the rebrand described below is DONE (Phase 7, 2026-06-21) — the on-chain `app` tag is now `opencook`, the domain is `opencook.fun`, the repo is `github.com/Challotes/opencook`. So historical phrasing in these entries — e.g. "`app` stays `bsvibes`" (accurate only for the Phase-1 window *before* the Phase-7 sweep) and references to the deleted `migration.ts` (removed with key rotation 2026-06-14) — is HISTORICAL, not current. Kept as an honest record of the launch path.
 
 - **Rebrand BSVibes → OpenCook before launch (settled 2026-06-13, SUPERSEDES the "Naming" decision at the top of this file).** The product launches as OpenCook. The rename is a name-only sweep across the entire naming surface — repo, all MDs, UI copy, the `bsvibes.com` domain, the `github.com/Challotes/bsvibes-` repo link, recovery-file name prefixes (`bsvibes-*`), localStorage key prefixes (`bfn_*`, `bsvibes_*`), the on-chain OP_RETURN `app` tag (`bsvibes` → `opencook`), the agent prompt, and OG metadata — performed LAST in the launch sequence so earlier fixes are not redone on renamed files. **Code/repo history, MDs, and session logs are KEPT** (renamed, not erased — they are the honest record of the build, legitimately attributed to the project). Positioning shifts "Agentic Fairness on BSV" → "on Bitcoin". **Execution hazard (verified against code):** the migration signed-message includes the `app` literal (`identity.ts:574-584`), the old key signs the exact message bytes, and the server re-encodes and verifies those exact bytes (`actions.ts:275-279`). So the `app` literal in the signer, the on-chain writers (`onchain.ts:25-33`, `migration.ts:59-67`, `boot-payment.ts:64-72`), and the verifier MUST be swept in ONE commit — a partial sweep breaks all key rotations (`invalid_signature`). Smoke-test a rotation immediately after the sweep.
 
