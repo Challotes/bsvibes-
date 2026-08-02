@@ -45,6 +45,10 @@ All parameters are exposed for the fairness agent to adjust in later phases. The
 
 **Implementation note:** the contributor pool 80% is currently DERIVED in `split.ts` as `bootFeeSats - platformSats - bonusSats` — the `poolShare: 0.8` field in `FAIRNESS_CONFIG` is documented for clarity but not actually read by code. Treat the table value as the documented intent; the source of truth is the platformCut + creatorBonus subtraction. Rounding dust from the pool floor() is added to the creator's bonus payout so every sat of the boot is accounted for in the same tx.
 
+### Launch pool epoch (`launchTs`)
+
+The pool has an EPOCH. Posts with `created_at < launchTs` — the backdated genesis seed and all pre-launch/test posts — are **excluded from the 80% contributor pool** (`weights.ts`) **and from the dynamic boot-price contributor count** (`pricing.ts`), so the pool starts fresh at launch rather than being pre-loaded with ~2k backdated posts. **Excluded posts still earn the 15% creator bonus when boosted** (pool-independent, paid to the post's own address). `launchTs` is a config value (env `LAUNCH_TS`, UTC space-format), permanent by design; unset → a far-future sentinel that keeps the pool empty (floor price) rather than leaking pre-launch posts into payouts. See DECISIONS.md "Launch pool cutoff".
+
 ### Payout Split (on a 10,000 sat boot)
 
 | Bucket | % | Sats | Goes to |

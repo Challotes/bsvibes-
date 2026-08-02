@@ -2,6 +2,20 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { calculateBootPrice, countActiveContributors } from "./pricing";
 
+// The config default launchTs is now a far-FUTURE sentinel, so the pre-existing
+// count tests pass an explicit far-PAST cutoff to isolate the anti-inflation logic
+// from the launch cutoff (which has its own dedicated case below).
+const PAST = "2000-01-01 00:00:00";
+
+/** Space-format UTC timestamp `offsetDays` from now (negative = in the past). */
+function daysFromNow(offsetDays: number): string {
+  return new Date(Date.now() + offsetDays * 86_400_000)
+    .toISOString()
+    .replace("T", " ")
+    .replace("Z", "")
+    .slice(0, 19);
+}
+
 function makeDb() {
   const db = new Database(":memory:");
   db.exec(`CREATE TABLE posts (
@@ -26,14 +40,30 @@ describe("countActiveContributors (boot-price anti-inflation)", () => {
 
     // Only the 2 established contributors count — not the 10 fake identities that
     // would otherwise push the dynamic boot price toward the ceiling.
-    expect(countActiveContributors(db)).toBe(2);
+    expect(countActiveContributors(db, PAST)).toBe(2);
   });
 
   it("ignores null-pubkey posts", () => {
     const db = makeDb();
     const ins = db.prepare("INSERT INTO posts (content, author_name, pubkey) VALUES (?,?,?)");
     for (let i = 0; i < 5; i++) ins.run("x", "anon_aaaa", null);
-    expect(countActiveContributors(db)).toBe(0);
+    expect(countActiveContributors(db, PAST)).toBe(0);
+  });
+
+  it("excludes pre-launch established contributors (launchTs cutoff)", () => {
+    const db = makeDb();
+    const ins = db.prepare(
+      "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?,?,?,?)"
+    );
+    // All fixtures are within the 30-day active window; only the launchTs cutoff
+    // (3 days ago) distinguishes them, so this isolates the launch filter.
+    const cutoff = daysFromNow(-3);
+    // Established pubkey with 3 posts BEFORE launch → excluded.
+    for (let i = 0; i < 3; i++) ins.run("x", "anon_pre", "pk_prelaunch", daysFromNow(-5));
+    // Established pubkey with 3 posts AFTER launch → counted.
+    for (let i = 0; i < 3; i++) ins.run("x", "anon_post", "pk_postlaunch", daysFromNow(-1));
+
+    expect(countActiveContributors(db, cutoff)).toBe(1);
   });
 });
 

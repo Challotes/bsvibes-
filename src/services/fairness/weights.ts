@@ -11,6 +11,8 @@ const { halfLifeDays, engagementMultiplier, scalingFn } = FAIRNESS_CONFIG;
 
 // Cache weights to avoid full table scan on every boot.
 // Invalidated after 30 seconds — weights only change when posts or boots change.
+// The cache is process-global and NOT keyed on launchTs — safe because launchTs is
+// a deploy-constant (only tests vary it, and they _clearWeightsCache() per case).
 const WEIGHTS_CACHE_TTL_MS = 30_000;
 let _cachedWeights: ContributorWeight[] | null = null;
 let _weightsCachedAt = 0;
@@ -50,22 +52,28 @@ function pubkeyToAddress(pubkey: string): string {
  * Calculate contribution weights for all active contributors.
  * Results are cached for 30 seconds to avoid repeated full table scans.
  */
-export function calculateWeights(db: import("better-sqlite3").Database): ContributorWeight[] {
+export function calculateWeights(
+  db: import("better-sqlite3").Database,
+  launchTs: string = FAIRNESS_CONFIG.launchTs
+): ContributorWeight[] {
   const now = Date.now();
   if (_cachedWeights && now - _weightsCachedAt < WEIGHTS_CACHE_TTL_MS) {
     return _cachedWeights;
   }
 
-  // Get all signed posts with boot counts
+  // Get all signed posts with boot counts. The `created_at >= launchTs` gate drops
+  // pre-launch history (backdated genesis seed + pre-launch test posts) from the
+  // 80% pool so it starts fresh at launch. Excluded posts still earn the
+  // pool-independent 15% creator bonus when boosted (split.ts).
   const posts = db
     .prepare(`
     SELECT p.pubkey, COALESCE(bc.boot_count, 0) as boot_count, p.created_at
     FROM posts p
     LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
       ON bc.post_id = p.id
-    WHERE p.pubkey IS NOT NULL
+    WHERE p.pubkey IS NOT NULL AND p.created_at >= ?
   `)
-    .all() as PostRow[];
+    .all(launchTs) as PostRow[];
 
   // Aggregate weights by pubkey
   const byPubkey = new Map<string, { weight: number; posts: number; boots: number }>();

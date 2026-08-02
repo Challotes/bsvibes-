@@ -41,6 +41,13 @@ function makeKey() {
   };
 }
 
+// Far-past launch epoch for the pre-existing logic tests: with the real config
+// default now a far-FUTURE sentinel ("2999-…"), these fixtures (dated ~now) would
+// all be pre-launch and excluded. Passing an explicit past cutoff isolates the
+// weight/decay/aggregation logic from the launch cutoff. The launch cutoff itself
+// is covered by the dedicated "launchTs cutoff" cases below.
+const PAST = "2000-01-01 00:00:00";
+
 function addPost(db: ReturnType<typeof Database>, pubkey: string, minutesAgo = 0) {
   const created = new Date(Date.now() - minutesAgo * 60_000)
     .toISOString()
@@ -50,6 +57,13 @@ function addPost(db: ReturnType<typeof Database>, pubkey: string, minutesAgo = 0
   db.prepare(
     "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)"
   ).run("test post", "anon_test", pubkey, created);
+}
+
+/** Insert a post at an explicit space-format created_at (for launchTs cutoff tests). */
+function addPostAt(db: ReturnType<typeof Database>, pubkey: string, createdAt: string) {
+  db.prepare(
+    "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, ?)"
+  ).run("test post", "anon_test", pubkey, createdAt);
 }
 
 function addBoot(db: ReturnType<typeof Database>, postId: number) {
@@ -65,18 +79,18 @@ describe("calculateWeights", () => {
   });
 
   it("returns empty array for empty DB", () => {
-    expect(calculateWeights(db)).toHaveLength(0);
+    expect(calculateWeights(db, PAST)).toHaveLength(0);
   });
 
   it("returns empty for unsigned posts only", () => {
     db.prepare("INSERT INTO posts (content, author_name) VALUES (?, ?)").run("unsigned", "anon");
-    expect(calculateWeights(db)).toHaveLength(0);
+    expect(calculateWeights(db, PAST)).toHaveLength(0);
   });
 
   it("returns one contributor for a single signed post", () => {
     const key = makeKey();
     addPost(db, key.pubkey);
-    const weights = calculateWeights(db);
+    const weights = calculateWeights(db, PAST);
 
     expect(weights).toHaveLength(1);
     expect(weights[0].pubkey).toBe(key.pubkey);
@@ -90,7 +104,7 @@ describe("calculateWeights", () => {
     const key = makeKey();
     addPost(db, key.pubkey, 0);
     addPost(db, key.pubkey, 5);
-    const weights = calculateWeights(db);
+    const weights = calculateWeights(db, PAST);
 
     expect(weights).toHaveLength(1);
     expect(weights[0].postCount).toBe(2);
@@ -103,7 +117,7 @@ describe("calculateWeights", () => {
     const keyB = makeKey();
     addPost(db, keyA.pubkey, 0);
     addPost(db, keyB.pubkey, 0);
-    const weights = calculateWeights(db);
+    const weights = calculateWeights(db, PAST);
 
     expect(weights).toHaveLength(2);
     const pubkeys = weights.map((w) => w.pubkey);
@@ -118,7 +132,7 @@ describe("calculateWeights", () => {
       db.prepare("SELECT id FROM posts ORDER BY id DESC LIMIT 1").get() as { id: number }
     ).id;
 
-    const weightBefore = calculateWeights(db)[0].weight;
+    const weightBefore = calculateWeights(db, PAST)[0].weight;
 
     // Add 3 boots and clear cache to force recalc
     addBoot(db, postId);
@@ -126,7 +140,7 @@ describe("calculateWeights", () => {
     addBoot(db, postId);
     _clearWeightsCache();
 
-    const weightsAfter = calculateWeights(db);
+    const weightsAfter = calculateWeights(db, PAST);
     expect(weightsAfter[0].weight).toBeGreaterThan(weightBefore);
     expect(weightsAfter[0].totalBoots).toBe(3);
   });
@@ -137,7 +151,7 @@ describe("calculateWeights", () => {
     addPost(db, key.pubkey, 0); // recent — high decay
     addPost(db, key.pubkey, 30 * 24 * 60); // 30 days — half-life decay
 
-    const weights = calculateWeights(db);
+    const weights = calculateWeights(db, PAST);
     expect(weights).toHaveLength(1);
     // With half-life = 30 days, recent post contributes ~1.0, old post ~0.5
     // Total should be ~1.5, proving the old post decayed (not equal to recent)
@@ -152,9 +166,43 @@ describe("calculateWeights", () => {
       "INSERT INTO posts (content, author_name, pubkey, created_at) VALUES (?, ?, ?, datetime('now'))"
     ).run("test", "anon", key.pubkey);
 
-    const weights = calculateWeights(db);
+    const weights = calculateWeights(db, PAST);
     expect(weights).toHaveLength(1);
     expect(weights[0].weight).toBeGreaterThan(0);
     expect(Number.isNaN(weights[0].weight)).toBe(false);
+  });
+
+  // --- launchTs pool cutoff: pre-launch history is excluded from the 80% pool ---
+
+  it("excludes pre-launch posts from the pool (launchTs cutoff)", () => {
+    const key = makeKey();
+    addPostAt(db, key.pubkey, "2026-05-01 12:00:00"); // before the cutoff
+    // A post entirely before launch contributes zero pool weight.
+    expect(calculateWeights(db, "2026-06-01 00:00:00")).toHaveLength(0);
+  });
+
+  it("includes post-launch posts (launchTs cutoff)", () => {
+    const key = makeKey();
+    addPostAt(db, key.pubkey, "2026-07-01 12:00:00"); // after the cutoff
+    const weights = calculateWeights(db, "2026-06-01 00:00:00");
+    expect(weights).toHaveLength(1);
+    expect(weights[0].pubkey).toBe(key.pubkey);
+    expect(weights[0].weight).toBeGreaterThan(0);
+  });
+
+  it("a post exactly at the launch instant counts as post-launch (>=)", () => {
+    const key = makeKey();
+    addPostAt(db, key.pubkey, "2026-06-01 00:00:00"); // exactly at the cutoff
+    expect(calculateWeights(db, "2026-06-01 00:00:00")).toHaveLength(1);
+  });
+
+  it("a pubkey posting before AND after launch only counts its post-launch post", () => {
+    const key = makeKey();
+    addPostAt(db, key.pubkey, "2026-05-01 12:00:00"); // pre-launch — excluded
+    addPostAt(db, key.pubkey, "2026-07-01 12:00:00"); // post-launch — counted
+    const weights = calculateWeights(db, "2026-06-01 00:00:00");
+    expect(weights).toHaveLength(1);
+    expect(weights[0].pubkey).toBe(key.pubkey);
+    expect(weights[0].postCount).toBe(1); // only the post-launch post
   });
 });

@@ -28,7 +28,14 @@ export function calculateBootPrice(activeContributors: number): number {
  * payers face (Phase 4). Bonus: the HAVING collapses the spam long tail, so this
  * is also cheaper at scale. Uncached — getBootPrice() caches the result.
  */
-export function countActiveContributors(db: import("better-sqlite3").Database): number {
+export function countActiveContributors(
+  db: import("better-sqlite3").Database,
+  launchTs: string = FAIRNESS_CONFIG.launchTs
+): number {
+  // Two independent lower bounds on the same column: the 30-day active window AND
+  // the launch epoch. Pre-launch posts (backdated genesis seed + pre-launch test
+  // posts) are excluded by `created_at >= launchTs`, so they never inflate the
+  // dynamic boot price real payers face. Effective floor = max(now-30d, launchTs).
   const row = db
     .prepare(
       `SELECT COUNT(*) as count FROM (
@@ -36,11 +43,12 @@ export function countActiveContributors(db: import("better-sqlite3").Database): 
        FROM posts
        WHERE pubkey IS NOT NULL
        AND created_at > datetime('now', '-' || ? || ' days')
+       AND created_at >= ?
        GROUP BY pubkey
        HAVING COUNT(*) >= ?
      )`
     )
-    .get(activeWindowDays, minPostsForPricing) as { count: number };
+    .get(activeWindowDays, launchTs, minPostsForPricing) as { count: number };
   return row.count;
 }
 

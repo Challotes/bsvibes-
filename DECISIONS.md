@@ -87,6 +87,15 @@
 - **Safe to defer:** runtime weight-formula change only (no on-chain format or DB migration; `boot_split` carries `formula_version` so the split rule can change forward), addable any time. Sole caveat: on-chain payouts can't be clawed back — hence the tripwire.
 - **Don't relitigate pre-scale.**
 
+## Launch pool cutoff — fresh pool at launch via `launchTs` (implemented 2026-08-02, money-path auditor: SHIP)
+
+- **Decision:** the earnings pool has an EPOCH. Posts with `created_at < launchTs` (the backdated genesis seed + all pre-launch/test posts) are EXCLUDED from both the 80% contributor pool (`weights.ts` `calculateWeights`) and the dynamic boot-price contributor count (`pricing.ts` `countActiveContributors`). Posts at/after `launchTs` earn normally. **This is PERMANENT** — not a temporary flag (see memory `project_opencook_genesis_seed`, agent-verified keep-forever: removing it later reclaims ~10% of the pool at 3mo, is negligible at 12mo, and is a second money-path change for no gain).
+- **Pre-launch posts STILL earn the 15% creator bonus** when boosted — that bonus is pool-independent (`split.ts` pays it to the boosted post's own address, ungated). So "genesis posts don't draw from the pool but still get paid for boosts" is satisfied with zero extra code.
+- **Mechanism:** one config value `launchTs` (`config.ts`), env-overridable via `LAUNCH_TS`, added as `AND created_at >= ?` to the two money queries only. `created_at` is SQLite space-format UTC `"YYYY-MM-DD HH:MM:SS"` (BINARY collation → lexicographic == chronological), so the string compare is exact; `>=` means a post at the exact launch instant is post-launch. **`LAUNCH_TS` MUST be set in UTC** at deploy (a local-time value silently shifts the epoch) — blocking `LAUNCH_CHECKLIST` step.
+- **Fail-closed fallback:** if `LAUNCH_TS` is unset, `launchTs` defaults to a far-future sentinel `"2999-01-01 00:00:00"` → the pool stays EMPTY (floor price 1000), never leaking a pre-launch post into a real payout. Erring late is safe; erring early (a real date guessed before an actual slipped launch) would leak — hence the sentinel, not a date guess.
+- **Supersedes** the earlier `pool_excluded` pubkey-table idea from the genesis plan: a `created_at` epoch is cleaner and, unlike a pubkey ban, lets the 3 genesis users earn normally from their FUTURE post-launch posts.
+- **Threaded as an optional param** (`launchTs = FAIRNESS_CONFIG.launchTs`) for testability; both prod callers pass `(db)` only. Non-blocking note: the 30s weights cache isn't keyed on `launchTs` — safe because it's a deploy-constant; a footgun only if a future caller varies it per-request. Tests: 199 total (5 new cutoff cases proving pre-launch=0, post-launch earns, `>=` boundary inclusion, mixed-pubkey counts only post-launch).
+
 ## Bootboard (settled)
 
 - **Mechanic:** Any post can be "booted" to a spotlight slot by paying a fee. Someone else pays, you get booted off

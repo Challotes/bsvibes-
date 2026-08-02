@@ -44,6 +44,7 @@
 - [ ] `ANTHROPIC_API_KEY` — required for the "Ask AI" agent chat.
 - [ ] `GROQ_API_KEY` — *(optional but recommended)* powers the compose-box voice-to-text mic (`/api/transcribe` → Groq Whisper). Free key, no card, from https://console.groq.com/keys (free tier 2,000 transcriptions/day). Unset = the mic shows "voice input offline" on tap; everything else works. *(optional)* `TRANSCRIBE_DAILY_LIMIT` caps daily transcription calls (default 2000).
 - [ ] `CONTENT_DENYLIST` — illegal-floor pre-publish filter (Phase 3). **MUST be set before public launch** (unset = permissive/no filtering). Patterns one-per-line or comma-separated; `/regex/` or substring. Scope to ILLEGAL content only. NOT committed.
+- [ ] `LAUNCH_TS` — **BLOCKING: set to the TRUE launch instant, in UTC, format `YYYY-MM-DD HH:MM:SS`.** It's the pool epoch: posts before it (the genesis seed + all pre-launch/test posts) are excluded from the 80% pool + the boot-price count so the pool starts fresh; they still earn the 15% creator bonus on boosts. **Unset = a far-future sentinel → the pool never opens (empty pool, floor price).** Fail-closed is deliberate (never leaks pre-launch posts into payouts), but that means forgetting this = nobody earns pool share. Must be UTC (a local-time value silently shifts the epoch).
 - [ ] `HEALTH_TOKEN` — bearer token gating `GET /api/health` (Phase 5). Set a long random string; you'll put it in the UptimeRobot URL.
 - [ ] `DATABASE_PATH=/data/local.db` — points SQLite at the mounted volume (see §2).
 - [ ] *(optional)* `SERVER_DAILY_SPEND_SATS` — daily server-wallet spend ceiling (default ~1,721,170 = ~$0.20/day). Tune or leave default.
@@ -78,6 +79,7 @@
 - [ ] **Cross-device QA** (Phase 8) — post / boost / install / deposit on iPhone + Android + desktop.
 - [ ] **Production smoke test** — `npm run build` green; post a test idea and confirm it lands on-chain (check the tx); do one free boost + one paid boost; open `/api/health` and confirm `"ok": true`.
 - [ ] Confirm `CONTENT_DENYLIST` is actually set (the one item that silently fails open if forgotten).
+- [ ] Confirm `LAUNCH_TS` is set to the true launch instant (UTC). Sanity-check: a post made just AFTER that instant enters the pool / boot-price count, and the seeded pre-launch posts do NOT (they still earn the 15% creator bonus on boosts).
 
 ## 6. Pre-launch gap-audit findings (2026-06-30 — 4-agent sweep: deploy / legal / security / code)
 

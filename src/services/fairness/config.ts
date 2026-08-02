@@ -20,6 +20,21 @@ export const FAIRNESS_CONFIG = {
   // the price real payers face. A genuine contributor crosses it; a spammer
   // minting one identity per post does not.
   minPostsForPricing: 3,
+  // Launch pool epoch — the instant the fresh pool "opens". Posts whose created_at
+  // is BEFORE this are pre-launch history: the backdated genesis seed + pre-launch
+  // test posts. They are EXCLUDED from BOTH the 80% pool weight (weights.ts) and
+  // the dynamic boot-price contributor count (pricing.ts), so the pool starts
+  // fresh at launch. They STILL earn the pool-independent 15% creator bonus when
+  // boosted (split.ts pays that by address, no gate). This is the pool's EPOCH,
+  // not a temporary flag — PERMANENT by design (see the genesis plan / DECISIONS.md).
+  // MUST be SQLite space-format UTC "YYYY-MM-DD HH:MM:SS" so it compares correctly
+  // (BINARY collation → lexicographic == chronological) against posts.created_at,
+  // which datetime('now') writes in the same UTC format. Set LAUNCH_TS at deploy to
+  // the TRUE launch instant IN UTC (a blocking LAUNCH_CHECKLIST step). The fallback
+  // is a far-future sentinel: if LAUNCH_TS is unset the pool stays empty (floor
+  // price) rather than leaking pre-launch posts into real payouts — fail-closed on
+  // the money path.
+  launchTs: process.env.LAUNCH_TS ?? "2999-01-01 00:00:00",
   freeBootsPerUser: 15,
   // Server-wallet ops threshold (Phase 2 Build B): emit a low-balance alert when
   // the server wallet's spendable balance drops below this, so the operator can

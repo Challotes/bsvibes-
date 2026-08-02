@@ -123,9 +123,9 @@ All on-chain payloads are JSON inside OP_FALSE OP_RETURN outputs:
 
 ### Fairness Pipeline
 
-- `src/services/fairness/config.ts` — Tunable parameters (governance surface)
-- `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached)
-- `src/services/fairness/weights.ts` — Contribution scoring (sqrt × decay × engagement). Posts attribute directly to their signing pubkey/address — no migration chain resolution.
+- `src/services/fairness/config.ts` — Tunable parameters (governance surface). Includes `launchTs` (the **launch pool epoch**, env `LAUNCH_TS`, UTC space-format `"YYYY-MM-DD HH:MM:SS"`, fail-closed far-future sentinel default): posts before it are excluded from the pool + boot-price count so the pool starts fresh at launch. Permanent by design — see DECISIONS.md "Launch pool cutoff".
+- `src/services/fairness/pricing.ts` — Dynamic boot price (contributors × 156, floor/ceiling, cached). `countActiveContributors(db, launchTs?)` counts only pubkeys with ≥3 posts in the 30-day window AND `created_at >= launchTs` (excludes pre-launch history from the price).
+- `src/services/fairness/weights.ts` — Contribution scoring (sqrt × decay × engagement). Posts attribute directly to their signing pubkey/address — no migration chain resolution. `calculateWeights(db, launchTs?)` gates the pool query on `created_at >= launchTs` (pre-launch posts earn no pool share; they still earn the pool-independent 15% creator bonus on boosts). 30s cache is a deploy-constant `launchTs` (not cache-keyed on it).
 - `src/services/fairness/split.ts` — No-custody payout split (every sat out in same tx)
 - `src/services/fairness/boot-payment.ts` — Multi-output BSV split transaction builder
 - `src/services/fairness/boot-orchestrator.ts` — Full boot workflow (validate → price → score → **consume free grant (atomic, pre-broadcast)** → split → broadcast → record). Step 8: `free_boots_used` is consumed in an atomic check-and-increment BEFORE the server wallet broadcasts, so a crash between broadcast and the DB record can't double-pay; no refund on broadcast failure (DECISIONS.md "consume the grant BEFORE paying"). A concurrently-exhausted grant returns `FREE_GRANT_EXHAUSTED` → `bootPost` routes to paid.
