@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { BootIcon } from "@/components/icons/BootIcon";
 import { useBootContext } from "@/contexts/BootContext";
 import { useIdentityContext } from "@/contexts/IdentityContext";
@@ -175,12 +175,23 @@ function BootButton({
 
 interface PostListProps {
   posts: Post[];
+  mode: "live" | "origin";
+  /** LIVE mode only: render an unread divider immediately before this post. */
+  firstUnreadId?: number;
   genesisRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
   observerRef: React.RefObject<IntersectionObserver | null>;
-  hasMore: boolean;
-  isLoadingMore: boolean;
-  onLoadEarlier: () => void;
+  /** ORIGIN mode only: bottom sentinel that auto-loads newer posts (read forward). */
+  fwdSentinelRef: React.RefObject<HTMLDivElement | null>;
+  originHasMore: boolean;
+  isLoadingForward: boolean;
+  /** LIVE mode only: top sentinel that auto-loads older posts (scroll up). */
+  topSentinelRef: React.RefObject<HTMLDivElement | null>;
+  /** LIVE mode: older history still remains (post #1 not yet loaded). */
+  liveHasMore: boolean;
+  isLoadingOlder: boolean;
+  /** Oldest id of the newest (polled) window — only these are observed for unread. */
+  oldestServerId: number;
   onBooted?: () => void;
   onAskAgent?: () => void;
   onFundNeeded?: (address: string, balance?: number, fee?: number) => void;
@@ -191,12 +202,18 @@ interface PostListProps {
 
 export function PostList({
   posts,
+  mode,
+  firstUnreadId,
   genesisRef,
   bottomRef,
   observerRef,
-  hasMore,
-  isLoadingMore,
-  onLoadEarlier,
+  fwdSentinelRef,
+  originHasMore,
+  isLoadingForward,
+  topSentinelRef,
+  liveHasMore,
+  isLoadingOlder,
+  oldestServerId,
   onBooted,
   onAskAgent,
   onFundNeeded,
@@ -213,20 +230,26 @@ export function PostList({
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
-      <div ref={genesisRef} />
-      <Genesis onAskAgent={onAskAgent} />
+      {/* TOP CAP — the founding block appears only when there's nothing older to
+          load (ORIGIN always; LIVE once post #1 is reached). Mutually exclusive
+          with the upward-load sentinel, so a prepend can never yank it. */}
+      {(mode === "origin" || (mode === "live" && !liveHasMore)) && (
+        <>
+          <div ref={genesisRef} />
+          <Genesis onAskAgent={onAskAgent} />
+        </>
+      )}
 
-      {hasMore && (
-        <div className="flex justify-center py-4">
-          <button
-            type="button"
-            onClick={onLoadEarlier}
-            disabled={isLoadingMore}
-            className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2.5 rounded border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50"
-          >
-            {isLoadingMore ? "Loading..." : "Load earlier posts"}
-          </button>
-        </div>
+      {/* LIVE upward-load sentinel — only while older history remains. */}
+      {mode === "live" && liveHasMore && (
+        <>
+          <div ref={topSentinelRef} aria-hidden className="h-px" />
+          {isLoadingOlder && (
+            <div className="flex justify-center py-4">
+              <span className="text-xs text-zinc-500">Loading…</span>
+            </div>
+          )}
+        </>
       )}
 
       {posts.length === 0 && (
@@ -237,75 +260,100 @@ export function PostList({
 
       <div className="divide-y divide-zinc-800/60">
         {posts.map((post) => (
-          <article
-            key={post.id}
-            data-post-id={post.id}
-            ref={(el) => {
-              if (el && observerRef.current) {
-                observerRef.current.observe(el);
-              }
-            }}
-            className="py-3.5 group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <span className="font-medium text-zinc-300">{post.author_name}</span>
-                  {post.signature && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"
-                      title="Signed"
-                    />
-                  )}
-                  <span>·</span>
-                  <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
-                  {post.tx_id && (
-                    <a
-                      href={`https://whatsonchain.com/tx/${post.tx_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="View on chain"
-                      className="relative -m-3 p-3 inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
-                    >
-                      <span className="sr-only">View on chain</span>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+          <Fragment key={post.id}>
+            {mode === "live" && firstUnreadId != null && post.id === firstUnreadId && (
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-amber-500/50" />
+                <span className="text-[10px] font-medium uppercase tracking-wider text-amber-400">
+                  New
+                </span>
+                <div className="flex-1 h-px bg-amber-500/50" />
+              </div>
+            )}
+            <article
+              data-post-id={post.id}
+              ref={(el) => {
+                // Observe ONLY the newest window — unread tracking never concerns
+                // prepended history, so the observed set stays bounded at depth.
+                if (el && observerRef.current && mode === "live" && post.id >= oldestServerId) {
+                  observerRef.current.observe(el);
+                }
+              }}
+              className="py-3.5 group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-xs text-zinc-500">
+                    <span className="font-medium text-zinc-300">{post.author_name}</span>
+                    {post.signature && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"
+                        title="Signed"
+                      />
+                    )}
+                    <span>·</span>
+                    <time suppressHydrationWarning>{timeAgo(post.created_at)}</time>
+                    {post.tx_id && (
+                      <a
+                        href={`https://whatsonchain.com/tx/${post.tx_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View on chain"
+                        className="relative -m-3 p-3 inline-flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
                       >
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                      </svg>
-                    </a>
-                  )}
+                        <span className="sr-only">View on chain</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">
+                    {post.content}
+                  </p>
                 </div>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">
-                  {post.content}
-                </p>
+                <div className="shrink-0 self-center">
+                  <BootButton
+                    postId={post.id}
+                    bootCount={post.boot_count}
+                    postPubkey={post.pubkey}
+                    bootPrice={bootPrice}
+                    freeBootsRemaining={freeBootsRemaining}
+                    onBooted={onBooted}
+                    onFundNeeded={onFundNeeded}
+                    onFreeBootUsed={onFreeBootUsed}
+                  />
+                </div>
               </div>
-              <div className="shrink-0 self-center">
-                <BootButton
-                  postId={post.id}
-                  bootCount={post.boot_count}
-                  postPubkey={post.pubkey}
-                  bootPrice={bootPrice}
-                  freeBootsRemaining={freeBootsRemaining}
-                  onBooted={onBooted}
-                  onFundNeeded={onFundNeeded}
-                  onFreeBootUsed={onFreeBootUsed}
-                />
-              </div>
-            </div>
-          </article>
+            </article>
+          </Fragment>
         ))}
       </div>
+
+      {/* ORIGIN mode: reading forward. This bottom sentinel auto-loads newer posts
+          as you scroll down (append — smooth, no scroll-anchor math). */}
+      {mode === "origin" && originHasMore && (
+        <>
+          <div ref={fwdSentinelRef} aria-hidden className="h-px" />
+          {isLoadingForward && (
+            <div className="flex justify-center py-4">
+              <span className="text-xs text-zinc-500">Loading…</span>
+            </div>
+          )}
+        </>
+      )}
 
       <div ref={bottomRef} />
     </div>

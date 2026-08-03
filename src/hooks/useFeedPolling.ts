@@ -17,17 +17,23 @@ interface UseFeedPollingOptions {
   initialPosts: Post[];
   initialBootboard: BootboardData;
   intervalMs?: number;
+  // When true (ORIGIN mode), stop merging server posts so the historical view
+  // isn't disturbed by newest-post polling. Resumes when unpaused.
+  paused?: boolean;
 }
 
 export function useFeedPolling({
   initialPosts,
   initialBootboard,
   intervalMs = 5000,
+  paused = false,
 }: UseFeedPollingOptions) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [bootboard, setBootboard] = useState<BootboardData>(initialBootboard);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFetchingRef = useRef(false);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   // Tracks the highest post id we have seen — null means first poll hasn't run yet
   const latestIdRef = useRef<number | null>(initialPosts.length > 0 ? initialPosts[0].id : null);
   // Keep a ref to current posts so we can read them in the async poll callback
@@ -35,7 +41,7 @@ export function useFeedPolling({
   postsRef.current = posts;
 
   const fetchFeed = useCallback(async () => {
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current || pausedRef.current) return;
     isFetchingRef.current = true;
     try {
       const latestId = latestIdRef.current;

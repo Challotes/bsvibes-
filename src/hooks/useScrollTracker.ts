@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface UseScrollTrackerOptions {
   postCount: number;
   postIds: number[];
+  // Unread tracking (per-article observer + badge) only makes sense in LIVE mode.
+  // In ORIGIN mode it's off, which also removes the per-article observer cost.
+  trackUnread: boolean;
 }
 
 interface UseScrollTrackerReturn {
@@ -25,6 +28,7 @@ interface UseScrollTrackerReturn {
 export function useScrollTracker({
   postCount,
   postIds,
+  trackUnread,
 }: UseScrollTrackerOptions): UseScrollTrackerReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -87,9 +91,15 @@ export function useScrollTracker({
     return () => el.removeEventListener("scroll", onScroll);
   }, [genesisVisited]);
 
+  // Unread observer — LIVE mode only. Gating on trackUnread means ORIGIN mode
+  // attaches ZERO per-article observers (the DOM-bound cost at depth).
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container) return;
+    if (!container || !trackUnread) {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      return;
+    }
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -108,19 +118,17 @@ export function useScrollTracker({
       { root: container, threshold: 0.5 }
     );
 
-    return () => observerRef.current?.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, []);
+    return () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    };
+  }, [trackUnread]);
 
   useEffect(() => {
     const newPosts = postCount - prevCountRef.current;
     prevCountRef.current = postCount;
 
-    if (newPosts > 0) {
+    if (newPosts > 0 && trackUnread) {
       if (Date.now() - justPostedAtRef.current < 2500) {
         // The user just posted — keep them on their own post + its confirmation.
         requestAnimationFrame(() => scrollToBottom());
@@ -134,7 +142,7 @@ export function useScrollTracker({
         setUnreadCount(unreadIdsRef.current.size);
       }
     }
-  }, [postCount, postIds, scrollToBottom]);
+  }, [postCount, postIds, scrollToBottom, trackUnread]);
 
   return {
     scrollRef,

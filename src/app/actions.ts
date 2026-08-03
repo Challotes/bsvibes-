@@ -197,6 +197,36 @@ export async function getOlderPosts(beforeId: number): Promise<Post[]> {
   return getPosts(beforeId);
 }
 
+/** Oldest 100 posts, ascending (id 1 first) — the ORIGIN window. */
+export async function getOldestPosts(): Promise<Post[]> {
+  return db
+    .prepare(`
+    SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
+    FROM posts p
+    LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
+      ON bc.post_id = p.id
+    ORDER BY p.id ASC
+    LIMIT 100
+  `)
+    .all() as Post[];
+}
+
+/** Next 100 posts NEWER than afterId, ascending — ORIGIN mode reads forward. */
+export async function getForwardPosts(afterId: number): Promise<Post[]> {
+  if (!Number.isInteger(afterId) || afterId < 0) return [];
+  return db
+    .prepare(`
+    SELECT p.*, COALESCE(bc.boot_count, 0) as boot_count
+    FROM posts p
+    LEFT JOIN (SELECT post_id, COUNT(*) as boot_count FROM bootboard GROUP BY post_id) bc
+      ON bc.post_id = p.id
+    WHERE p.id > ?
+    ORDER BY p.id ASC
+    LIMIT 100
+  `)
+    .all(afterId) as Post[];
+}
+
 /**
  * Authoritative boot counts for a set of (confirmed, visible) posts. Lets the
  * feed poll refresh counts that change from ANY boot source — Bootboard re-boot,
