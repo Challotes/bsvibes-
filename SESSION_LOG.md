@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-08-04 — Genesis feed polish (remove hardcoded sample, badge the real first post)
+
+- **Removed the hardcoded genesis sample.** `Genesis.tsx` was a wrapper = `Manifesto` (vision) + a hardcoded founding-conversation snippet (`data/genesis.ts`). Now that the real founding conversation is seeded into the feed as genesis posts, the hardcoded copy is redundant. `PostList` now renders `<Manifesto>` directly as the top cap; **deleted `Genesis.tsx` + `data/genesis.ts`** (−141 lines). The header "Genesis/Origin" jump button is separate wiring, untouched.
+- **Genesis tag on the true first post.** A subtle amber "Genesis" chip on post #1 (tooltip "the first post — where OpenCook began"). Derived locally in `PostList` from props it already has: `i === 0 && (mode === "origin" || (mode === "live" && !liveHasMore))` — the topmost row when nothing older remains. No server action, no prop-drilling.
+- **Explored + reverted a marker-brainstorm.** Two agents (brand + minimalism) weighed: per-post "from Telegram" tags (SKIP — clutter + already visible via unsigned=no-green-dot + backdated timestamps), a first-post marker (BUILD, subtle), a launch divider (the agents liked it). Owner tried an "OpenCook Live" launch-boundary divider then decided against it → reverted cleanly (zero residue). Also caught + removed an over-plumbed first version of the tag (a `getFeedMeta` server action + `firstPostId` threaded through 4 files) in favour of the local derivation above.
+- Net footprint: 4 files, +19 / −149; `Feed.tsx`/`page.tsx`/`actions.ts` back to committed state. tsc 0 / biome clean / 199 tests. **UNPUSHED** (stacked with the prior launch-cutoff + feed-redesign commits).
+
 ## 2026-08-03 — Clean-DB build script + full feed redesign (LIVE/ORIGIN + upward infinite scroll)
 
 - **Script A — build-clean-db (off-repo ops tool, not committed).** Builds a fresh `launch.db` from the curated inputs: 98 kept posts pulled from the live DB by id (authoritative), + ~2,020 genesis posts (195 blank + 2 over-length rows dropped), each attributed to its recovered pubkey + existing anon name, dates converted to SQLite space-format UTC, all inserted oldest→newest so ids ascend chronologically. Empty bootboard. Verified: 2,118 posts, id-order == date-order, first post = the true origin (2026-02-18), all kept posts carry tx_id, genesis tx_id NULL (Script B fills later). Owner previews by pointing the dev app at `launch.db` with spending disabled.

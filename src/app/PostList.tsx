@@ -7,7 +7,7 @@ import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useBoot } from "@/hooks/useBoot";
 import { timeAgo } from "@/lib/utils";
 import type { Post } from "@/types";
-import { Genesis } from "./Genesis";
+import { Manifesto } from "./Manifesto";
 
 // ── Inline amber spinner (16px, Tailwind animate-spin) ───────────────────────
 
@@ -230,13 +230,15 @@ export function PostList({
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-3">
-      {/* TOP CAP — the founding block appears only when there's nothing older to
+      {/* TOP CAP — the vision/manifesto appears only when there's nothing older to
           load (ORIGIN always; LIVE once post #1 is reached). Mutually exclusive
-          with the upward-load sentinel, so a prepend can never yank it. */}
+          with the upward-load sentinel, so a prepend can never yank it. The real
+          founding conversation now lives in the feed itself (seeded posts), so the
+          old hardcoded genesis sample was removed. */}
       {(mode === "origin" || (mode === "live" && !liveHasMore)) && (
         <>
           <div ref={genesisRef} />
-          <Genesis onAskAgent={onAskAgent} />
+          <Manifesto onAskAgent={onAskAgent} />
         </>
       )}
 
@@ -259,7 +261,7 @@ export function PostList({
       )}
 
       <div className="divide-y divide-zinc-800/60">
-        {posts.map((post) => (
+        {posts.map((post, i) => (
           <Fragment key={post.id}>
             {mode === "live" && firstUnreadId != null && post.id === firstUnreadId && (
               <div className="flex items-center gap-3 py-2">
@@ -285,6 +287,17 @@ export function PostList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <span className="font-medium text-zinc-300">{post.author_name}</span>
+                    {/* The very first post = topmost row when nothing older remains
+                        (ORIGIN always; LIVE once post #1 is reached). No server round-
+                        trip — derived from props PostList already has. */}
+                    {i === 0 && (mode === "origin" || (mode === "live" && !liveHasMore)) && (
+                      <span
+                        className="text-[9px] font-semibold uppercase tracking-wider text-amber-400/80 border border-amber-500/30 rounded px-1 py-px shrink-0"
+                        title="The first post — where OpenCook began"
+                      >
+                        Genesis
+                      </span>
+                    )}
                     {post.signature && (
                       <span
                         className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"
