@@ -8,28 +8,56 @@
 > Build status: Phases 1–7 COMPLETE. Phase 8 (cross-device QA) done. Remaining: 9 (deploy).
 > This list is executed during 8–9.
 
-## 0. Deployment approach — Railway + closed-alpha-first
+## 0. Deployment approach — Railway, SINGLE-DOMAIN quiet launch
 
 > **Platform = Railway** (the repo is already wired: `railway.toml` + `Dockerfile`, `/data` volume).
 > **NOT a self-managed VPS** — see DECISIONS "Deploy on Railway, NOT a self-managed VPS". Decider:
 > a VPS exposes the server-wallet key (`BSV_SERVER_WIF`) to anyone with root; Railway keeps it in
-> your own env vars. **Sequence: closed alpha first, then public.**
+> your own env vars.
+>
+> **Sequence: (1) throwaway shakeout → (2) code prep → (3) real gated quiet launch on `opencook.fun` → (4) go public (same URL).**
+>
+> **Why single-domain, NOT a staged `alpha.` subdomain** (two independent agent reviews, 2026-08-09):
+> localStorage identities are **per-origin**, so an alpha→apex flip would wipe every tester's account —
+> and could silently lose an *earner* real sats (they never trip the backup gate); on-chain posts are
+> **permanent regardless of domain**, so a subdomain is NOT a sandbox; rollback is cleaner (no DNS
+> flip); there is **no service worker**, so no stale-cache risk on the real origin. Real test-safety
+> comes from deploying with **no server key first**, not from a subdomain. See SESSION_LOG 2026-08-09.
 
-### Closed alpha — small trusted group, unadvertised, at `alpha.opencook.fun`
-- [ ] Connect the GitHub repo to a new Railway project (uses the existing `railway.toml`/`Dockerfile`).
-- [ ] Add a **Volume** mounted at `/data` (matches `DATABASE_PATH=/data/local.db`).
-- [ ] Set the env vars from §1 — **including `CONTENT_DENYLIST`** (the one that silently fails open). Leave `BSV_WALLET_SPEND_DISABLED` unset; do NOT set `PORT` (Railway injects it).
-- [ ] **Fund the server wallet** (§2).
-- [ ] **Point `alpha.opencook.fun`** at the service (Railway → service → Settings → Networking → Custom Domain → add the CNAME it shows at your DNS provider; SSL auto-provisions). Leave the apex `opencook.fun` parked/unpointed.
-- [ ] **Gate it** — *simplest:* just don't advertise the URL (enough for a small trusted group). *One notch up:* a small net-new `middleware.ts` doing HTTP Basic-Auth against a shared-password env var (e.g. `ALPHA_GATE_PASSWORD`), gating the whole site EXCEPT `/api/health` (so UptimeRobot still works). ~15 lines, no library; remove/disable to go public. *(No `middleware.ts` exists yet — this is net-new.)*
-- [ ] **UptimeRobot** on `https://alpha.opencook.fun/api/health?token=<HEALTH_TOKEN>` (§3).
-- [ ] **Legal minimum for a closed alpha** *(practical risk framing, NOT legal advice)*: `CONTENT_DENYLIST` set; fill the cheap `[TODO]`s — **contact email + effective date** (⚠️ the operator's real legal name goes in the DEPLOYED/visible copy ONLY — never commit it to the public repo, Hard Rule #6); confirm the **PermanenceGate** acknowledgement fires before the first post. The 3 `[LAWYER]` hard clauses, DMCA-agent registration, and the binding jurisdiction/liability/age `[TODO]`s WAIT for public (§4).
+### Stage 1 — Throwaway shakeout (zero risk — learn Railway with nothing real at stake)
+Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. Throw it away after.
+- [ ] Create a Railway account + connect the GitHub repo to a NEW project (uses `railway.toml`/`Dockerfile`).
+- [ ] Add a **Volume** mounted at `/data`; set `DATABASE_PATH=/data/local.db`.
+- [ ] **Leave `BSV_SERVER_WIF` UNSET** — CRITICAL: this (not the domain) is what keeps test posts OFF mainnet. Skip `CONTENT_DENYLIST`, legal, gate — it's a throwaway.
+- [ ] Deploy. Watch the build log: **confirm `better-sqlite3` compiled**. If `nixpacks` picks the wrong Node and the native compile fails, switch the builder to the **Dockerfile** (Railway → service → Settings → Build).
+- [ ] Confirm: app boots, `GET /api/health` returns JSON, the feed renders (empty DB is fine), a test post saves (it'll have `tx_id` NULL — correct: no key = no broadcast).
+- [ ] Confirm `x-forwarded-for` carries a real client IP (same proxy layer as prod — testable here; every per-IP cap depends on it).
+- [ ] Delete the throwaway project (or keep as a staging toy). Nothing here touched the chain.
 
-### Alpha → public (`opencook.fun`) — a flip, not a rebuild
-- [ ] Point the apex `opencook.fun` (+ `www`) at the **SAME** Railway service (same `/data` volume → the alpha's posts + funded wallet carry over; decide deliberately if you instead want a clean DB).
-- [ ] Remove the alpha gate (delete the middleware / unset `ALPHA_GATE_PASSWORD`).
-- [ ] Update the UptimeRobot URL to the apex.
-- [ ] Complete §4 legal (lawyer pass on the 3 hard clauses + fill the binding `[TODO]`s + register the DMCA agent) and §5 verification (smoke test + confirm `x-forwarded-for` carries a real client IP).
+### Stage 2 — Code prep for the real deploy (in the repo, before going live)
+- [ ] **Dedicated server key** — generate a FRESH BSV key (never a personal wallet; see §1 `BSV_SERVER_WIF`). Owner runs the key op in their own terminal; the WIF never goes in a committed file.
+- [ ] **Basic-Auth gate `middleware.ts`** (net-new, ~15 lines, no library) — HTTP Basic-Auth against `SITE_GATE_PASSWORD`, gating the whole site **EXCEPT `/api/health`**. **MANDATORY** (not "just don't advertise"): it 401s crawlers (protects the apex's first impression while the build is rough) and shields the funded wallet during the quiet phase.
+- [ ] **Two-part health fix — do BOTH or the deploy restart-loops:** change `railway.toml` `healthcheckPath` from `/` → `/api/health`, **AND** exempt `/api/health` in the middleware matcher. (Railway's own healthcheck sends no credentials; if the gate covers it, it 401s → "unhealthy" → restart loop.)
+- [ ] **`public/robots.txt`** — allow `/`, disallow `/api/` (belt-and-suspenders behind the gate; none exists today).
+- [ ] **Fee-rate bump** — `src/services/bsv/wallet.ts` `SatoshisPerKilobyte(100)` → `110` (the same 1-sat ARC-rejection bug hit during genesis seeding; agent-verify the money path).
+- [ ] Commit + push.
+
+### Stage 3 — Real gated quiet launch on `opencook.fun`
+- [ ] Connect the repo to the real Railway project; add the **Volume** at `/data`; `DATABASE_PATH=/data/local.db`.
+- [ ] **Ship the pre-built genesis DB** → `/data/local.db` (see §2) BEFORE first serve.
+- [ ] Set ALL env vars from §1 — the **dedicated** `BSV_SERVER_WIF`, `LAUNCH_TS` (UTC!), `CONTENT_DENYLIST`, `SITE_GATE_PASSWORD`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `HEALTH_TOKEN`, `DATABASE_PATH`. Leave `BSV_WALLET_SPEND_DISABLED` unset; don't set `PORT`.
+- [ ] **Fund the (dedicated) server wallet** (§2).
+- [ ] **Point `opencook.fun` (+ `www`)** at the service (Railway → Settings → Networking → Custom Domain → add the records it shows at your DNS provider; SSL auto-provisions).
+- [ ] Confirm the gate is live: the site prompts for the password; `GET /api/health` does NOT.
+- [ ] **UptimeRobot** on `https://opencook.fun/api/health?token=<HEALTH_TOKEN>` (§3).
+- [ ] **Legal minimum** *(practical risk framing, NOT legal advice)*: `CONTENT_DENYLIST` set; fill the cheap `[TODO]`s — **contact email + effective date** (⚠️ operator's real legal name goes in the DEPLOYED copy ONLY — never the repo, Hard Rule #6); confirm the **PermanenceGate** fires before the first post.
+- [ ] Invite the trusted group to the real URL + gate password. Their accounts persist here forever — no migration.
+
+### Stage 4 — Go public (same URL — a config change, not a rebuild)
+- [ ] *(Optional — only if you want a pristine feed)* Re-upload the off-repo pristine genesis master over `/data/local.db`. Stage-3 trusted-group test posts are permanent on-chain and otherwise stay visible in the feed (they're already excluded from earnings by `LAUNCH_TS`). Easy to forget — make it a deliberate step.
+- [ ] Remove the gate (unset `SITE_GATE_PASSWORD` / disable the middleware).
+- [ ] Complete §4 legal (lawyer pass on the 3 `[LAWYER]` hard clauses + fill the binding `[TODO]`s + register the DMCA agent) and §5 verification (smoke test + re-confirm `x-forwarded-for`).
+- [ ] Advertise. Done — no domain switch, no data or identity discontinuity.
 
 ### Railway gotchas (know these before the first deploy)
 - **Build:** `railway.toml` is set to `nixpacks`, but a `Dockerfile` (which installs `python3 make g++` to compile the native `better-sqlite3`) also exists. On the FIRST deploy, **watch the build log confirm `better-sqlite3` compiled**; if it fails, switch the builder to the Dockerfile.
@@ -46,6 +74,7 @@
 - [ ] `CONTENT_DENYLIST` — illegal-floor pre-publish filter (Phase 3). **MUST be set before public launch** (unset = permissive/no filtering). Patterns one-per-line or comma-separated; `/regex/` or substring. Scope to ILLEGAL content only. NOT committed.
 - [ ] `LAUNCH_TS` — **BLOCKING: set to the TRUE launch instant, in UTC, format `YYYY-MM-DD HH:MM:SS`.** It's the pool epoch: posts before it (the genesis seed + all pre-launch/test posts) are excluded from the 80% pool + the boot-price count so the pool starts fresh; they still earn the 15% creator bonus on boosts. **Unset = a far-future sentinel → the pool never opens (empty pool, floor price).** Fail-closed is deliberate (never leaks pre-launch posts into payouts), but that means forgetting this = nobody earns pool share. Must be UTC (a local-time value silently shifts the epoch).
 - [ ] `HEALTH_TOKEN` — bearer token gating `GET /api/health` (Phase 5). Set a long random string; you'll put it in the UptimeRobot URL.
+- [ ] `SITE_GATE_PASSWORD` — the Basic-Auth password for the quiet-launch gate (Stage 2/3 middleware). Set a strong shared secret; share it with the trusted group. **Unset it (or disable the middleware) at Stage 4 to go public.** The gate exempts `/api/health` so UptimeRobot + Railway's healthcheck still work.
 - [ ] `DATABASE_PATH=/data/local.db` — points SQLite at the mounted volume (see §2).
 - [ ] *(optional)* `SERVER_DAILY_SPEND_SATS` — daily server-wallet spend ceiling (default ~1,721,170 = ~$0.20/day). Tune or leave default.
 - [ ] *(optional)* `ONCHAIN_POST_IP_LIMIT` — per-IP daily on-chain post cap (default 200). Tune or leave default.
