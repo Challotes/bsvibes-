@@ -58,6 +58,7 @@
 
 - [ ] **Fund the server wallet** — send some sats to the `BSV_SERVER_WIF` address (covers free boosts + post-logging fees; ~66 sats/post, ~1,000+ sats/free boost). Watch the low-balance alert (§3) and top up.
 - [ ] **Mounted volume** for the SQLite DB at `/data` (so the DB survives redeploys), matching `DATABASE_PATH`.
+- [ ] **Ship the pre-built genesis DB** — the launch DB (2,006 posts = 98 kept + 1,908 genesis, all on-chain, chronological ids, empty bootboard) is built and kept **off-repo** (not committed — it's the data, and it's large). Upload it to the volume as `/data/local.db` **before serving publicly**, so the feed shows the full genesis history from first load. Do this before the app boot-creates an empty DB on a fresh volume (if it already did, overwrite the empty file). The pristine master lives in the off-repo genesis-ops working copy.
 - [ ] **Trusted proxy must set `x-forwarded-for` / `x-real-ip`** — Railway does this by default. **Every per-IP control depends on it** (the 200/day post cap, free-boot cap, all route rate limits). If a deploy ever strips both headers, header-less requests share one bucket → free boots silently all become paid and posts can hit a shared daily cap. Verify after first deploy by checking a couple of requests carry a real client IP.
 
 ## 3. External services

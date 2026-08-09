@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-08-09 — Genesis SEEDED ON-CHAIN + launch DB finalized
+
+- **Genesis seeding COMPLETE.** Built + agent-audited + ran the off-repo seed script (Script B): all **1,908 genesis posts are now permanently on-chain** in ~40 batched, self-chained OP_RETURN transactions. Each record is the canonical `opencook`/`post` v1 envelope + `genesis:true` + the real backdated `posted_at` (unsigned / operator-attested by the recovered pubkey). Funded from the server wallet's UTXOs; total fee ~a few cents. Verified end-to-end: the launch DB shows 0 un-seeded rows, and the origin post (id 1, the founding *"how can we set bsv apart…"* message) decodes clean on-chain. The seed scripts are off-repo ops tools — **no repo code changed this session.**
+- **Two money-path fixes during the run (both agent-audited SHIP):** (1) broadcast via an explicit ARC broadcaster with a fetch HTTP client — the ESM SDK's default HTTP client resolves to a noop in a standalone script; (2) fee rate 100→110 sat/kB — at 100, ~11% of 50-output batches landed 1 sat under ARC's floor (DER-signature-length variance on the ceil boundary → error 465). Resume was flawless (keyed on `tx_id IS NULL`, checkpoint-after-success).
+- **Launch DB finalized.** Rebuilt from the owner's ver4 curation (offchain trimmed ~112 posts) → **2,006 posts (98 kept + 1,908 genesis)**, chronological ids. Swapped the genesis DB in as the local dev DB (old test DB backed up) so `npm run dev` shows the real feed; the pristine master stays off-repo for deploy.
+- **Server-wallet: dedicate a fresh key before launch (deploy item).** Confirmed the current `BSV_SERVER_WIF` is a reused multi-purpose hot wallet, not a dedicated key. Genesis is unaffected (immutable; a funder switch is invisible to readers — no re-seed). Full ops detail is in local notes (kept off-repo per the server-key policy).
+- **Still for deploy (Phase 9):** dedicate the server key → ship the launch DB to the Railway volume → work LAUNCH_CHECKLIST → push the stacked commits (unchanged this session).
+
 ## 2026-08-04 — Genesis feed polish (remove hardcoded sample, badge the real first post)
 
 - **Removed the hardcoded genesis sample.** `Genesis.tsx` was a wrapper = `Manifesto` (vision) + a hardcoded founding-conversation snippet (`data/genesis.ts`). Now that the real founding conversation is seeded into the feed as genesis posts, the hardcoded copy is redundant. `PostList` now renders `<Manifesto>` directly as the top cap; **deleted `Genesis.tsx` + `data/genesis.ts`** (−141 lines). The header "Genesis/Origin" jump button is separate wiring, untouched.
