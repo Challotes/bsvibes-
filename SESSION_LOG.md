@@ -2,6 +2,14 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-08-10 — Deploy Stage 1 (Railway shakeout) + Stage 2 code prep
+
+- **Railway shakeout (Stage 1) — SUCCESS.** First real deploy to Railway (throwaway, `BSV_SERVER_WIF` unset → no chain writes). Fixed one blocker: removed the Docker `VOLUME ["/data"]` instruction (Railway rejects it — "use Railway Volumes"). Confirmed end-to-end: Dockerfile builds (`better-sqlite3` compiles), app serves, the `/data` Volume mounts (must attach in the dashboard **and** redeploy — the `[deploy.volumes]` TOML alone doesn't), `/api/health` returns proper JSON (a `503` with `no_server_wif` is correct with no wallet). Decided to keep this project and promote it into the real deploy rather than rebuild.
+- **Quiet-launch approach — noindex, NO password gate** (two-agent reviewed; owner chose the lower-friction path). Built env-driven `noindex`: new `src/app/robots.ts` + a `robots` meta in `layout.tsx`, both gated on `ALLOW_INDEXING` (default off = noindex; set `true` at go-public). A Basic-Auth `middleware.ts` was designed then dropped — the wallet is already bounded by the per-IP/daily-spend caps and the browser popup is real friction for invitees. See DECISIONS "Quiet launch: noindex, no password gate".
+- **Fee-rate bump (money path, BSV-agent-verified):** all three `SatoshisPerKilobyte(100)` → `110` (`wallet.ts` server paths + `client-boot.ts` paid-boot + consolidation) — fixes the 1-sat ARC error-465 rejection (DER sig-length variance tips the pre-signing fee 1 sat under floor) that hit ~11% of genesis-seed batches at 100. Build + 161 unit tests green; no test pinned the fee.
+- **Docs:** LAUNCH_CHECKLIST rewritten to the no-gate/noindex flow, Railway gotchas updated with the shakeout learnings (Dockerfile wins over nixpacks, dashboard Volume required, healthcheck stays `/` because `/api/health` 503s by design); DECISIONS + `.env.example` (`ALLOW_INDEXING`) updated.
+- **Still next:** Stage 2's dedicated server key (owner key op) → Stage 3 real deploy (ship genesis DB, set env vars, point `opencook.fun`).
+
 ## 2026-08-09 — Genesis SEEDED ON-CHAIN + launch DB finalized
 
 - **Genesis seeding COMPLETE.** Built + agent-audited + ran the off-repo seed script (Script B): all **1,908 genesis posts are now permanently on-chain** in ~40 batched, self-chained OP_RETURN transactions. Each record is the canonical `opencook`/`post` v1 envelope + `genesis:true` + the real backdated `posted_at` (unsigned / operator-attested by the recovered pubkey). Funded from the server wallet's UTXOs; total fee ~a few cents. Verified end-to-end: the launch DB shows 0 un-seeded rows, and the origin post (id 1, the founding *"how can we set bsv apart…"* message) decodes clean on-chain. The seed scripts are off-repo ops tools — **no repo code changed this session.**

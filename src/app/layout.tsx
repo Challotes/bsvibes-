@@ -52,6 +52,12 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
   },
+  // Search-engine indexing is OFF until ALLOW_INDEXING=true (early-access / quiet
+  // launch — keeps a rough opencook.fun out of Google). Going public = set that
+  // env var, no code change. See LAUNCH_CHECKLIST Stage 4. Kept in sync with
+  // app/robots.ts.
+  robots:
+    process.env.ALLOW_INDEXING === "true" ? undefined : { index: false, follow: false },
 };
 
 export default function RootLayout({

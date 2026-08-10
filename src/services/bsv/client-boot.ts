@@ -478,8 +478,11 @@ async function _clientSideBootInner(
     });
 
     // ── Fee calculation and signing ─────────────────────────
-    // 100 sat/kb — GorillaPool's official mining minimum per ARC policy.
-    await tx.fee(new SatoshisPerKilobyte(100));
+    // 110 sat/kb. ARC floor is 100, but tx.fee() sizes the fee pre-signing while
+    // DER signature length varies (71/72 bytes), so 100 can land 1 sat under the
+    // floor after signing → ARC error 465. 110 adds rounding headroom (verified
+    // during genesis seeding: 0 rejections at 110 vs ~11% at 100).
+    await tx.fee(new SatoshisPerKilobyte(110));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 sats.
@@ -713,8 +716,10 @@ export async function consolidateUtxos(
       change: true,
     });
 
-    // 100 sat/kb — uniform rate across all tx paths
-    await tx.fee(new SatoshisPerKilobyte(100));
+    // 110 sat/kb — uniform rate across all tx paths (ARC floor is 100; the extra
+    // 10 absorbs pre-signing fee-rounding vs variable DER sig length → avoids the
+    // 1-sat ARC error-465 rejection).
+    await tx.fee(new SatoshisPerKilobyte(110));
     await tx.sign();
 
     // NOTE: No optimistic blacklisting for consolidation. Unlike clientSideBoot
@@ -723,7 +728,7 @@ export async function consolidateUtxos(
     // entire wallet. Only blacklist on success — on failure, user retries once
     // conflicting txs confirm and WoC stops returning them.
 
-    // ARC (SDK default) at 100 sat/kb — consistent with all other broadcast paths.
+    // ARC (SDK default) at 110 sat/kb — consistent with all other broadcast paths.
     // Previously used WoC due to a local DNS issue misattributed to ARC.
     let broadcastResult: Awaited<ReturnType<typeof tx.broadcast>>;
     try {

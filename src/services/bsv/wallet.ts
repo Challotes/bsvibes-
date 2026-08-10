@@ -336,10 +336,12 @@ async function _buildAndBroadcastInner(
       change: true,
     });
 
-    // Explicit 100 sat/kB fee — matches the live ARC miner floor (GorillaPool
-    // miningFee = 100 sat / 1000 bytes, verified 2026-06-19), so txs always clear
-    // the floor without a per-tx policy round-trip.
-    await tx.fee(new SatoshisPerKilobyte(100));
+    // Explicit 110 sat/kB fee. The ARC miner floor is 100 sat/kB, but tx.fee()
+    // sizes the fee on the PRE-signing tx while DER signature length varies
+    // (71 vs 72 bytes), so a fee computed at exactly 100 can land 1 sat under the
+    // floor after signing → ARC error 465 (hit ~11% of genesis-seed batches at
+    // 100; 0 rejections at 110). The extra 10% is rounding headroom.
+    await tx.fee(new SatoshisPerKilobyte(110));
     await tx.sign();
 
     // If the fee consumed all remaining funds the change output will have 0 satoshis.

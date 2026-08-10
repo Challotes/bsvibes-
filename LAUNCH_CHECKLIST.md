@@ -35,32 +35,32 @@ Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. 
 - [ ] Delete the throwaway project (or keep as a staging toy). Nothing here touched the chain.
 
 ### Stage 2 — Code prep for the real deploy (in the repo, before going live)
+- [x] **Env-driven noindex** (DONE 2026-08-10) — search-indexing is OFF by default; `src/app/robots.ts` + the `robots` meta in `layout.tsx` both gate on `ALLOW_INDEXING`. Keeps a rough `opencook.fun` out of Google during the quiet phase. Reverse at **Stage 4** by setting `ALLOW_INDEXING=true`. **No Basic-Auth password gate** — deliberately skipped for a small trusted quiet launch (the browser popup adds real friction; the wallet is already bounded by the per-IP/daily-spend caps, and `CONTENT_DENYLIST` guards the permanent chain). See DECISIONS "Quiet launch: noindex, no password gate".
+- [x] **Fee-rate bump** (DONE 2026-08-10) — all three `SatoshisPerKilobyte(100)` → `110` (`wallet.ts` server paths + `client-boot.ts` ×2), fixing the 1-sat ARC error-465 rejection seen during genesis seeding. BSV-agent-verified; build + 161 unit tests green.
 - [ ] **Dedicated server key** — generate a FRESH BSV key (never a personal wallet; see §1 `BSV_SERVER_WIF`). Owner runs the key op in their own terminal; the WIF never goes in a committed file.
-- [ ] **Basic-Auth gate `middleware.ts`** (net-new, ~15 lines, no library) — HTTP Basic-Auth against `SITE_GATE_PASSWORD`, gating the whole site **EXCEPT `/api/health`**. **MANDATORY** (not "just don't advertise"): it 401s crawlers (protects the apex's first impression while the build is rough) and shields the funded wallet during the quiet phase.
-- [ ] **Two-part health fix — do BOTH or the deploy restart-loops:** change `railway.toml` `healthcheckPath` from `/` → `/api/health`, **AND** exempt `/api/health` in the middleware matcher. (Railway's own healthcheck sends no credentials; if the gate covers it, it 401s → "unhealthy" → restart loop.)
-- [ ] **`public/robots.txt`** — allow `/`, disallow `/api/` (belt-and-suspenders behind the gate; none exists today).
-- [ ] **Fee-rate bump** — `src/services/bsv/wallet.ts` `SatoshisPerKilobyte(100)` → `110` (the same 1-sat ARC-rejection bug hit during genesis seeding; agent-verify the money path).
-- [ ] Commit + push.
+- [ ] Commit + push. *(noindex + fee bump already committed.)*
 
 ### Stage 3 — Real gated quiet launch on `opencook.fun`
 - [ ] Connect the repo to the real Railway project; add the **Volume** at `/data`; `DATABASE_PATH=/data/local.db`.
 - [ ] **Ship the pre-built genesis DB** → `/data/local.db` (see §2) BEFORE first serve.
-- [ ] Set ALL env vars from §1 — the **dedicated** `BSV_SERVER_WIF`, `LAUNCH_TS` (UTC!), `CONTENT_DENYLIST`, `SITE_GATE_PASSWORD`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `HEALTH_TOKEN`, `DATABASE_PATH`. Leave `BSV_WALLET_SPEND_DISABLED` unset; don't set `PORT`.
+- [ ] Set ALL env vars from §1 — the **dedicated** `BSV_SERVER_WIF`, `LAUNCH_TS` (UTC!), `CONTENT_DENYLIST`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `HEALTH_TOKEN`, `DATABASE_PATH`. **Leave `ALLOW_INDEXING` UNSET** (noindex stays on during the quiet phase). Leave `BSV_WALLET_SPEND_DISABLED` unset; don't set `PORT`.
 - [ ] **Fund the (dedicated) server wallet** (§2).
 - [ ] **Point `opencook.fun` (+ `www`)** at the service (Railway → Settings → Networking → Custom Domain → add the records it shows at your DNS provider; SSL auto-provisions).
-- [ ] Confirm the gate is live: the site prompts for the password; `GET /api/health` does NOT.
+- [ ] Confirm **noindex is active**: `GET https://opencook.fun/robots.txt` shows `Disallow: /` (indexing blocked until Stage 4).
 - [ ] **UptimeRobot** on `https://opencook.fun/api/health?token=<HEALTH_TOKEN>` (§3).
 - [ ] **Legal minimum** *(practical risk framing, NOT legal advice)*: `CONTENT_DENYLIST` set; fill the cheap `[TODO]`s — **contact email + effective date** (⚠️ operator's real legal name goes in the DEPLOYED copy ONLY — never the repo, Hard Rule #6); confirm the **PermanenceGate** fires before the first post.
-- [ ] Invite the trusted group to the real URL + gate password. Their accounts persist here forever — no migration.
+- [ ] Invite the trusted group to the real URL (unadvertised — no password gate). Their accounts persist here forever — no migration.
 
 ### Stage 4 — Go public (same URL — a config change, not a rebuild)
 - [ ] *(Optional — only if you want a pristine feed)* Re-upload the off-repo pristine genesis master over `/data/local.db`. Stage-3 trusted-group test posts are permanent on-chain and otherwise stay visible in the feed (they're already excluded from earnings by `LAUNCH_TS`). Easy to forget — make it a deliberate step.
-- [ ] Remove the gate (unset `SITE_GATE_PASSWORD` / disable the middleware).
+- [ ] **Set `ALLOW_INDEXING=true`** — reverses the quiet-launch noindex so Google can crawl/index the site. ⚠️ Don't forget this, or the public site stays invisible to search. (`GET /robots.txt` should flip to `Allow: /` / `Disallow: /api/`.)
 - [ ] Complete §4 legal (lawyer pass on the 3 `[LAWYER]` hard clauses + fill the binding `[TODO]`s + register the DMCA agent) and §5 verification (smoke test + re-confirm `x-forwarded-for`).
 - [ ] Advertise. Done — no domain switch, no data or identity discontinuity.
 
 ### Railway gotchas (know these before the first deploy)
-- **Build:** `railway.toml` is set to `nixpacks`, but a `Dockerfile` (which installs `python3 make g++` to compile the native `better-sqlite3`) also exists. On the FIRST deploy, **watch the build log confirm `better-sqlite3` compiled**; if it fails, switch the builder to the Dockerfile.
+- **Build (CONFIRMED on the 2026-08-10 shakeout):** Railway uses the **`Dockerfile`** (which installs `python3 make g++` to compile `better-sqlite3`), NOT the `nixpacks` line in `railway.toml` — the Dockerfile wins. `better-sqlite3` compiles cleanly this way. The Docker `VOLUME` instruction was **removed** (Railway rejects it — "use Railway Volumes"); persistent storage is the dashboard Volume, not a Docker VOLUME.
+- **Volume must be attached in the DASHBOARD + then redeploy.** The `[deploy.volumes]` line in `railway.toml` alone does NOT mount it (confirmed — the shakeout 500'd with "directory does not exist" until the Volume was attached at `/data` via the dashboard and the service was redeployed).
+- **Keep `healthcheckPath = "/"` — do NOT point it at `/api/health`.** `/api/health` intentionally returns **503** on operational issues (low balance, no wallet), which would fail Railway's deploy healthcheck and restart-loop. `/` returns 200 whenever the app + DB are up. (`/api/health` is for the external UptimeRobot monitor, which alerts on non-200 — that's the point there.)
 - **DB backups are thin on Railway** — set up a simple periodic copy of `/data/local.db` off-box (it holds posts + earnings).
 - **`x-forwarded-for`** — verify on the first real deploy that requests carry a genuine client IP (the cloudflared-tunnel testing masked this); every per-IP cap depends on it.
 - **In-memory caps** (daily spend, rate-limit windows) reset on every redeploy — documented + acceptable; just don't be surprised by a burst of redeploys near launch.
@@ -74,7 +74,7 @@ Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. 
 - [ ] `CONTENT_DENYLIST` — illegal-floor pre-publish filter (Phase 3). **MUST be set before public launch** (unset = permissive/no filtering). Patterns one-per-line or comma-separated; `/regex/` or substring. Scope to ILLEGAL content only. NOT committed.
 - [ ] `LAUNCH_TS` — **BLOCKING: set to the TRUE launch instant, in UTC, format `YYYY-MM-DD HH:MM:SS`.** It's the pool epoch: posts before it (the genesis seed + all pre-launch/test posts) are excluded from the 80% pool + the boot-price count so the pool starts fresh; they still earn the 15% creator bonus on boosts. **Unset = a far-future sentinel → the pool never opens (empty pool, floor price).** Fail-closed is deliberate (never leaks pre-launch posts into payouts), but that means forgetting this = nobody earns pool share. Must be UTC (a local-time value silently shifts the epoch).
 - [ ] `HEALTH_TOKEN` — bearer token gating `GET /api/health` (Phase 5). Set a long random string; you'll put it in the UptimeRobot URL.
-- [ ] `SITE_GATE_PASSWORD` — the Basic-Auth password for the quiet-launch gate (Stage 2/3 middleware). Set a strong shared secret; share it with the trusted group. **Unset it (or disable the middleware) at Stage 4 to go public.** The gate exempts `/api/health` so UptimeRobot + Railway's healthcheck still work.
+- [ ] `ALLOW_INDEXING` — controls search-engine indexing. **Leave UNSET during the quiet launch** (default = noindex: `app/robots.ts` serves `Disallow: /` and `layout.tsx` emits a `noindex` meta). **Set to `true` at Stage 4** to let Google index the public site. No password gate is used (see DECISIONS "Quiet launch: noindex, no password gate").
 - [ ] `DATABASE_PATH=/data/local.db` — points SQLite at the mounted volume (see §2).
 - [ ] *(optional)* `SERVER_DAILY_SPEND_SATS` — daily server-wallet spend ceiling (default ~1,721,170 = ~$0.20/day). Tune or leave default.
 - [ ] *(optional)* `ONCHAIN_POST_IP_LIMIT` — per-IP daily on-chain post cap (default 200). Tune or leave default.
