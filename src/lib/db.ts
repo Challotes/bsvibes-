@@ -38,35 +38,38 @@ try {
     )
   `);
 
-  // Migrate bootboard: add boosted_by_name column if missing.
-  // boosted_by now stores the BSV address (stable ID for queries),
-  // boosted_by_name stores the display name (anon_XXXX).
-  const bootboardCols = db.prepare("PRAGMA table_info(bootboard)").all() as { name: string }[];
-  const bootboardColNames = bootboardCols.map((c) => c.name);
-  if (!bootboardColNames.includes("boosted_by_name")) {
-    db.exec("ALTER TABLE bootboard ADD COLUMN boosted_by_name TEXT");
-    // Back-fill: existing rows stored the display name in boosted_by,
-    // so copy it to boosted_by_name (address unknown for old rows).
+  // ALTER TABLE ADD COLUMN is NOT idempotent, and `next build` collects page
+  // data across many parallel worker processes that each import this module and
+  // run these migrations against the SAME database file. On a FRESH db they race
+  // — two workers both see a column missing and both ADD it → "duplicate column
+  // name" (this broke the Railway build on a fresh /data). Guard each add so a
+  // lost race is a harmless no-op; the column ends up present either way.
+  const addColumnIfMissing = (table: string, column: string, definition: string): boolean => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (cols.some((c) => c.name === column)) return false;
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+      return true;
+    } catch (err) {
+      // Another process won the race and added it first — the column now exists,
+      // which is exactly what we wanted. Re-throw anything that ISN'T that.
+      if (err instanceof Error && /duplicate column name/i.test(err.message)) return false;
+      throw err;
+    }
+  };
+
+  // bootboard.boosted_by_name — display name (anon_XXXX); boosted_by holds the
+  // BSV address (stable ID for queries). Back-fill copies the old display name.
+  if (addColumnIfMissing("bootboard", "boosted_by_name", "boosted_by_name TEXT")) {
     db.exec("UPDATE bootboard SET boosted_by_name = boosted_by WHERE boosted_by_name IS NULL");
   }
-  // Migrate bootboard: add is_free column if missing.
-  // is_free = 1 means the server paid for this boot (user used a free boot grant).
-  // is_free = 0 means the user paid out of their own wallet.
-  // Back-fill: existing rows pre-date this column, treat as paid (conservative — avoids hiding real costs).
-  if (!bootboardColNames.includes("is_free")) {
-    db.exec("ALTER TABLE bootboard ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0");
-  }
+  // bootboard.is_free — 1 = server-funded free boot, 0 = user-paid. Existing rows
+  // pre-date this column; the DEFAULT 0 treats them as paid (conservative).
+  addColumnIfMissing("bootboard", "is_free", "is_free INTEGER NOT NULL DEFAULT 0");
 
-  // Migrate: add columns if they don't exist yet
-  const columns = db.prepare("PRAGMA table_info(posts)").all() as { name: string }[];
-  const columnNames = columns.map((c) => c.name);
-
-  if (!columnNames.includes("signature")) {
-    db.exec("ALTER TABLE posts ADD COLUMN signature TEXT");
-  }
-  if (!columnNames.includes("pubkey")) {
-    db.exec("ALTER TABLE posts ADD COLUMN pubkey TEXT");
-  }
+  // posts.signature / posts.pubkey — added after the original posts schema.
+  addColumnIfMissing("posts", "signature", "signature TEXT");
+  addColumnIfMissing("posts", "pubkey", "pubkey TEXT");
 
   // Boot grants — free boot tracking per user (no custody)
   db.exec(`
