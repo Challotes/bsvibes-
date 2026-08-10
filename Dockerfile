@@ -11,9 +11,8 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Persistent volume mount point for the SQLite file
-VOLUME ["/data"]
-
+# NOTE: /data is provided by a Railway Volume (configured in the Railway dashboard),
+# NOT a Docker VOLUME instruction — Railway rejects `VOLUME` at build time.
 ENV DATABASE_PATH=/data/local.db
 ENV NODE_ENV=production
 
