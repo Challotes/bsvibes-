@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prestart": "node scripts/seed-if-empty.mjs",
     "start": "next start",
     "lint": "biome check .",
     "format": "biome format --write .",

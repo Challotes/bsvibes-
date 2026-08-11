@@ -3,11 +3,11 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-# NOTE: this startCommand OVERRIDES the Dockerfile CMD, so the genesis seed step
-# MUST live here (not only in the Dockerfile) or it silently never runs. It
-# copies seed/genesis.db into the volume on first boot (copy-if-empty), then
-# starts the app. `;` (not `&&`) so a seed hiccup can't block startup.
-startCommand = "node scripts/seed-if-empty.mjs; npm start"
+# Railway runs startCommand WITHOUT a shell, so a compound "a; b" breaks (node
+# gets "scripts/…;" as a filename and nothing serves). The genesis seed runs via
+# the npm `prestart` hook (package.json), which npm sequences before `start` — so
+# a plain "npm start" here both seeds and starts, no shell needed.
+startCommand = "npm start"
 healthcheckPath = "/"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
