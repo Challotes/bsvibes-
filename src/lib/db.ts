@@ -12,6 +12,14 @@ try {
 }
 
 try {
+  // Concurrency guard for `next build`: it collects page data across ~31 worker
+  // processes that each import this module and run schema init against the SAME
+  // fresh DB file. Without this, two writers collide → "database is locked".
+  // busy_timeout makes a blocked writer WAIT (up to 10s) for the lock instead of
+  // throwing immediately, so the parallel inits serialize cleanly. Set FIRST, so
+  // even the journal_mode/DDL writes below honor it. (Runtime is single-process,
+  // so this is effectively a no-op there.)
+  db.pragma("busy_timeout = 10000");
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
