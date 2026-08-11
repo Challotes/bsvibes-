@@ -129,10 +129,10 @@ Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. 
 - [ ] **Build an instant runtime kill-switch toggle** (DB/Redis-backed) — `BSV_WALLET_SPEND_DISABLED` needs a redeploy to take effect = minutes of exposure during a live wallet drain.
 - [ ] **OG image (1200×630) + `metadataBase` + `og:url`** in `layout.tsx` — shared links are blank cards otherwise (matters for a share-driven launch).
 - [ ] **Error monitoring** (Sentry, or a Railway → Logtail/BetterStack log drain) — `console.error` into 7-day Railway logs is the only signal today.
-- [ ] **DB backup off Railway** (cron dump of `/data/local.db` → S3/R2/Backblaze) — the SQLite file is the only copy of contributor earnings.
+- [ ] **Off-Railway DB backup — set up early (before real users/earnings accrue).** *(Parked 2026-08-11 — not launch-day-blocking, but do it soon after.)* The Railway volume `/data/local.db` is the only *convenient* copy of live data (new posts + earnings + bootboard). Genesis is safe regardless (repo `seed/genesis.db` + on-chain + volume), and **every post's content is permanently on-chain** (ultimate backstop) — but rebuilding the working DB from a chain scan is a recovery *project*, not a click. So schedule a simple periodic copy of `/data/local.db` → R2 / S3 / Backblaze (Railway cron or a GitHub Action). ~30 min. NOTE: the genesis seed is copy-if-empty, so restoring a backup = drop the file on the volume and redeploy (the seed won't overwrite a DB that has posts).
 - [ ] **Broadcast-proxy / ARC failover** (`/api/broadcast`, Phase 6.5) — a single ARC provider is a SPOF that halts ALL boosts (free + paid) during an outage.
 - [ ] **`anon_XXXX` handle collisions** (FUTURE.md "before launch" item — ~1% collision at 184 users).
-- [ ] **`robots.txt`** (allow `/`, disallow `/api/`).
+- [x] **`robots.txt`** — DONE: env-driven `src/app/robots.ts` (noindex `Disallow: /` until `ALLOW_INDEXING=true`, then `Allow: /` + `Disallow: /api/`).
 - [ ] **Legal (public):** the ~1hr lawyer pass on the 3 hard clauses (**CSAM/operator-as-broadcaster is #1** — your server signs every post, so it doesn't de-risk like the others); fill ALL binding `[TODO]`s; remove the "Draft — not final" banner + flip docs in-force; age-gate decision; lawyer look at the "earnings/real-money" UI framing; register the DMCA agent.
 
 ### NICE-TO-HAVE (debt)
