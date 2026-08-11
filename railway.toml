@@ -3,7 +3,11 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npm start"
+# NOTE: this startCommand OVERRIDES the Dockerfile CMD, so the genesis seed step
+# MUST live here (not only in the Dockerfile) or it silently never runs. It
+# copies seed/genesis.db into the volume on first boot (copy-if-empty), then
+# starts the app. `;` (not `&&`) so a seed hiccup can't block startup.
+startCommand = "node scripts/seed-if-empty.mjs; npm start"
 healthcheckPath = "/"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
