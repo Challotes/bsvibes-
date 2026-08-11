@@ -18,4 +18,8 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Seed the genesis DB into the volume on first boot (copy-if-empty; never
+# overwrites a DB that already has posts), then start the app. Uses `;` not `&&`
+# so a seed hiccup can never block the app from starting (it self-heals on the
+# next redeploy since the post count is still 0).
+CMD ["sh", "-c", "node scripts/seed-if-empty.mjs; npm start"]

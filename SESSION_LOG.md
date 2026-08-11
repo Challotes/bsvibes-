@@ -2,6 +2,13 @@
 
 > Short summaries of each working session. AI agents: add an entry before ending any significant session.
 
+## 2026-08-11 — Deploy Stage 3: DB race fix + server-key migration + genesis seed-on-boot
+
+- **DB migration race fix** (commit `619a5f9`): `next build`'s parallel workers raced on `ALTER TABLE ADD COLUMN` against a fresh DB → "duplicate column name" broke the Railway build. Made column-adds idempotent (swallow only that error, re-throw others). 3 fresh-DB builds + 161 tests green.
+- **Server-key migration DONE + verified live.** Generated a fresh dedicated key (`1HrC…`), swept the whole big coin (99,173,113 sats ~0.99 BSV, 22-sat fee) from the old shared wallet `12vyi…` via an agent-audited one-off sweep script (`scratchpad/fund-new-server.mjs`; dry-run → broadcast; WIF via env, never in chat); ~795 dust left behind. Set `BSV_SERVER_WIF` (+ `DATABASE_PATH`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`) in Railway Variables; `/api/health` returned `ok:true` / `balanceSats:99173113` / `addressConfigured:true`. App now runs on a clean dedicated wallet. Ignored a stale `E30_STALE_KEY_ENABLED` (dead flag). See memory `project_server_key_ops`.
+- **Genesis DB seed-on-boot built + agent-verified.** `seed/genesis.db` (824 KB, 2006 on-chain posts) committed to the repo; `scripts/seed-if-empty.mjs` (Dockerfile CMD, before `npm start`, `;` so it can't block startup) copies it into the Railway volume's `/data/local.db` on first boot — ONLY when missing/empty, and fails toward PRESERVING a corrupt/locked DB. Agent caught (a) the seed file being uncommitted (would silently no-op → empty feed) and (b) a `catch→seed` data-loss inversion; both fixed. 4 local cases pass: missing→seed, empty→seed, has-posts→preserve, corrupt→preserve. Docs: DECISIONS "Genesis DB seed-on-boot", LAUNCH_CHECKLIST §2, CLAUDE.md.
+- **Next:** push → Railway redeploys → genesis feed goes live (replaces the empty shakeout DB). Remaining Stage 3: point `opencook.fun`, `CONTENT_DENYLIST` before inviting posters, `LAUNCH_TS`/`ALLOW_INDEXING` at go-public, UptimeRobot.
+
 ## 2026-08-10 — Deploy Stage 1 (Railway shakeout) + Stage 2 code prep
 
 - **Railway shakeout (Stage 1) — SUCCESS.** First real deploy to Railway (throwaway, `BSV_SERVER_WIF` unset → no chain writes). Fixed one blocker: removed the Docker `VOLUME ["/data"]` instruction (Railway rejects it — "use Railway Volumes"). Confirmed end-to-end: Dockerfile builds (`better-sqlite3` compiles), app serves, the `/data` Volume mounts (must attach in the dashboard **and** redeploy — the `[deploy.volumes]` TOML alone doesn't), `/api/health` returns proper JSON (a `503` with `no_server_wif` is correct with no wallet). Decided to keep this project and promote it into the real deploy rather than rebuild.

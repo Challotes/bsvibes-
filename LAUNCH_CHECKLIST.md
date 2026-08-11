@@ -42,7 +42,7 @@ Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. 
 
 ### Stage 3 — Real gated quiet launch on `opencook.fun`
 - [ ] Connect the repo to the real Railway project; add the **Volume** at `/data`; `DATABASE_PATH=/data/local.db`.
-- [ ] **Ship the pre-built genesis DB** → `/data/local.db` (see §2) BEFORE first serve.
+- [x] **Genesis DB** — ships automatically via the committed `seed/genesis.db` + copy-on-first-boot (`scripts/seed-if-empty.mjs`); no manual upload. Just confirm the feed shows ~2,006 posts after the deploy (see §2).
 - [ ] Set ALL env vars from §1 — the **dedicated** `BSV_SERVER_WIF`, `LAUNCH_TS` (UTC!), `CONTENT_DENYLIST`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `HEALTH_TOKEN`, `DATABASE_PATH`. **Leave `ALLOW_INDEXING` UNSET** (noindex stays on during the quiet phase). Leave `BSV_WALLET_SPEND_DISABLED` unset; don't set `PORT`.
 - [ ] **Fund the (dedicated) server wallet** (§2).
 - [ ] **Point `opencook.fun` (+ `www`)** at the service (Railway → Settings → Networking → Custom Domain → add the records it shows at your DNS provider; SSL auto-provisions).
@@ -87,7 +87,7 @@ Goal: prove the deploy MECHANICS with no real domain, no funded key, a junk DB. 
 
 - [ ] **Fund the server wallet** — send some sats to the `BSV_SERVER_WIF` address (covers free boosts + post-logging fees; ~66 sats/post, ~1,000+ sats/free boost). Watch the low-balance alert (§3) and top up.
 - [ ] **Mounted volume** for the SQLite DB at `/data` (so the DB survives redeploys), matching `DATABASE_PATH`.
-- [ ] **Ship the pre-built genesis DB** — the launch DB (2,006 posts = 98 kept + 1,908 genesis, all on-chain, chronological ids, empty bootboard) is built and kept **off-repo** (not committed — it's the data, and it's large). Upload it to the volume as `/data/local.db` **before serving publicly**, so the feed shows the full genesis history from first load. Do this before the app boot-creates an empty DB on a fresh volume (if it already did, overwrite the empty file). The pristine master lives in the off-repo genesis-ops working copy.
+- [x] **Genesis DB ships AUTOMATICALLY (built 2026-08-11)** — `seed/genesis.db` (824 KB, 2,006 posts = 98 kept + 1,908 genesis, all on-chain) is **committed to the repo**, and `scripts/seed-if-empty.mjs` (run before `npm start` via the Dockerfile CMD) copies it into `/data/local.db` on first boot. It seeds ONLY when the target is missing/empty, so it NEVER overwrites a live DB — and fails toward PRESERVING a corrupt/locked DB rather than overwriting it. No manual upload. See DECISIONS "Genesis DB seed-on-boot". Just confirm the feed shows the genesis posts after the first deploy (it replaces the empty shakeout DB automatically).
 - [ ] **Trusted proxy must set `x-forwarded-for` / `x-real-ip`** — Railway does this by default. **Every per-IP control depends on it** (the 200/day post cap, free-boot cap, all route rate limits). If a deploy ever strips both headers, header-less requests share one bucket → free boots silently all become paid and posts can hit a shared daily cap. Verify after first deploy by checking a couple of requests carry a real client IP.
 
 ## 3. External services

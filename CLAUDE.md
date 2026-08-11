@@ -208,7 +208,10 @@ BootButton/useBoot → bootPost server action → server wallet builds split tx 
   - `BSV_WALLET_SPEND_DISABLED` — kill-switch (Phase 2 Build C). Set to `true`/`1` to halt ALL server-wallet spending in an emergency (wallet draining / WIF leaked). Free boots transparently route to PAID (no grant consumed — checked pre-consume in `executeBoot`), post-logging is skipped. Paid/client boots are UNAFFECTED. Env var = takes effect on redeploy (a DB-backed instant runtime toggle is a documented fast-follow). Default (unset) = spending enabled. See `wallet.ts` `isServerSpendDisabled()`.
   - `CONTENT_DENYLIST` — pre-publish content filter (Phase 3, illegal-floor only). Patterns (one per line / comma-separated; `/regex/` or case-insensitive substring) that reject a post in `createPost` BEFORE the DB insert + on-chain broadcast — the only point that can stop content reaching the immutable chain. Scope to ILLEGAL content only, not opinions (free-speech ethos). NOT committed (no slur dump in a public repo). Unset = permissive (no filtering) → MUST be set before a public launch. Best-effort + extensible, not comprehensive. See `lib/content-filter.ts` `screenContent()`.
   - `DATABASE_PATH` — defaults to `./local.db`. Railway: set to `/data/local.db` with a mounted volume.
+  - `ALLOW_INDEXING` — unset (default) = **noindex** (`app/robots.ts` serves `Disallow: /` + `layout.tsx` emits a noindex meta) for the quiet launch; set `true` to allow search indexing at go-public. No password gate is used — see DECISIONS "Quiet launch: noindex, no password gate".
   - `PORT` — Railway sets this automatically. Vercel ignores it.
+
+- **Genesis DB seed-on-boot.** `seed/genesis.db` (824 KB, 2006 on-chain posts) is committed; `scripts/seed-if-empty.mjs` (run before `npm start` via the Dockerfile CMD) copies it into `DATABASE_PATH` on first boot ONLY when the target is missing/empty — never overwrites a DB with posts, and fails toward preserving a corrupt/locked DB. This is how the launch feed reaches a fresh Railway volume. See DECISIONS "Genesis DB seed-on-boot".
 
 ## Development
 

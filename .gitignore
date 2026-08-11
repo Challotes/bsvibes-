@@ -45,6 +45,10 @@ local.db
 local.db-wal
 local.db-shm
 
+# Genesis seed: commit the DB itself (seed/genesis.db) but never its WAL sidecars
+seed/genesis.db-wal
+seed/genesis.db-shm
+
 # claude code local config
 .claude/
 
